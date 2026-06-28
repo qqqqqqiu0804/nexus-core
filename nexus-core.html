@@ -1,0 +1,2262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS CORE // 任务核心</title>
+<style>
+/* ============================================================
+   NEXUS CORE v1.0 - 赛博朋克个人任务面板
+   单文件 HTML/CSS/JS 应用，数据存 localStorage
+   ============================================================ */
+
+/* === CSS Variables === */
+:root {
+  --bg-deep: #0a0a0f;
+  --bg-panel: #111119;
+  --bg-card: #16161f;
+  --bg-hover: #1c1c28;
+  --border-subtle: #1e1e2e;
+  --border-glow: #00f0ff;
+  --text-primary: #e0e0e8;
+  --text-secondary: #8888a0;
+  --text-dim: #555568;
+  --neon-cyan: #00f0ff;
+  --neon-magenta: #ff00ff;
+  --neon-yellow: #ffe500;
+  --neon-green: #00ff88;
+  --neon-red: #ff3344;
+  --neon-purple: #b44dff;
+  --neon-orange: #ff8800;
+  --xp-bar: #00f0ff;
+  --font-mono: 'Courier New', 'Consolas', 'Monaco', monospace;
+  --font-sans: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --glow-cyan: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 30px rgba(0, 240, 255, 0.2);
+  --glow-magenta: 0 0 10px rgba(255, 0, 255, 0.5), 0 0 30px rgba(255, 0, 255, 0.2);
+}
+
+/* === Reset & Base === */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+/* === Canvas Background === */
+#bg-canvas {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 0; pointer-events: none;
+}
+
+/* === Scanlines Overlay === */
+.scanlines {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent, transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px, rgba(0, 0, 0, 0.03) 4px
+  );
+}
+
+/* === Main Container === */
+.app-container {
+  position: relative; z-index: 2;
+  max-width: 1100px; margin: 0 auto;
+  padding: 16px;
+}
+
+/* === Header === */
+.header {
+  text-align: center; padding: 24px 0 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 20px;
+  position: relative;
+}
+.header::after {
+  content: ''; position: absolute; bottom: -1px; left: 50%;
+  transform: translateX(-50%);
+  width: 60%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+  box-shadow: var(--glow-cyan);
+}
+.header-title {
+  font-family: var(--font-mono);
+  font-size: 2rem; font-weight: bold;
+  letter-spacing: 4px;
+  color: var(--neon-cyan);
+  text-shadow: var(--glow-cyan);
+  margin-bottom: 4px;
+}
+.header-subtitle {
+  font-family: var(--font-mono);
+  font-size: 0.75rem; color: var(--text-dim);
+  letter-spacing: 6px;
+}
+
+/* === Navigation === */
+.nav {
+  display: flex; gap: 4px; margin-bottom: 20px;
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 4px; flex-wrap: wrap;
+}
+.nav-btn {
+  flex: 1; min-width: 80px;
+  padding: 10px 16px; border: none;
+  background: transparent; color: var(--text-secondary);
+  font-family: var(--font-mono); font-size: 0.8rem;
+  cursor: pointer; border-radius: 4px;
+  transition: all 0.2s; letter-spacing: 1px;
+  white-space: nowrap;
+}
+.nav-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.nav-btn.active {
+  background: rgba(0, 240, 255, 0.1);
+  color: var(--neon-cyan);
+  box-shadow: inset 0 0 0 1px rgba(0, 240, 255, 0.3);
+}
+
+/* === Panel (Content Area) === */
+.panel {
+  display: none;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px; padding: 20px;
+  min-height: 500px;
+  position: relative;
+}
+.panel.active { display: block; }
+.panel::before {
+  content: ''; position: absolute; top: -1px; left: 20px; right: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.3), transparent);
+}
+
+/* === Cards === */
+.card {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 16px; margin-bottom: 12px;
+  transition: all 0.2s;
+}
+.card:hover { border-color: rgba(0, 240, 255, 0.3); }
+.card-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.card-title {
+  font-family: var(--font-mono); font-size: 0.9rem;
+  color: var(--neon-cyan); letter-spacing: 1px;
+}
+.card-subtitle { font-size: 0.75rem; color: var(--text-dim); }
+
+/* === Progress Bar === */
+.progress-bar {
+  height: 6px; background: var(--bg-deep); border-radius: 3px;
+  overflow: hidden; margin: 8px 0;
+}
+.progress-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+  transition: width 0.5s ease;
+}
+
+/* === Status Badge === */
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 3px;
+  font-family: var(--font-mono); font-size: 0.65rem; letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.badge-cyan { background: rgba(0,240,255,0.15); color: var(--neon-cyan); border: 1px solid rgba(0,240,255,0.3); }
+.badge-magenta { background: rgba(255,0,255,0.15); color: var(--neon-magenta); border: 1px solid rgba(255,0,255,0.3); }
+.badge-green { background: rgba(0,255,136,0.15); color: var(--neon-green); border: 1px solid rgba(0,255,136,0.3); }
+.badge-yellow { background: rgba(255,229,0,0.15); color: var(--neon-yellow); border: 1px solid rgba(255,229,0,0.3); }
+.badge-red { background: rgba(255,51,68,0.15); color: var(--neon-red); border: 1px solid rgba(255,51,68,0.3); }
+.badge-purple { background: rgba(180,77,255,0.15); color: var(--neon-purple); border: 1px solid rgba(180,77,255,0.3); }
+.badge-orange { background: rgba(255,136,0,0.15); color: var(--neon-orange); border: 1px solid rgba(255,136,0,0.3); }
+
+/* === Buttons === */
+.btn {
+  padding: 8px 16px; border: 1px solid var(--border-subtle);
+  background: var(--bg-card); color: var(--text-secondary);
+  font-family: var(--font-mono); font-size: 0.75rem;
+  border-radius: 4px; cursor: pointer;
+  letter-spacing: 1px; transition: all 0.2s;
+}
+.btn:hover { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.btn-primary {
+  background: rgba(0,240,255,0.1); border-color: rgba(0,240,255,0.4);
+  color: var(--neon-cyan);
+}
+.btn-primary:hover {
+  background: rgba(0,240,255,0.2);
+  box-shadow: var(--glow-cyan);
+}
+.btn-danger { border-color: rgba(255,51,68,0.4); color: var(--neon-red); }
+.btn-danger:hover { background: rgba(255,51,68,0.1); }
+.btn-sm { padding: 4px 10px; font-size: 0.65rem; }
+
+/* === Forms === */
+input, select, textarea {
+  background: var(--bg-deep); border: 1px solid var(--border-subtle);
+  color: var(--text-primary); font-family: var(--font-sans);
+  font-size: 0.85rem; padding: 8px 12px; border-radius: 4px;
+  width: 100%; outline: none; transition: border-color 0.2s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.2);
+}
+textarea { resize: vertical; min-height: 60px; }
+select { cursor: pointer; appearance: none; }
+select option { background: var(--bg-panel); color: var(--text-primary); }
+label {
+  display: block; font-size: 0.75rem; color: var(--text-secondary);
+  margin-bottom: 4px; font-family: var(--font-mono); letter-spacing: 1px;
+}
+.form-group { margin-bottom: 12px; }
+.form-row { display: flex; gap: 12px; }
+.form-row .form-group { flex: 1; }
+
+/* === Grid Layouts === */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+/* === Stats Row === */
+.stats-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 16px; text-align: center;
+  position: relative; overflow: hidden;
+}
+.stat-card::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+  opacity: 0.5;
+}
+.stat-value {
+  font-family: var(--font-mono); font-size: 1.5rem; font-weight: bold;
+  color: var(--neon-cyan); text-shadow: var(--glow-cyan);
+}
+.stat-label { font-size: 0.7rem; color: var(--text-dim); letter-spacing: 2px; margin-top: 4px; }
+
+/* === Level Display === */
+.level-display {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px; background: var(--bg-card);
+  border: 1px solid var(--border-subtle); border-radius: 6px;
+  margin-bottom: 20px;
+}
+.level-badge {
+  width: 60px; height: 60px; border-radius: 50%;
+  border: 2px solid var(--neon-cyan);
+  box-shadow: var(--glow-cyan);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 1.5rem; font-weight: bold;
+  color: var(--neon-cyan); flex-shrink: 0;
+}
+.level-info { flex: 1; }
+.level-title {
+  font-family: var(--font-mono); font-size: 0.85rem;
+  color: var(--neon-magenta); letter-spacing: 2px;
+  text-shadow: var(--glow-magenta);
+}
+.level-xp { font-size: 0.7rem; color: var(--text-dim); margin-top: 4px; }
+
+/* === Task List === */
+.task-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; background: var(--bg-card);
+  border: 1px solid var(--border-subtle); border-radius: 6px;
+  margin-bottom: 6px; transition: all 0.2s;
+  cursor: pointer;
+}
+.task-item:hover { border-color: rgba(0, 240, 255, 0.3); }
+.task-item.completed { opacity: 0.5; }
+.task-item.completed .task-title { text-decoration: line-through; }
+.task-check {
+  width: 20px; height: 20px; border: 2px solid var(--border-subtle);
+  border-radius: 3px; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; font-size: 0.7rem;
+}
+.task-check:hover { border-color: var(--neon-cyan); }
+.task-check.checked {
+  background: var(--neon-cyan); border-color: var(--neon-cyan);
+  color: var(--bg-deep);
+}
+.task-info { flex: 1; min-width: 0; }
+.task-title { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-meta {
+  font-size: 0.7rem; color: var(--text-dim);
+  display: flex; gap: 12px; margin-top: 2px;
+}
+.task-reward { font-size: 0.7rem; color: var(--neon-yellow); flex-shrink: 0; }
+.task-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* === Section Header === */
+.section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.section-title {
+  font-family: var(--font-mono); font-size: 0.85rem;
+  color: var(--text-primary); letter-spacing: 2px;
+}
+.section-count {
+  font-family: var(--font-mono); font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+/* === Modal === */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7); z-index: 100;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: 8px; padding: 24px; width: 90%; max-width: 500px;
+  position: relative;
+  box-shadow: 0 0 40px rgba(0, 240, 255, 0.1);
+}
+.modal::before {
+  content: ''; position: absolute; top: 0; left: 20px; right: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+}
+.modal-title {
+  font-family: var(--font-mono); font-size: 1rem;
+  color: var(--neon-cyan); margin-bottom: 16px;
+  letter-spacing: 2px;
+}
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+/* === Pomodoro Timer === */
+.pomodoro-display {
+  font-family: var(--font-mono); font-size: 4rem; font-weight: bold;
+  text-align: center; color: var(--neon-cyan);
+  text-shadow: var(--glow-cyan); margin: 20px 0;
+  letter-spacing: 8px;
+}
+.pomodoro-status {
+  text-align: center; font-family: var(--font-mono);
+  color: var(--text-secondary); letter-spacing: 2px;
+}
+.pomodoro-controls {
+  display: flex; gap: 8px; justify-content: center; margin-top: 16px;
+}
+
+/* === Achievement Grid === */
+.achievement-card {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 14px; text-align: center;
+  transition: all 0.2s;
+}
+.achievement-card.unlocked { border-color: rgba(255, 229, 0, 0.4); }
+.achievement-card.locked { opacity: 0.5; }
+.achievement-icon { font-size: 2rem; margin-bottom: 6px; }
+.achievement-name { font-size: 0.8rem; margin-bottom: 2px; }
+.achievement-desc { font-size: 0.65rem; color: var(--text-dim); }
+
+/* === Bounty Board === */
+.bounty-item {
+  background: var(--bg-card); border: 1px solid rgba(255, 136, 0, 0.3);
+  border-radius: 6px; padding: 14px; margin-bottom: 10px;
+  position: relative; overflow: hidden;
+}
+.bounty-item::before {
+  content: '悬赏'; position: absolute; top: 8px; right: 12px;
+  font-family: var(--font-mono); font-size: 0.6rem;
+  color: var(--neon-orange); letter-spacing: 2px;
+}
+.bounty-reward {
+  color: var(--neon-yellow); font-size: 0.8rem; font-weight: bold;
+}
+.bounty-timer {
+  font-family: var(--font-mono); font-size: 0.65rem;
+  color: var(--neon-red);
+}
+
+/* === Shop === */
+.shop-item {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 14px; margin-bottom: 10px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.shop-price {
+  color: var(--neon-yellow); font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+/* === Charts Area === */
+.chart-container {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 16px; margin-bottom: 12px;
+  min-height: 200px; position: relative;
+}
+.chart-container canvas { width: 100%; }
+
+/* === Toast === */
+.toast-container {
+  position: fixed; top: 16px; right: 16px; z-index: 200;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  padding: 10px 16px; border-radius: 4px;
+  font-family: var(--font-mono); font-size: 0.75rem;
+  animation: slideIn 0.3s ease;
+  border: 1px solid;
+}
+.toast-success { background: rgba(0,255,136,0.1); border-color: var(--neon-green); color: var(--neon-green); }
+.toast-info { background: rgba(0,240,255,0.1); border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.toast-warning { background: rgba(255,229,0,0.1); border-color: var(--neon-yellow); color: var(--neon-yellow); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* === Scrollbar === */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-deep); }
+::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* === Sync Button === */
+.sync-btn {
+  position: absolute; top: 24px; right: 0;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: var(--bg-card);
+  border: 1px solid var(--border-subtle); border-radius: 4px;
+  cursor: pointer; font-family: var(--font-mono);
+  font-size: 0.7rem; color: var(--text-secondary);
+  transition: all 0.2s; letter-spacing: 1px;
+}
+.sync-btn:hover { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.sync-btn.synced { border-color: rgba(0,255,136,0.4); color: var(--neon-green); }
+.sync-btn.syncing { border-color: rgba(255,229,0,0.4); color: var(--neon-yellow); }
+.sync-btn.error { border-color: rgba(255,51,68,0.4); color: var(--neon-red); }
+.sync-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor; animation: syncPulse 2s infinite;
+}
+@keyframes syncPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+.checkbox-label {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-sans); font-size: 0.8rem;
+  cursor: pointer; letter-spacing: 0;
+}
+.checkbox-label input[type="checkbox"] { width: auto; margin: 0; }
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .form-row { flex-direction: column; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .header-title { font-size: 1.5rem; }
+  .level-display { flex-direction: column; text-align: center; }
+  .sync-btn { position: static; margin-top: 12px; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="scanlines"></div>
+
+<div class="app-container">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-title">N E X U S &nbsp; C O R E</div>
+    <div class="header-subtitle">// 任务核心系统 v1.0</div>
+    <button class="sync-btn" id="sync-btn" onclick="openSyncModal()">
+      <span class="sync-dot"></span>
+      <span id="sync-btn-text">云同步</span>
+    </button>
+  </header>
+
+  <!-- Navigation -->
+  <nav class="nav" id="nav">
+    <button class="nav-btn active" data-panel="dashboard">◆ 仪表盘</button>
+    <button class="nav-btn" data-panel="tasks">◆ 任务</button>
+    <button class="nav-btn" data-panel="bounty">◆ 悬赏板</button>
+    <button class="nav-btn" data-panel="pomodoro">◆ 番茄核心</button>
+    <button class="nav-btn" data-panel="shop">◆ 积分商店</button>
+    <button class="nav-btn" data-panel="achievements">◆ 成就殿堂</button>
+    <button class="nav-btn" data-panel="stats">◆ 数据看板</button>
+  </nav>
+
+  <!-- Panel: Dashboard -->
+  <div class="panel active" id="panel-dashboard">
+    <!-- Level Display -->
+    <div class="level-display" id="level-display">
+      <div class="level-badge" id="level-num">Lv.1</div>
+      <div class="level-info">
+        <div class="level-title" id="level-title">数据残片</div>
+        <div class="progress-bar" style="margin-top: 8px;">
+          <div class="progress-fill" id="xp-bar" style="width: 0%"></div>
+        </div>
+        <div class="level-xp" id="xp-text">EXP 0 / 100</div>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-streak">0</div>
+        <div class="stat-label">连续打卡天数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-coins">0</div>
+        <div class="stat-label">积分余额</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total">0</div>
+        <div class="stat-label">累计完成任务</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-today">0</div>
+        <div class="stat-label">今日完成</div>
+      </div>
+    </div>
+
+    <!-- Daily Tasks -->
+    <div class="section-header">
+      <span class="section-title">◆ 每日任务</span>
+      <span class="section-count" id="daily-count">剩余 0/0</span>
+    </div>
+    <div id="daily-tasks-list"></div>
+
+    <!-- Main Quest -->
+    <div class="section-header" style="margin-top: 20px;">
+      <span class="section-title">◆ 主线任务</span>
+    </div>
+    <div id="main-quests-list"></div>
+
+    <!-- Urgent Tasks -->
+    <div class="section-header" style="margin-top: 20px;">
+      <span class="section-title">◆ 临近截止</span>
+    </div>
+    <div id="urgent-tasks-list"></div>
+  </div>
+
+  <!-- Panel: Tasks -->
+  <div class="panel" id="panel-tasks">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <div style="display: flex; gap: 8px;">
+        <select id="task-filter" style="width: auto;">
+          <option value="all">全部任务</option>
+          <option value="main">主线任务</option>
+          <option value="side">支线任务</option>
+          <option value="daily">每日任务</option>
+          <option value="timed">限时任务</option>
+        </select>
+        <select id="task-sort" style="width: auto;">
+          <option value="newest">最新</option>
+          <option value="priority">优先级</option>
+          <option value="deadline">截止日期</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="openTaskModal()">+ 新增任务</button>
+    </div>
+    <div id="all-tasks-list"></div>
+  </div>
+
+  <!-- Panel: Bounty Board -->
+  <div class="panel" id="panel-bounty">
+    <div class="section-header">
+      <span class="section-title">◆ 悬赏板</span>
+      <span class="section-count" style="color: var(--neon-orange);">双倍奖励 · 限时刷新</span>
+    </div>
+    <div id="bounty-list"></div>
+    <div style="text-align: center; margin-top: 12px;">
+      <button class="btn btn-primary" onclick="refreshBounties()">⟳ 刷新悬赏（每日3次）</button>
+      <span id="bounty-refresh-count" style="font-size: 0.7rem; color: var(--text-dim); margin-left: 8px;">剩余刷新: 3</span>
+    </div>
+  </div>
+
+  <!-- Panel: Pomodoro -->
+  <div class="panel" id="panel-pomodoro">
+    <div style="text-align: center; margin-bottom: 16px;">
+      <label style="text-align: left;">关联任务</label>
+      <select id="pomodoro-task-select">
+        <option value="">-- 选择要专注的任务 --</option>
+      </select>
+    </div>
+    <div class="pomodoro-display" id="pomodoro-time">25:00</div>
+    <div class="pomodoro-status" id="pomodoro-status">准备就绪</div>
+    <div class="progress-bar" style="max-width: 300px; margin: 12px auto;">
+      <div class="progress-fill" id="pomodoro-progress" style="width: 100%;"></div>
+    </div>
+    <div class="pomodoro-controls">
+      <button class="btn btn-primary" id="pomodoro-start" onclick="startPomodoro()">▶ 开始专注</button>
+      <button class="btn" onclick="pausePomodoro()">⏸ 暂停</button>
+      <button class="btn" onclick="resetPomodoro()">↺ 重置</button>
+    </div>
+    <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: center;">
+      <button class="btn btn-sm" onclick="setPomodoroPreset(25)">25分钟</button>
+      <button class="btn btn-sm" onclick="setPomodoroPreset(45)">45分钟</button>
+      <button class="btn btn-sm" onclick="setPomodoroPreset(5)">5分钟休息</button>
+    </div>
+    <div style="text-align: center; margin-top: 12px; font-size: 0.7rem; color: var(--text-dim);">
+      今日专注: <span id="pomodoro-today-count" style="color: var(--neon-cyan);">0</span> 个番茄
+    </div>
+  </div>
+
+  <!-- Panel: Shop -->
+  <div class="panel" id="panel-shop">
+    <div class="section-header">
+      <span class="section-title">◆ 积分商店</span>
+      <span class="section-count" style="color: var(--neon-yellow);">余额: <span id="shop-balance">0</span> 💰</span>
+    </div>
+    <div id="shop-items"></div>
+    <div style="margin-top: 20px;">
+      <div class="section-header">
+        <span class="section-title">◆ 兑换记录</span>
+      </div>
+      <div id="shop-history" style="font-size: 0.75rem; color: var(--text-dim);"></div>
+    </div>
+  </div>
+
+  <!-- Panel: Achievements -->
+  <div class="panel" id="panel-achievements">
+    <div class="section-header">
+      <span class="section-title">◆ 成就殿堂</span>
+      <span class="section-count" id="achievement-progress">已解锁 0/15</span>
+    </div>
+    <div class="grid-3" id="achievements-grid"></div>
+  </div>
+
+  <!-- Panel: Stats -->
+  <div class="panel" id="panel-stats">
+    <div class="grid-2">
+      <div class="chart-container">
+        <div class="section-title" style="margin-bottom: 12px;">◆ 近7日完成趋势</div>
+        <canvas id="chart-weekly"></canvas>
+      </div>
+      <div class="chart-container">
+        <div class="section-title" style="margin-bottom: 12px;">◆ 任务类型分布</div>
+        <canvas id="chart-types"></canvas>
+      </div>
+    </div>
+    <div class="chart-container" style="margin-top: 12px;">
+      <div class="section-title" style="margin-bottom: 12px;">◆ 本周每日完成数</div>
+      <div id="weekly-breakdown" style="display: flex; gap: 8px; justify-content: space-around; padding: 16px 0;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Task Modal -->
+<div class="modal-overlay" id="task-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">// 新增任务</div>
+    <div class="form-group">
+      <label>任务名称</label>
+      <input type="text" id="task-name" placeholder="输入任务名称...">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>任务类型</label>
+        <select id="task-type">
+          <option value="main">主线任务</option>
+          <option value="side">支线任务</option>
+          <option value="daily">每日任务</option>
+          <option value="timed">限时任务</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>优先级</label>
+        <select id="task-priority">
+          <option value="low">低</option>
+          <option value="medium" selected>中</option>
+          <option value="high">高</option>
+          <option value="urgent">紧急</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>经验值奖励</label>
+        <input type="number" id="task-xp" value="50" min="10" max="500">
+      </div>
+      <div class="form-group">
+        <label>积分奖励</label>
+        <input type="number" id="task-coins" value="30" min="5" max="300">
+      </div>
+    </div>
+    <div class="form-group" id="deadline-group">
+      <label>截止日期（限时任务）</label>
+      <input type="date" id="task-deadline">
+    </div>
+    <div class="form-group">
+      <label>备注</label>
+      <textarea id="task-note" placeholder="任务详情..."></textarea>
+    </div>
+    <input type="hidden" id="task-edit-id" value="">
+    <div class="modal-actions">
+      <button class="btn" onclick="closeTaskModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveTask()">保存任务</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sync Modal -->
+<div class="modal-overlay" id="sync-modal">
+  <div class="modal" style="max-width: 520px;">
+    <div class="modal-title">// 云同步设置</div>
+
+    <!-- Setup Section (not configured) -->
+    <div id="sync-setup-section">
+      <div class="form-group">
+        <label>Gitee 私人令牌</label>
+        <input type="password" id="sync-token" placeholder="粘贴你的 Gitee 私人令牌">
+        <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 4px; line-height: 1.6;">
+          前往 Gitee → 设置 → 私人令牌 → 生成新令牌<br>
+          令牌需要有 <span style="color: var(--neon-cyan);">gists</span> 权限（勾选 snippets）
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Gist ID（已有同步则填入，留空自动创建）</label>
+        <input type="text" id="sync-gist-id-input" placeholder="留空将自动创建新的 Gitee Gist">
+      </div>
+
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="sync-auto" checked>
+          自动同步（数据变更后自动上传，3秒延迟）
+        </label>
+      </div>
+    </div>
+
+    <!-- Connected Section (configured) -->
+    <div id="sync-connected-section" style="display: none;">
+      <div style="background: var(--bg-card); padding: 14px; border-radius: 6px; margin-bottom: 12px; border: 1px solid var(--border-subtle);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">同步状态</span>
+          <span id="sync-state-badge" class="badge badge-green">已连接</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">Gist ID</span>
+          <span id="sync-gist-display" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--neon-cyan); word-break: break-all; text-align: right; max-width: 280px;"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">上次同步</span>
+          <span id="sync-last-time" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim);"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">自动同步</span>
+          <span id="sync-auto-status" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--neon-green);">已开启</span>
+        </div>
+      </div>
+
+      <div style="background: rgba(0,240,255,0.05); padding: 10px; border-radius: 6px; border: 1px solid rgba(0,240,255,0.15); font-size: 0.7rem; color: var(--text-secondary); line-height: 1.6;">
+        <strong style="color: var(--neon-cyan);">使用方法：</strong><br>
+        1. 在此设备配置完成后，复制上方 Gist ID<br>
+        2. 在另一台设备（手机/电脑）打开此页面<br>
+        3. 输入相同的 Gitee 令牌和 Gist ID 即可同步
+      </div>
+    </div>
+
+    <div class="modal-actions" style="flex-wrap: wrap; gap: 8px;">
+      <button class="btn btn-danger btn-sm" id="sync-disconnect-btn" onclick="disconnectSync()" style="display: none;">断开</button>
+      <div style="flex: 1;"></div>
+      <button class="btn" onclick="closeSyncModal()">关闭</button>
+      <button class="btn" id="sync-pull-btn" onclick="manualPull()" style="display: none;">↓ 下载</button>
+      <button class="btn" id="sync-push-btn" onclick="manualPush()" style="display: none;">↑ 上传</button>
+      <button class="btn btn-primary" id="sync-save-btn" onclick="saveSyncSettings()">保存并连接</button>
+      <button class="btn btn-primary" id="sync-now-btn" onclick="manualSync()" style="display: none;">⟳ 立即同步</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ============================================================
+// NEXUS CORE - Main Application Script
+// ============================================================
+
+// === Data Store (localStorage wrapper) ===
+const Store = {
+  _listeners: [],
+  onSet(callback) { this._listeners.push(callback); },
+  get(key, def = null) {
+    try { const v = localStorage.getItem('nexus_' + key); return v ? JSON.parse(v) : def; }
+    catch { return def; }
+  },
+  set(key, val) {
+    try {
+      localStorage.setItem('nexus_' + key, JSON.stringify(val));
+      this._listeners.forEach(cb => { try { cb(key, val); } catch(e) { console.error('Listener error:', e); } });
+    } catch(e) { console.error('Store error:', e); }
+  }
+};
+
+// === Cloud Sync Manager (Gitee Gist) ===
+const SyncManager = {
+  config: { token: '', gistId: '', autoSync: true, lastSync: 0, lastLocalModify: 0 },
+  _pushTimer: null,
+  _isSyncing: false,
+  _initialized: false,
+  _suppressAutoPush: false,
+
+  init() {
+    const saved = Store.get('syncConfig');
+    if (saved) this.config = { ...this.config, ...saved };
+    this._initialized = true;
+    this.updateButton();
+  },
+
+  isConfigured() {
+    return !!(this.config.token && this.config.gistId);
+  },
+
+  // Export all nexus data (excluding syncConfig)
+  exportData() {
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('nexus_') && key !== 'nexus_syncConfig') {
+        try { data[key] = JSON.parse(localStorage.getItem(key)); }
+        catch { data[key] = localStorage.getItem(key); }
+      }
+    }
+    return { app: 'nexus-core', version: '1.0', timestamp: Date.now(), data: data };
+  },
+
+  // Import remote data (replaces all local nexus data)
+  importData(payload) {
+    if (!payload || !payload.data) return;
+    this._suppressAutoPush = true;
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('nexus_') && key !== 'nexus_syncConfig') keysToRemove.push(key);
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    for (const [key, value] of Object.entries(payload.data)) {
+      if (key.startsWith('nexus_')) {
+        localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+      }
+    }
+    this._suppressAutoPush = false;
+  },
+
+  // Push local data to Gitee Gist
+  async push() {
+    if (!this.isConfigured()) return { success: false, error: '未配置同步' };
+    if (this._isSyncing) return { success: false, error: '正在同步中' };
+    this._isSyncing = true;
+    this.updateButton('syncing');
+    try {
+      const content = JSON.stringify(this.exportData(), null, 2);
+      const params = new URLSearchParams();
+      params.append('access_token', this.config.token);
+      params.append('files[nexus-core-sync.json][content]', content);
+      const res = await fetch(`https://gitee.com/api/v5/gists/${this.config.gistId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `HTTP ${res.status}`); }
+      this.config.lastSync = Date.now();
+      this.saveConfig();
+      this.updateButton('synced');
+      return { success: true };
+    } catch (e) {
+      this.updateButton('error', e.message);
+      return { success: false, error: e.message };
+    } finally {
+      this._isSyncing = false;
+    }
+  },
+
+  // Pull remote data from Gitee Gist
+  async pull() {
+    if (!this.isConfigured()) return { success: false, error: '未配置同步' };
+    if (this._isSyncing) return { success: false, error: '正在同步中' };
+    this._isSyncing = true;
+    this.updateButton('syncing');
+    try {
+      const res = await fetch(`https://gitee.com/api/v5/gists/${this.config.gistId}?access_token=${this.config.token}`);
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `HTTP ${res.status}`); }
+      const gist = await res.json();
+      const file = gist.files['nexus-core-sync.json'];
+      if (!file || !file.content) throw new Error('Gist 中未找到同步数据');
+      const payload = JSON.parse(file.content);
+      // Only import if remote is newer than last sync
+      if (payload.timestamp > (this.config.lastSync || 0)) {
+        this.importData(payload);
+        this.config.lastSync = Date.now();
+        this.config.lastLocalModify = payload.timestamp;
+        this.saveConfig();
+        this.updateButton('synced');
+        return { success: true, pulled: true };
+      }
+      this.updateButton('synced');
+      return { success: true, pulled: false, message: '本地数据已是最新' };
+    } catch (e) {
+      this.updateButton('error', e.message);
+      return { success: false, error: e.message };
+    } finally {
+      this._isSyncing = false;
+    }
+  },
+
+  // Create a new secret Gist for sync
+  async createGist() {
+    if (!this.config.token) return { success: false, error: '请先输入令牌' };
+    try {
+      const content = JSON.stringify(this.exportData(), null, 2);
+      const params = new URLSearchParams();
+      params.append('access_token', this.config.token);
+      params.append('description', 'NEXUS CORE Sync Data');
+      params.append('public', 'false');
+      params.append('files[nexus-core-sync.json][content]', content);
+      const res = await fetch('https://gitee.com/api/v5/gists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `HTTP ${res.status}`); }
+      const gist = await res.json();
+      this.config.gistId = gist.id;
+      this.config.lastSync = Date.now();
+      this.config.lastLocalModify = Date.now();
+      this.saveConfig();
+      return { success: true, gistId: gist.id };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  // Debounced auto-push (3s delay)
+  autoPush() {
+    if (!this._initialized || this._suppressAutoPush || !this.config.autoSync || !this.isConfigured()) return;
+    this.config.lastLocalModify = Date.now();
+    this.saveConfig();
+    clearTimeout(this._pushTimer);
+    this._pushTimer = setTimeout(async () => {
+      const r = await this.push();
+      if (!r.success) console.warn('Auto-push failed:', r.error);
+    }, 3000);
+  },
+
+  saveConfig() { localStorage.setItem('nexus_syncConfig', JSON.stringify(this.config)); },
+
+  updateButton(state, error = '') {
+    const btn = document.getElementById('sync-btn');
+    const text = document.getElementById('sync-btn-text');
+    if (!btn || !text) return;
+    btn.classList.remove('synced', 'syncing', 'error');
+    if (!this.isConfigured()) { text.textContent = '云同步'; return; }
+    if (state === 'syncing') { btn.classList.add('syncing'); text.textContent = '同步中...'; }
+    else if (state === 'error') { btn.classList.add('error'); text.textContent = '同步失败'; }
+    else {
+      btn.classList.add('synced');
+      const t = this.config.lastSync ? new Date(this.config.lastSync) : null;
+      text.textContent = t ? `已同步 ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}` : '已连接';
+    }
+  }
+};
+
+// Subscribe Store changes to auto-push (exclude syncConfig & initialized)
+Store.onSet((key) => {
+  if (key !== 'syncConfig' && key !== 'initialized') SyncManager.autoPush();
+});
+
+// === Initialize Default Data ===
+function initData() {
+  if (!Store.get('initialized')) {
+    Store.set('profile', {
+      level: 1, xp: 0, coins: 0, streak: 0, lastCheckin: '',
+      totalCompleted: 0, pomodoroToday: 0, pomodoroDate: ''
+    });
+    Store.set('tasks', []);
+    Store.set('dailyTemplates', [
+      { id: 'd1', title: '背30个英语单词', xp: 50, coins: 30, enabled: true },
+      { id: 'd2', title: '阅读30分钟', xp: 50, coins: 30, enabled: true },
+      { id: 'd3', title: '运动20分钟', xp: 80, coins: 50, enabled: true },
+      { id: 'd4', title: '复习当天所学内容', xp: 60, coins: 40, enabled: true },
+      { id: 'd5', title: '整理桌面/房间', xp: 30, coins: 20, enabled: true }
+    ]);
+    Store.set('dailyTasks', []); // { id, templateId, title, xp, coins, done, date }
+    Store.set('achievements', generateAchievements());
+    Store.set('shopItems', generateShopItems());
+    Store.set('shopHistory', []);
+    Store.set('bounties', []);
+    Store.set('bountyRefreshes', 3);
+    Store.set('bountyDate', '');
+    Store.set('completionLog', {}); // { 'YYYY-MM-DD': count }
+    Store.set('initialized', true);
+  }
+  // Ensure daily tasks are refreshed
+  refreshDailyTasks();
+  // Ensure bounties are refreshed
+  refreshBountiesCheck();
+  // Check streak
+  updateStreak();
+}
+
+// === Toast System ===
+function showToast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2000);
+  setTimeout(() => toast.remove(), 2500);
+}
+
+// === Level System ===
+const LEVELS = [
+  { level: 1, xp: 100, title: '数据残片' },
+  { level: 2, xp: 250, title: '数据残片' },
+  { level: 3, xp: 450, title: '数据残片' },
+  { level: 4, xp: 700, title: '数据残片' },
+  { level: 5, xp: 1000, title: '数据残片' },
+  { level: 6, xp: 1400, title: '街头佣兵' },
+  { level: 7, xp: 1900, title: '街头佣兵' },
+  { level: 8, xp: 2500, title: '街头佣兵' },
+  { level: 9, xp: 3200, title: '街头佣兵' },
+  { level: 10, xp: 4000, title: '街头佣兵' },
+  { level: 11, xp: 5000, title: '网络行者' },
+  { level: 12, xp: 6200, title: '网络行者' },
+  { level: 13, xp: 7600, title: '网络行者' },
+  { level: 14, xp: 9200, title: '网络行者' },
+  { level: 15, xp: 11000, title: '网络行者' },
+  { level: 16, xp: 13200, title: '赛博武士' },
+  { level: 17, xp: 15800, title: '赛博武士' },
+  { level: 18, xp: 18800, title: '赛博武士' },
+  { level: 19, xp: 22200, title: '赛博武士' },
+  { level: 20, xp: 26000, title: '赛博武士' },
+  { level: 21, xp: 31000, title: '系统骇客' },
+  { level: 22, xp: 37000, title: '系统骇客' },
+  { level: 23, xp: 44000, title: '系统骇客' },
+  { level: 24, xp: 52000, title: '系统骇客' },
+  { level: 25, xp: 61000, title: '系统骇客' },
+  { level: 26, xp: 999999, title: '核心之主' }
+];
+
+function getLevelInfo(xp) {
+  for (let i = 0; i < LEVELS.length; i++) {
+    if (xp < LEVELS[i].xp) {
+      const prev = i > 0 ? LEVELS[i - 1].xp : 0;
+      const needed = LEVELS[i].xp;
+      return {
+        level: LEVELS[i].level,
+        title: LEVELS[i].title,
+        current: xp - prev,
+        needed: needed - prev,
+        progress: ((xp - prev) / (needed - prev)) * 100
+      };
+    }
+  }
+  return { level: 26, title: '核心之主', current: 999999, needed: 999999, progress: 100 };
+}
+
+function addXP(amount) {
+  const profile = Store.get('profile');
+  profile.xp += amount;
+  const oldLevel = profile.level;
+  const info = getLevelInfo(profile.xp);
+  profile.level = info.level;
+  Store.set('profile', profile);
+  if (profile.level > oldLevel) {
+    showToast(`⬆ 等级提升！Lv.${profile.level} ${info.title}`, 'success');
+  }
+  updateDashboard();
+}
+
+function addCoins(amount) {
+  const profile = Store.get('profile');
+  profile.coins += amount;
+  Store.set('profile', profile);
+  updateDashboard();
+}
+
+// === Task Management ===
+function generateId() { return 't_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6); }
+
+function getTasks() { return Store.get('tasks', []); }
+
+function saveTasks(tasks) { Store.set('tasks', tasks); }
+
+function addTask(taskData) {
+  const tasks = getTasks();
+  const task = {
+    id: generateId(),
+    title: taskData.title,
+    type: taskData.type || 'side',
+    priority: taskData.priority || 'medium',
+    xp: parseInt(taskData.xp) || 50,
+    coins: parseInt(taskData.coins) || 30,
+    deadline: taskData.deadline || '',
+    note: taskData.note || '',
+    progress: 0,
+    status: 'active', // active, completed, failed
+    createdAt: new Date().toISOString(),
+    completedAt: null
+  };
+  tasks.push(task);
+  saveTasks(tasks);
+  return task;
+}
+
+function updateTask(id, updates) {
+  const tasks = getTasks();
+  const idx = tasks.findIndex(t => t.id === id);
+  if (idx >= 0) {
+    tasks[idx] = { ...tasks[idx], ...updates };
+    saveTasks(tasks);
+  }
+}
+
+function deleteTask(id) {
+  const tasks = getTasks().filter(t => t.id !== id);
+  saveTasks(tasks);
+}
+
+function completeTask(id) {
+  const tasks = getTasks();
+  const task = tasks.find(t => t.id === id);
+  if (!task || task.status === 'completed') return;
+
+  task.status = 'completed';
+  task.completedAt = new Date().toISOString();
+  task.progress = 100;
+  saveTasks(tasks);
+
+  // Rewards
+  addXP(task.xp);
+  addCoins(task.coins);
+
+  // Update completion log
+  const today = new Date().toISOString().split('T')[0];
+  const log = Store.get('completionLog', {});
+  log[today] = (log[today] || 0) + 1;
+  Store.set('completionLog', log);
+
+  // Update profile
+  const profile = Store.get('profile');
+  profile.totalCompleted = (profile.totalCompleted || 0) + 1;
+  Store.set('profile', profile);
+
+  showToast(`✓ 任务完成！+${task.xp}XP +${task.coins}💰`, 'success');
+  checkAchievements();
+  renderAll();
+}
+
+function completeDailyTask(taskId) {
+  const dailyTasks = Store.get('dailyTasks', []);
+  const dt = dailyTasks.find(t => t.id === taskId);
+  if (!dt || dt.done) return;
+
+  dt.done = true;
+  Store.set('dailyTasks', dailyTasks);
+
+  addXP(dt.xp);
+  addCoins(dt.coins);
+
+  const today = new Date().toISOString().split('T')[0];
+  const log = Store.get('completionLog', {});
+  log[today] = (log[today] || 0) + 1;
+  Store.set('completionLog', log);
+
+  const profile = Store.get('profile');
+  profile.totalCompleted = (profile.totalCompleted || 0) + 1;
+  Store.set('profile', profile);
+
+  showToast(`✓ 每日任务完成！+${dt.xp}XP +${dt.coins}💰`, 'success');
+  checkAchievements();
+  renderAll();
+}
+
+// === Daily Tasks System ===
+function refreshDailyTasks() {
+  const today = new Date().toISOString().split('T')[0];
+  let dailyTasks = Store.get('dailyTasks', []);
+  const dailyDate = dailyTasks.length > 0 ? dailyTasks[0].date : '';
+
+  if (dailyDate !== today) {
+    const templates = Store.get('dailyTemplates', []).filter(t => t.enabled);
+    dailyTasks = templates.map(t => ({
+      id: 'd_' + today + '_' + t.id,
+      templateId: t.id,
+      title: t.title,
+      xp: t.xp,
+      coins: t.coins,
+      done: false,
+      date: today
+    }));
+    Store.set('dailyTasks', dailyTasks);
+  }
+}
+
+function updateStreak() {
+  const profile = Store.get('profile');
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+  if (profile.lastCheckin === today) return; // Already checked today
+
+  const log = Store.get('completionLog', {});
+  const todayDone = (log[today] || 0) > 0;
+
+  if (todayDone) {
+    if (profile.lastCheckin === yesterday) {
+      profile.streak = (profile.streak || 0) + 1;
+    } else if (profile.lastCheckin !== today) {
+      profile.streak = 1;
+    }
+    profile.lastCheckin = today;
+    Store.set('profile', profile);
+  }
+}
+
+// === Bounty System ===
+const BOUNTY_POOL = [
+  { title: '清理电脑桌面文件', xp: 40, coins: 25 },
+  { title: '做10分钟拉伸运动', xp: 50, coins: 30 },
+  { title: '喝8杯水（今日记录）', xp: 30, coins: 20 },
+  { title: '给家人/朋友发一条消息', xp: 20, coins: 15 },
+  { title: '整理手机相册（删10张）', xp: 35, coins: 20 },
+  { title: '学一个快捷键/小技巧', xp: 45, coins: 25 },
+  { title: '写50字今日总结', xp: 40, coins: 25 },
+  { title: '整理书桌/工位5分钟', xp: 30, coins: 20 },
+  { title: '听一首新歌并记录感受', xp: 25, coins: 15 },
+  { title: '做5分钟冥想/深呼吸', xp: 35, coins: 20 },
+  { title: '复习10个已学单词', xp: 50, coins: 30 },
+  { title: '整理浏览器书签', xp: 25, coins: 15 },
+  { title: '站起来活动5分钟', xp: 20, coins: 10 },
+  { title: '读一篇技术/学习文章', xp: 60, coins: 35 },
+  { title: '删除一个不用的APP', xp: 20, coins: 10 },
+];
+
+function refreshBountiesCheck() {
+  const today = new Date().toISOString().split('T')[0];
+  const bountyDate = Store.get('bountyDate', '');
+  if (bountyDate !== today) {
+    Store.set('bountyRefreshes', 3);
+    Store.set('bountyDate', today);
+    generateBounties();
+  }
+}
+
+function generateBounties() {
+  const pool = [...BOUNTY_POOL];
+  // Shuffle and pick 3
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const bounties = pool.slice(0, 3).map(b => ({
+    id: 'b_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    title: b.title,
+    xp: b.xp * 2, // Double rewards
+    coins: b.coins * 2,
+    claimed: false
+  }));
+  Store.set('bounties', bounties);
+}
+
+function refreshBounties() {
+  const refreshes = Store.get('bountyRefreshes', 0);
+  if (refreshes <= 0) {
+    showToast('今日刷新次数已用完', 'warning');
+    return;
+  }
+  Store.set('bountyRefreshes', refreshes - 1);
+  generateBounties();
+  showToast('悬赏板已刷新！', 'info');
+  renderBounties();
+}
+
+function claimBounty(id) {
+  const bounties = Store.get('bounties', []);
+  const bounty = bounties.find(b => b.id === id);
+  if (!bounty || bounty.claimed) return;
+
+  bounty.claimed = true;
+  Store.set('bounties', bounties);
+  addXP(bounty.xp);
+  addCoins(bounty.coins);
+
+  const today = new Date().toISOString().split('T')[0];
+  const log = Store.get('completionLog', {});
+  log[today] = (log[today] || 0) + 1;
+  Store.set('completionLog', log);
+
+  const profile = Store.get('profile');
+  profile.totalCompleted = (profile.totalCompleted || 0) + 1;
+  Store.set('profile', profile);
+
+  showToast(`⚡ 悬赏完成！双倍奖励 +${bounty.xp}XP +${bounty.coins}💰`, 'success');
+  checkAchievements();
+  renderAll();
+}
+
+// === Shop System ===
+function generateShopItems() {
+  return [
+    { id: 's1', name: '看一集动漫/剧', cost: 100, icon: '📺', description: '奖励自己看一集喜欢的剧' },
+    { id: 's2', name: '打30分钟游戏', cost: 150, icon: '🎮', description: '游戏时间放松一下' },
+    { id: 's3', name: '吃一份零食', cost: 80, icon: '🍿', description: '来点零食犒劳自己' },
+    { id: 's4', name: '买一个小物件', cost: 300, icon: '🛍️', description: '给自己买个小礼物' },
+    { id: 's5', name: '睡懒觉1小时', cost: 120, icon: '😴', description: '明天多睡一小时' },
+    { id: 's6', name: '刷30分钟社交媒体', cost: 60, icon: '📱', description: '刷手机放松一下' },
+    { id: 's7', name: '喝一杯奶茶', cost: 100, icon: '🧋', description: '来杯奶茶犒劳自己' },
+    { id: 's8', name: '休息日（不安排任务）', cost: 500, icon: '🏖️', description: '给自己放一天假' },
+  ];
+}
+
+function redeemItem(itemId) {
+  const profile = Store.get('profile');
+  const items = Store.get('shopItems', []);
+  const item = items.find(i => i.id === itemId);
+  if (!item) return;
+  if (profile.coins < item.cost) {
+    showToast('积分不足！', 'warning');
+    return;
+  }
+
+  profile.coins -= item.cost;
+  Store.set('profile', profile);
+
+  const history = Store.get('shopHistory', []);
+  history.unshift({
+    item: item.name,
+    cost: item.cost,
+    date: new Date().toISOString()
+  });
+  if (history.length > 20) history.pop();
+  Store.set('shopHistory', history);
+
+  showToast(`🎉 兑换成功：${item.name}！-${item.cost}💰`, 'success');
+  renderShop();
+  updateDashboard();
+}
+
+// === Achievement System ===
+function generateAchievements() {
+  return [
+    { id: 'a1', name: '初次觉醒', desc: '完成第一个任务', icon: '🌟', unlocked: false, hidden: false },
+    { id: 'a2', name: '连击x3', desc: '连续打卡3天', icon: '🔥', unlocked: false, hidden: false },
+    { id: 'a3', name: '连击x7', desc: '连续打卡7天', icon: '💫', unlocked: false, hidden: false },
+    { id: 'a4', name: '连击x30', desc: '连续打卡30天', icon: '👑', unlocked: false, hidden: false },
+    { id: 'a5', name: '百夫长', desc: '累计完成100个任务', icon: '💯', unlocked: false, hidden: false },
+    { id: 'a6', name: '佣兵新人', desc: '达到等级5', icon: '⚔️', unlocked: false, hidden: false },
+    { id: 'a7', name: '网络行者', desc: '达到等级10', icon: '🌐', unlocked: false, hidden: false },
+    { id: 'a8', name: '赛博武士', desc: '达到等级15', icon: '⚡', unlocked: false, hidden: false },
+    { id: 'a9', name: '积分富豪', desc: '累计获得1000积分', icon: '💰', unlocked: false, hidden: false },
+    { id: 'a10', name: '商店常客', desc: '兑换5次奖励', icon: '🛒', unlocked: false, hidden: false },
+    { id: 'a11', name: '番茄大师', desc: '完成10个番茄钟', icon: '🍅', unlocked: false, hidden: false },
+    { id: 'a12', name: '悬赏猎人', desc: '完成5个悬赏任务', icon: '🎯', unlocked: false, hidden: false },
+    { id: 'a13', name: '任务收割者', desc: '一天内完成5个任务', icon: '💀', unlocked: false, hidden: true },
+    { id: 'a14', name: '主线推进者', desc: '完成3个主线任务', icon: '🏆', unlocked: false, hidden: false },
+    { id: 'a15', name: '终极骇客', desc: '达到等级20', icon: '🔮', unlocked: false, hidden: false },
+  ];
+}
+
+function checkAchievements() {
+  const achievements = Store.get('achievements', []);
+  const profile = Store.get('profile');
+  const tasks = getTasks();
+  const shopHistory = Store.get('shopHistory', []);
+  const bounties = Store.get('bounties', []);
+  let updated = false;
+
+  const checks = {
+    a1: () => profile.totalCompleted >= 1,
+    a2: () => profile.streak >= 3,
+    a3: () => profile.streak >= 7,
+    a4: () => profile.streak >= 30,
+    a5: () => profile.totalCompleted >= 100,
+    a6: () => profile.level >= 5,
+    a7: () => profile.level >= 10,
+    a8: () => profile.level >= 15,
+    a9: () => {
+      // Total coins earned (estimate from completed tasks)
+      const completed = tasks.filter(t => t.status === 'completed');
+      const totalCoins = completed.reduce((s, t) => s + t.coins, 0);
+      return totalCoins >= 1000;
+    },
+    a10: () => shopHistory.length >= 5,
+    a11: () => {
+      const totalPomodoros = parseInt(localStorage.getItem('nexus_totalPomodoros') || '0');
+      return totalPomodoros >= 10;
+    },
+    a12: () => bounties.filter(b => b.claimed).length >= 5,
+    a13: () => {
+      const today = new Date().toISOString().split('T')[0];
+      const log = Store.get('completionLog', {});
+      return (log[today] || 0) >= 5;
+    },
+    a14: () => tasks.filter(t => t.type === 'main' && t.status === 'completed').length >= 3,
+    a15: () => profile.level >= 20,
+  };
+
+  for (const ach of achievements) {
+    if (!ach.unlocked && checks[ach.id] && checks[ach.id]()) {
+      ach.unlocked = true;
+      updated = true;
+      showToast(`🏆 成就解锁：${ach.name} - ${ach.desc}`, 'success');
+    }
+  }
+
+  if (updated) Store.set('achievements', achievements);
+}
+
+// === Pomodoro System ===
+let pomodoroState = {
+  minutes: 25, seconds: 0, totalSeconds: 25 * 60,
+  running: false, paused: false, intervalId: null,
+  taskId: ''
+};
+
+function setPomodoroPreset(min) {
+  pausePomodoro();
+  pomodoroState.minutes = min;
+  pomodoroState.seconds = 0;
+  pomodoroState.totalSeconds = min * 60;
+  updatePomodoroDisplay();
+}
+
+function updatePomodoroDisplay() {
+  const m = String(pomodoroState.minutes).padStart(2, '0');
+  const s = String(pomodoroState.seconds).padStart(2, '0');
+  document.getElementById('pomodoro-time').textContent = `${m}:${s}`;
+  const progress = ((pomodoroState.minutes * 60 + pomodoroState.seconds) / pomodoroState.totalSeconds) * 100;
+  document.getElementById('pomodoro-progress').style.width = progress + '%';
+}
+
+function startPomodoro() {
+  if (pomodoroState.running && !pomodoroState.paused) return;
+
+  const taskId = document.getElementById('pomodoro-task-select').value;
+  pomodoroState.taskId = taskId;
+
+  if (pomodoroState.paused) {
+    pomodoroState.paused = false;
+    document.getElementById('pomodoro-status').textContent = '专注中...';
+  } else {
+    document.getElementById('pomodoro-status').textContent = '专注中...';
+  }
+
+  pomodoroState.running = true;
+  document.getElementById('pomodoro-start').textContent = '⏳ 专注中...';
+
+  pomodoroState.intervalId = setInterval(() => {
+    if (pomodoroState.seconds === 0) {
+      if (pomodoroState.minutes === 0) {
+        // Pomodoro complete
+        clearInterval(pomodoroState.intervalId);
+        pomodoroState.running = false;
+        document.getElementById('pomodoro-status').textContent = '完成！';
+        document.getElementById('pomodoro-start').textContent = '▶ 开始专注';
+        showToast('🍅 番茄钟完成！', 'success');
+
+        // Update count
+        const profile = Store.get('profile');
+        const today = new Date().toISOString().split('T')[0];
+        if (profile.pomodoroDate !== today) {
+          profile.pomodoroToday = 0;
+          profile.pomodoroDate = today;
+        }
+        profile.pomodoroToday = (profile.pomodoroToday || 0) + 1;
+        Store.set('profile', profile);
+
+        // Track total pomodoros
+        const total = parseInt(localStorage.getItem('nexus_totalPomodoros') || '0');
+        localStorage.setItem('nexus_totalPomodoros', total + 1);
+
+        document.getElementById('pomodoro-today-count').textContent = profile.pomodoroToday;
+
+        // Advance task progress if linked
+        if (taskId) {
+          const tasks = getTasks();
+          const task = tasks.find(t => t.id === taskId);
+          if (task && task.status === 'active') {
+            task.progress = Math.min(100, (task.progress || 0) + 10);
+            if (task.progress >= 100) {
+              completeTask(taskId);
+            } else {
+              saveTasks(tasks);
+              showToast(`任务进度 +10% (当前 ${task.progress}%)`, 'info');
+            }
+          }
+        }
+
+        checkAchievements();
+        resetPomodoro();
+        renderAll();
+        return;
+      }
+      pomodoroState.minutes--;
+      pomodoroState.seconds = 59;
+    } else {
+      pomodoroState.seconds--;
+    }
+    updatePomodoroDisplay();
+  }, 1000);
+}
+
+function pausePomodoro() {
+  if (!pomodoroState.running) return;
+  pomodoroState.paused = true;
+  pomodoroState.running = false;
+  clearInterval(pomodoroState.intervalId);
+  document.getElementById('pomodoro-status').textContent = '已暂停';
+  document.getElementById('pomodoro-start').textContent = '▶ 继续';
+}
+
+function resetPomodoro() {
+  clearInterval(pomodoroState.intervalId);
+  pomodoroState.running = false;
+  pomodoroState.paused = false;
+  pomodoroState.minutes = 25;
+  pomodoroState.seconds = 0;
+  pomodoroState.totalSeconds = 25 * 60;
+  pomodoroState.taskId = '';
+  document.getElementById('pomodoro-status').textContent = '准备就绪';
+  document.getElementById('pomodoro-start').textContent = '▶ 开始专注';
+  updatePomodoroDisplay();
+}
+
+// === Task Modal ===
+function openTaskModal(editId = null) {
+  const modal = document.getElementById('task-modal');
+  modal.classList.add('show');
+  document.getElementById('task-edit-id').value = '';
+
+  if (editId) {
+    document.getElementById('modal-title').textContent = '// 编辑任务';
+    const tasks = getTasks();
+    const task = tasks.find(t => t.id === editId);
+    if (task) {
+      document.getElementById('task-edit-id').value = editId;
+      document.getElementById('task-name').value = task.title;
+      document.getElementById('task-type').value = task.type;
+      document.getElementById('task-priority').value = task.priority;
+      document.getElementById('task-xp').value = task.xp;
+      document.getElementById('task-coins').value = task.coins;
+      document.getElementById('task-deadline').value = task.deadline;
+      document.getElementById('task-note').value = task.note || '';
+    }
+  } else {
+    document.getElementById('modal-title').textContent = '// 新增任务';
+    document.getElementById('task-name').value = '';
+    document.getElementById('task-type').value = 'side';
+    document.getElementById('task-priority').value = 'medium';
+    document.getElementById('task-xp').value = '50';
+    document.getElementById('task-coins').value = '30';
+    document.getElementById('task-deadline').value = '';
+    document.getElementById('task-note').value = '';
+  }
+
+  // Show/hide deadline based on type
+  toggleDeadline();
+  document.getElementById('task-type').addEventListener('change', toggleDeadline);
+}
+
+function closeTaskModal() {
+  document.getElementById('task-modal').classList.remove('show');
+}
+
+function toggleDeadline() {
+  const type = document.getElementById('task-type').value;
+  document.getElementById('deadline-group').style.display = type === 'timed' ? 'block' : 'none';
+}
+
+function saveTask() {
+  const editId = document.getElementById('task-edit-id').value;
+  const data = {
+    title: document.getElementById('task-name').value.trim(),
+    type: document.getElementById('task-type').value,
+    priority: document.getElementById('task-priority').value,
+    xp: document.getElementById('task-xp').value,
+    coins: document.getElementById('task-coins').value,
+    deadline: document.getElementById('task-deadline').value,
+    note: document.getElementById('task-note').value.trim()
+  };
+
+  if (!data.title) { showToast('请输入任务名称', 'warning'); return; }
+
+  if (editId) {
+    updateTask(editId, data);
+    showToast('任务已更新', 'info');
+  } else {
+    addTask(data);
+    showToast('任务已创建', 'success');
+  }
+
+  closeTaskModal();
+  renderAll();
+}
+
+// === Render Functions ===
+function renderAll() {
+  renderDashboard();
+  renderTasks();
+  renderBounties();
+  renderShop();
+  renderAchievements();
+  renderStats();
+  updatePomodoroTaskSelect();
+}
+
+function updateDashboard() {
+  const profile = Store.get('profile');
+  const info = getLevelInfo(profile.xp);
+
+  document.getElementById('level-num').textContent = 'Lv.' + info.level;
+  document.getElementById('level-title').textContent = info.title;
+  document.getElementById('xp-bar').style.width = info.progress + '%';
+  document.getElementById('xp-text').textContent = `EXP ${info.current} / ${info.needed}`;
+  document.getElementById('stat-streak').textContent = profile.streak || 0;
+  document.getElementById('stat-coins').textContent = profile.coins || 0;
+  document.getElementById('stat-total').textContent = profile.totalCompleted || 0;
+
+  const today = new Date().toISOString().split('T')[0];
+  const log = Store.get('completionLog', {});
+  document.getElementById('stat-today').textContent = log[today] || 0;
+}
+
+function renderDashboard() {
+  updateDashboard();
+
+  // Daily tasks
+  const dailyTasks = Store.get('dailyTasks', []);
+  const doneCount = dailyTasks.filter(t => t.done).length;
+  document.getElementById('daily-count').textContent = `剩余 ${dailyTasks.length - doneCount}/${dailyTasks.length}`;
+
+  const dailyList = document.getElementById('daily-tasks-list');
+  dailyList.innerHTML = dailyTasks.map(t => `
+    <div class="task-item ${t.done ? 'completed' : ''}" onclick="${t.done ? '' : `completeDailyTask('${t.id}')`}">
+      <div class="task-check ${t.done ? 'checked' : ''}">${t.done ? '✓' : ''}</div>
+      <div class="task-info">
+        <div class="task-title">${t.title}</div>
+      </div>
+      <div class="task-reward">+${t.xp}XP +${t.coins}💰</div>
+    </div>
+  `).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无每日任务</div>';
+
+  // Main quests
+  const tasks = getTasks();
+  const mainQuests = tasks.filter(t => t.type === 'main' && t.status === 'active');
+  const mainList = document.getElementById('main-quests-list');
+  mainList.innerHTML = mainQuests.map(t => `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">⚡ ${t.title}</span>
+        <span class="badge badge-${getPriorityColor(t.priority)}">${getPriorityLabel(t.priority)}</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: ${t.progress || 0}%"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span class="card-subtitle">进度 ${t.progress || 0}%</span>
+        <div style="display: flex; gap: 4px;">
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); completeTask('${t.id}')">完成</button>
+          <button class="btn btn-sm" onclick="event.stopPropagation(); openTaskModal('${t.id}')">编辑</button>
+        </div>
+      </div>
+    </div>
+  `).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无主线任务，去任务中心添加吧！</div>';
+
+  // Urgent tasks
+  const now = new Date();
+  const urgentTasks = tasks.filter(t => {
+    if (t.status !== 'active' || t.type !== 'timed' || !t.deadline) return false;
+    const deadline = new Date(t.deadline);
+    const diff = (deadline - now) / (1000 * 60 * 60 * 24);
+    return diff <= 3 && diff >= 0;
+  });
+  const urgentList = document.getElementById('urgent-tasks-list');
+  urgentList.innerHTML = urgentTasks.map(t => {
+    const deadline = new Date(t.deadline);
+    const diff = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+    return `
+      <div class="task-item" onclick="completeTask('${t.id}')">
+        <div class="task-check"></div>
+        <div class="task-info">
+          <div class="task-title">⏰ ${t.title}</div>
+          <div class="task-meta">剩余 ${diff} 天</div>
+        </div>
+        <div class="task-reward">+${t.xp}XP</div>
+      </div>
+    `;
+  }).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无临近截止任务</div>';
+}
+
+function renderTasks() {
+  const tasks = getTasks();
+  const filter = document.getElementById('task-filter')?.value || 'all';
+  const sort = document.getElementById('task-sort')?.value || 'newest';
+
+  let filtered = [...tasks];
+  if (filter !== 'all') filtered = filtered.filter(t => t.type === filter);
+
+  // Sort
+  if (sort === 'priority') {
+    const order = { urgent: 0, high: 1, medium: 2, low: 3 };
+    filtered.sort((a, b) => (order[a.priority] || 2) - (order[b.priority] || 2));
+  } else if (sort === 'deadline') {
+    filtered.sort((a, b) => {
+      if (!a.deadline) return 1;
+      if (!b.deadline) return -1;
+      return new Date(a.deadline) - new Date(b.deadline);
+    });
+  } else {
+    filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  // Active first, completed last
+  filtered.sort((a, b) => {
+    if (a.status === 'completed' && b.status !== 'completed') return 1;
+    if (a.status !== 'completed' && b.status === 'completed') return -1;
+    return 0;
+  });
+
+  const list = document.getElementById('all-tasks-list');
+  list.innerHTML = filtered.map(t => `
+    <div class="task-item ${t.status === 'completed' ? 'completed' : ''}" onclick="${t.status === 'completed' ? '' : `completeTask('${t.id}')`}">
+      <div class="task-check ${t.status === 'completed' ? 'checked' : ''}">${t.status === 'completed' ? '✓' : ''}</div>
+      <div class="task-info">
+        <div class="task-title">${t.title}</div>
+        <div class="task-meta">
+          <span class="badge badge-${getTypeColor(t.type)}">${getTypeLabel(t.type)}</span>
+          <span class="badge badge-${getPriorityColor(t.priority)}">${getPriorityLabel(t.priority)}</span>
+          ${t.deadline ? `<span>📅 ${t.deadline}</span>` : ''}
+          ${t.status === 'active' ? `<span>进度 ${t.progress || 0}%</span>` : ''}
+        </div>
+      </div>
+      <div class="task-reward">+${t.xp}XP +${t.coins}💰</div>
+      <div class="task-actions">
+        <button class="btn btn-sm" onclick="event.stopPropagation(); openTaskModal('${t.id}')">编辑</button>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteTask('${t.id}'); renderAll();">删除</button>
+      </div>
+    </div>
+  `).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无任务，点击右上角"新增任务"开始吧！</div>';
+}
+
+function renderBounties() {
+  const bounties = Store.get('bounties', []);
+  const list = document.getElementById('bounty-list');
+  list.innerHTML = bounties.map(b => `
+    <div class="bounty-item">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-weight: bold; margin-bottom: 4px;">${b.title}</div>
+          <div class="bounty-reward">💰 +${b.coins}积分 &nbsp; ⚡ +${b.xp}XP</div>
+        </div>
+        ${b.claimed
+          ? '<span class="badge badge-green">已完成</span>'
+          : `<button class="btn btn-primary btn-sm" onclick="claimBounty('${b.id}')">领取悬赏</button>`
+        }
+      </div>
+    </div>
+  `).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">悬赏板为空，点击刷新获取悬赏！</div>';
+
+  document.getElementById('bounty-refresh-count').textContent = `剩余刷新: ${Store.get('bountyRefreshes', 0)}`;
+}
+
+function renderShop() {
+  const profile = Store.get('profile');
+  const items = Store.get('shopItems', []);
+  document.getElementById('shop-balance').textContent = profile.coins;
+
+  const list = document.getElementById('shop-items');
+  list.innerHTML = items.map(item => `
+    <div class="shop-item">
+      <div>
+        <div style="font-weight: bold;">${item.icon} ${item.name}</div>
+        <div style="font-size: 0.7rem; color: var(--text-dim);">${item.description}</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="shop-price">${item.cost} 💰</span>
+        <button class="btn btn-primary btn-sm" onclick="redeemItem('${item.id}')"
+          ${profile.coins < item.cost ? 'disabled style="opacity:0.5"' : ''}>兑换</button>
+      </div>
+    </div>
+  `).join('');
+
+  const history = Store.get('shopHistory', []);
+  document.getElementById('shop-history').innerHTML = history.length > 0
+    ? history.map(h => `<div style="padding: 4px 0;">📅 ${h.date.split('T')[0]} — ${h.item} (-${h.cost}💰)</div>`).join('')
+    : '暂无兑换记录';
+}
+
+function renderAchievements() {
+  const achievements = Store.get('achievements', []);
+  const unlocked = achievements.filter(a => a.unlocked).length;
+  document.getElementById('achievement-progress').textContent = `已解锁 ${unlocked}/${achievements.length}`;
+
+  const grid = document.getElementById('achievements-grid');
+  grid.innerHTML = achievements.map(a => {
+    if (a.hidden && !a.unlocked) {
+      return `<div class="achievement-card locked"><div class="achievement-icon">❓</div><div class="achievement-name">???</div><div class="achievement-desc">隐藏成就</div></div>`;
+    }
+    return `
+      <div class="achievement-card ${a.unlocked ? 'unlocked' : 'locked'}">
+        <div class="achievement-icon">${a.icon}</div>
+        <div class="achievement-name">${a.name}</div>
+        <div class="achievement-desc">${a.desc}</div>
+        ${a.unlocked ? '<span class="badge badge-yellow" style="margin-top: 4px;">已解锁</span>' : '<span class="badge" style="margin-top: 4px;">未解锁</span>'}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderStats() {
+  const log = Store.get('completionLog', {});
+  const profile = Store.get('profile');
+
+  // Weekly breakdown
+  const breakdown = document.getElementById('weekly-breakdown');
+  const days = [];
+  const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    const key = d.toISOString().split('T')[0];
+    const day = d.getDay();
+    days.push({ label: `周${dayNames[day]}`, date: key, count: log[key] || 0 });
+  }
+
+  breakdown.innerHTML = days.map(d => {
+    const maxH = Math.max(1, ...days.map(x => x.count));
+    const h = d.count > 0 ? (d.count / maxH) * 100 : 4;
+    const isToday = d.date === new Date().toISOString().split('T')[0];
+    return `
+      <div style="text-align: center; flex: 1;">
+        <div style="font-size: 0.8rem; font-weight: bold; color: ${isToday ? 'var(--neon-cyan)' : 'var(--text-secondary)'};">${d.count}</div>
+        <div style="height: ${Math.max(h, 4)}px; background: ${isToday ? 'var(--neon-cyan)' : 'rgba(0,240,255,0.3)'}; border-radius: 2px; margin: 4px 0; min-width: 20px; box-shadow: ${isToday ? '0 0 8px rgba(0,240,255,0.5)' : 'none'};"></div>
+        <div style="font-size: 0.65rem; color: var(--text-dim);">${d.label}</div>
+      </div>
+    `;
+  }).join('');
+
+  // Weekly chart (simple canvas)
+  drawWeeklyChart(days);
+
+  // Type distribution chart
+  drawTypeChart();
+}
+
+function drawWeeklyChart(days) {
+  const canvas = document.getElementById('chart-weekly');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.parentElement.clientWidth - 32;
+  const h = 160;
+  canvas.width = w;
+  canvas.height = h;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const y = 20 + i * 35;
+    ctx.beginPath();
+    ctx.moveTo(40, y);
+    ctx.lineTo(w - 20, y);
+    ctx.stroke();
+  }
+
+  const maxVal = Math.max(1, ...days.map(d => d.count));
+  const barW = (w - 80) / days.length - 8;
+
+  days.forEach((d, i) => {
+    const x = 50 + i * ((w - 80) / days.length);
+    const barH = (d.count / maxVal) * 120;
+    const y = h - 20 - barH;
+
+    const isToday = d.date === new Date().toISOString().split('T')[0];
+
+    // Bar
+    const gradient = ctx.createLinearGradient(x, y, x, h - 20);
+    gradient.addColorStop(0, isToday ? '#00f0ff' : 'rgba(0, 240, 255, 0.6)');
+    gradient.addColorStop(1, isToday ? 'rgba(0, 240, 255, 0.2)' : 'rgba(0, 240, 255, 0.1)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, y, barW, barH);
+
+    // Value
+    ctx.fillStyle = isToday ? '#00f0ff' : '#8888a0';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(d.count, x + barW / 2, y - 6);
+
+    // Label
+    ctx.fillStyle = '#555568';
+    ctx.font = '9px monospace';
+    ctx.fillText(d.label, x + barW / 2, h - 4);
+  });
+}
+
+function drawTypeChart() {
+  const tasks = getTasks();
+  const completed = tasks.filter(t => t.status === 'completed');
+  const types = { main: 0, side: 0, daily: 0, timed: 0 };
+  completed.forEach(t => { if (types[t.type] !== undefined) types[t.type]++; });
+
+  const canvas = document.getElementById('chart-types');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const size = 150;
+  canvas.width = size;
+  canvas.height = size;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+
+  ctx.clearRect(0, 0, size, size);
+
+  const total = Object.values(types).reduce((a, b) => a + b, 0) || 1;
+  const colors = {
+    main: '#ff00ff', side: '#00f0ff', daily: '#00ff88', timed: '#ffe500'
+  };
+  const labels = {
+    main: '主线', side: '支线', daily: '每日', timed: '限时'
+  };
+
+  const cx = size / 2, cy = size / 2, r = 50;
+  let angle = -Math.PI / 2;
+
+  Object.entries(types).forEach(([key, val]) => {
+    if (val === 0) return;
+    const slice = (val / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, angle, angle + slice);
+    ctx.closePath();
+    ctx.fillStyle = colors[key];
+    ctx.globalAlpha = 0.7;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#0a0a0f';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    angle += slice;
+  });
+
+  // Legend
+  let lx = 10, ly = 110;
+  Object.entries(types).forEach(([key, val]) => {
+    ctx.fillStyle = colors[key];
+    ctx.fillRect(lx, ly, 10, 10);
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${labels[key]}: ${val}`, lx + 14, ly + 9);
+    ly += 16;
+  });
+}
+
+function updatePomodoroTaskSelect() {
+  const select = document.getElementById('pomodoro-task-select');
+  if (!select) return;
+  const tasks = getTasks().filter(t => t.status === 'active');
+  select.innerHTML = '<option value="">-- 选择要专注的任务 --</option>' +
+    tasks.map(t => `<option value="${t.id}">${t.title} (${t.progress || 0}%)</option>`).join('');
+
+  const profile = Store.get('profile');
+  const today = new Date().toISOString().split('T')[0];
+  if (profile.pomodoroDate !== today) {
+    profile.pomodoroToday = 0;
+    profile.pomodoroDate = today;
+    Store.set('profile', profile);
+  }
+  const el = document.getElementById('pomodoro-today-count');
+  if (el) el.textContent = profile.pomodoroToday || 0;
+}
+
+// === Helper Functions ===
+function getTypeLabel(type) {
+  const map = { main: '主线', side: '支线', daily: '每日', timed: '限时' };
+  return map[type] || type;
+}
+
+function getTypeColor(type) {
+  const map = { main: 'magenta', side: 'cyan', daily: 'green', timed: 'orange' };
+  return map[type] || 'cyan';
+}
+
+function getPriorityLabel(p) {
+  const map = { low: '低', medium: '中', high: '高', urgent: '紧急' };
+  return map[p] || p;
+}
+
+function getPriorityColor(p) {
+  const map = { low: 'cyan', medium: 'green', high: 'orange', urgent: 'red' };
+  return map[p] || 'cyan';
+}
+
+// === Cloud Sync UI ===
+function openSyncModal() {
+  document.getElementById('sync-modal').classList.add('show');
+  if (SyncManager.isConfigured()) {
+    document.getElementById('sync-setup-section').style.display = 'none';
+    document.getElementById('sync-connected-section').style.display = 'block';
+    document.getElementById('sync-save-btn').style.display = 'none';
+    document.getElementById('sync-now-btn').style.display = 'inline-block';
+    document.getElementById('sync-pull-btn').style.display = 'inline-block';
+    document.getElementById('sync-push-btn').style.display = 'inline-block';
+    document.getElementById('sync-disconnect-btn').style.display = 'inline-block';
+    updateSyncModalStatus();
+  } else {
+    document.getElementById('sync-setup-section').style.display = 'block';
+    document.getElementById('sync-connected-section').style.display = 'none';
+    document.getElementById('sync-save-btn').style.display = 'inline-block';
+    document.getElementById('sync-now-btn').style.display = 'none';
+    document.getElementById('sync-pull-btn').style.display = 'none';
+    document.getElementById('sync-push-btn').style.display = 'none';
+    document.getElementById('sync-disconnect-btn').style.display = 'none';
+    document.getElementById('sync-token').value = '';
+    document.getElementById('sync-gist-id-input').value = '';
+    document.getElementById('sync-auto').checked = true;
+  }
+}
+
+function closeSyncModal() {
+  document.getElementById('sync-modal').classList.remove('show');
+}
+
+async function saveSyncSettings() {
+  const token = document.getElementById('sync-token').value.trim();
+  const gistId = document.getElementById('sync-gist-id-input').value.trim();
+  const autoSync = document.getElementById('sync-auto').checked;
+  if (!token) { showToast('请输入 Gitee 令牌', 'warning'); return; }
+
+  SyncManager.config.token = token;
+  SyncManager.config.autoSync = autoSync;
+  SyncManager._initialized = true;
+
+  if (gistId) {
+    // Connect to existing Gist
+    SyncManager.config.gistId = gistId;
+    SyncManager.saveConfig();
+    showToast('正在连接...', 'info');
+    const result = await SyncManager.pull();
+    if (result.success) {
+      if (result.pulled) { renderAll(); updateDashboard(); showToast('已从云端同步数据！', 'success'); }
+      else { showToast('连接成功！本地数据已是最新', 'success'); }
+      SyncManager.updateButton('synced');
+      openSyncModal();
+    } else {
+      showToast('连接失败: ' + result.error, 'warning');
+    }
+  } else {
+    // Create new Gist
+    showToast('正在创建同步...', 'info');
+    SyncManager.saveConfig();
+    const result = await SyncManager.createGist();
+    if (result.success) {
+      showToast('同步创建成功！', 'success');
+      SyncManager.updateButton('synced');
+      openSyncModal();
+    } else {
+      showToast('创建失败: ' + result.error, 'warning');
+    }
+  }
+}
+
+async function manualSync() {
+  showToast('正在同步...', 'info');
+  const pullResult = await SyncManager.pull();
+  if (pullResult.pulled) { renderAll(); updateDashboard(); }
+  const pushResult = await SyncManager.push();
+  if (pushResult.success) showToast('同步完成！', 'success');
+  else showToast('同步出错: ' + (pullResult.error || pushResult.error), 'warning');
+  updateSyncModalStatus();
+}
+
+async function manualPush() {
+  showToast('正在上传...', 'info');
+  const r = await SyncManager.push();
+  showToast(r.success ? '上传成功！' : '上传失败: ' + r.error, r.success ? 'success' : 'warning');
+  updateSyncModalStatus();
+}
+
+async function manualPull() {
+  showToast('正在下载...', 'info');
+  const r = await SyncManager.pull();
+  if (r.success) {
+    if (r.pulled) { renderAll(); updateDashboard(); showToast('下载成功，数据已更新！', 'success'); }
+    else showToast(r.message || '本地数据已是最新', 'info');
+  } else {
+    showToast('下载失败: ' + r.error, 'warning');
+  }
+  updateSyncModalStatus();
+}
+
+function disconnectSync() {
+  if (!confirm('确定断开云同步？本地数据不会被删除，但将不再自动同步。')) return;
+  SyncManager.config = { token: '', gistId: '', autoSync: true, lastSync: 0, lastLocalModify: 0 };
+  SyncManager.saveConfig();
+  SyncManager.updateButton();
+  showToast('已断开云同步', 'info');
+  openSyncModal();
+}
+
+function updateSyncModalStatus() {
+  if (!SyncManager.isConfigured()) return;
+  document.getElementById('sync-gist-display').textContent = SyncManager.config.gistId;
+  const ls = SyncManager.config.lastSync;
+  if (ls) {
+    const d = new Date(ls);
+    document.getElementById('sync-last-time').textContent =
+      `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  } else {
+    document.getElementById('sync-last-time').textContent = '从未';
+  }
+  const autoEl = document.getElementById('sync-auto-status');
+  autoEl.textContent = SyncManager.config.autoSync ? '已开启' : '已关闭';
+  autoEl.style.color = SyncManager.config.autoSync ? 'var(--neon-green)' : 'var(--text-dim)';
+}
+
+// Close sync modal on overlay click
+document.getElementById('sync-modal')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeSyncModal();
+});
+
+// === Navigation ===
+document.getElementById('nav').addEventListener('click', (e) => {
+  const btn = e.target.closest('.nav-btn');
+  if (!btn) return;
+
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const panelId = 'panel-' + btn.dataset.panel;
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(panelId).classList.add('active');
+
+  renderAll();
+});
+
+// === Filter/Sort listeners ===
+document.getElementById('task-filter')?.addEventListener('change', renderTasks);
+document.getElementById('task-sort')?.addEventListener('change', renderTasks);
+
+// === Close modal on overlay click ===
+document.getElementById('task-modal')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeTaskModal();
+});
+
+// === Particle Background ===
+function initParticles() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  const maxParticles = 60;
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  class Particle {
+    constructor() {
+      this.reset();
+      this.y = Math.random() * canvas.height;
+    }
+    reset() {
+      this.x = Math.random() * canvas.width;
+      this.y = -10;
+      this.size = Math.random() * 2 + 1;
+      this.speed = Math.random() * 0.5 + 0.2;
+      this.opacity = Math.random() * 0.5 + 0.1;
+      this.hue = Math.random() < 0.5 ? 190 : 300; // cyan or magenta
+    }
+    update() {
+      this.y += this.speed;
+      this.opacity -= 0.001;
+      if (this.y > canvas.height + 10 || this.opacity <= 0) {
+        this.reset();
+      }
+    }
+    draw() {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${this.hue}, 100%, 60%, ${this.opacity})`;
+      ctx.fill();
+    }
+  }
+
+  for (let i = 0; i < maxParticles; i++) {
+    particles.push(new Particle());
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => { p.update(); p.draw(); });
+
+    // Occasional data line
+    if (Math.random() < 0.02) {
+      const y = Math.random() * canvas.height;
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.03)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+
+    requestAnimationFrame(animate);
+  }
+  animate();
+}
+
+// === Initialize ===
+document.addEventListener('DOMContentLoaded', async () => {
+  SyncManager.init();
+  initData();
+  initParticles();
+  renderAll();
+  updateDashboard();
+
+  // Auto-pull from cloud if configured
+  if (SyncManager.isConfigured()) {
+    const result = await SyncManager.pull();
+    if (result.pulled) {
+      renderAll();
+      updateDashboard();
+      showToast('已从云端同步数据', 'success');
+    }
+  }
+});
+
+// Auto-refresh daily at midnight
+setInterval(() => {
+  const now = new Date();
+  if (now.getHours() === 0 && now.getMinutes() === 0) {
+    refreshDailyTasks();
+    refreshBountiesCheck();
+    updateStreak();
+    renderAll();
+  }
+}, 60000);
+
+console.log('%c NEXUS CORE v1.0 %c 任务核心系统已就绪 ',
+  'background:#0a0a0f;color:#00f0ff;font-size:16px;padding:8px;',
+  'background:#0a0a0f;color:#e0e0e8;font-size:12px;padding:8px;');
+</script>
+
+</body>
+</html>
