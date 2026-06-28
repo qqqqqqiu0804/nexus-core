@@ -26,6 +26,7 @@
   --neon-yellow: #ffe500;
   --neon-green: #00ff88;
   --neon-red: #ff3344;
+  --neon-pink: #ff3380;
   --neon-purple: #b44dff;
   --neon-orange: #ff8800;
   --xp-bar: #00f0ff;
@@ -464,6 +465,132 @@ label {
   .header-title { font-size: 1.5rem; }
   .level-display { flex-direction: column; text-align: center; }
   .sync-btn { position: static; margin-top: 12px; }
+  .wallet-stats-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* === Wallet === */
+.wallet-balance-card {
+  background: linear-gradient(135deg, rgba(0,240,255,0.08), rgba(255,0,128,0.05));
+  border: 1px solid rgba(0,240,255,0.2);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.wallet-balance-card::before {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: radial-gradient(circle, rgba(0,240,255,0.06) 0%, transparent 60%);
+  animation: wallet-glow 4s ease-in-out infinite;
+}
+@keyframes wallet-glow {
+  0%, 100% { transform: rotate(0deg); opacity: 0.5; }
+  50% { transform: rotate(180deg); opacity: 1; }
+}
+.wallet-balance-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  position: relative;
+}
+.wallet-balance-amount {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: var(--neon-cyan);
+  font-family: var(--font-mono);
+  margin: 8px 0 12px;
+  text-shadow: 0 0 20px rgba(0,240,255,0.4);
+  position: relative;
+}
+.wallet-balance-actions { position: relative; }
+
+.wallet-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+.wallet-stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 14px 10px;
+  text-align: center;
+}
+.wallet-stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.wallet-stat-label {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.wallet-add-form {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 16px;
+}
+.wallet-type-toggle {
+  display: flex;
+  gap: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-glow);
+}
+.wallet-type-btn {
+  flex: 1;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font-mono);
+}
+.wallet-type-btn.active {
+  background: var(--neon-cyan);
+  color: var(--bg-darker);
+  font-weight: 700;
+}
+#wtype-expense.active { background: var(--neon-pink); }
+#wtype-income.active { background: var(--neon-green); }
+
+.wallet-txn-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+.wallet-txn-item:hover { background: rgba(0,240,255,0.04); }
+.wallet-txn-icon {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+.wallet-txn-icon.expense {
+  background: rgba(255,51,68,0.15);
+  color: var(--neon-pink);
+}
+.wallet-txn-icon.income {
+  background: rgba(0,255,136,0.15);
+  color: var(--neon-green);
 }
 </style>
 </head>
@@ -492,6 +619,7 @@ label {
     <button class="nav-btn" data-panel="shop">◆ 积分商店</button>
     <button class="nav-btn" data-panel="achievements">◆ 成就殿堂</button>
     <button class="nav-btn" data-panel="stats">◆ 数据看板</button>
+    <button class="nav-btn" data-panel="wallet">◆ 金币管家</button>
   </nav>
 
   <!-- Panel: Dashboard -->
@@ -531,7 +659,10 @@ label {
     <!-- Daily Tasks -->
     <div class="section-header">
       <span class="section-title">◆ 每日任务</span>
-      <span class="section-count" id="daily-count">剩余 0/0</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="section-count" id="daily-count">剩余 0/0</span>
+        <button class="btn btn-sm" onclick="openDailyModal()" style="padding: 2px 8px; font-size: 0.7rem;">⚙ 管理</button>
+      </div>
     </div>
     <div id="daily-tasks-list"></div>
 
@@ -652,9 +783,79 @@ label {
       <div id="weekly-breakdown" style="display: flex; gap: 8px; justify-content: space-around; padding: 16px 0;"></div>
     </div>
   </div>
-</div>
 
-<!-- Task Modal -->
+  <!-- Panel: Wallet -->
+  <div class="panel" id="panel-wallet">
+    <!-- Balance Card -->
+    <div class="wallet-balance-card" id="wallet-balance-card">
+      <div class="wallet-balance-label">当前余额</div>
+      <div class="wallet-balance-amount" id="wallet-balance">¥ 0.00</div>
+      <div class="wallet-balance-actions">
+        <button class="btn btn-sm" onclick="openSetBalanceModal()" style="padding: 4px 12px;">设置初始余额</button>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="wallet-stats-row">
+      <div class="wallet-stat-card expense">
+        <div class="wallet-stat-value" id="wallet-today-expense" style="color: var(--neon-pink);">¥0</div>
+        <div class="wallet-stat-label">今日支出</div>
+      </div>
+      <div class="wallet-stat-card income">
+        <div class="wallet-stat-value" id="wallet-today-income" style="color: var(--neon-green);">¥0</div>
+        <div class="wallet-stat-label">今日收入</div>
+      </div>
+      <div class="wallet-stat-card expense">
+        <div class="wallet-stat-value" id="wallet-month-expense" style="color: var(--neon-pink);">¥0</div>
+        <div class="wallet-stat-label">本月支出</div>
+      </div>
+      <div class="wallet-stat-card income">
+        <div class="wallet-stat-value" id="wallet-month-income" style="color: var(--neon-green);">¥0</div>
+        <div class="wallet-stat-label">本月收入</div>
+      </div>
+    </div>
+
+    <!-- Add Transaction -->
+    <div class="section-header" style="margin-top: 20px;">
+      <span class="section-title">◆ 记一笔</span>
+    </div>
+    <div class="wallet-add-form">
+      <div class="wallet-type-toggle">
+        <button class="wallet-type-btn active" id="wtype-expense" onclick="setWalletType('expense')">支出</button>
+        <button class="wallet-type-btn" id="wtype-income" onclick="setWalletType('income')">收入</button>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
+        <input type="number" id="wallet-amount" placeholder="金额" step="0.01" min="0" style="width: 120px;">
+        <select id="wallet-category" style="width: auto;">
+          <option value="餐饮">餐饮</option>
+          <option value="交通">交通</option>
+          <option value="购物">购物</option>
+          <option value="娱乐">娱乐</option>
+          <option value="学习">学习</option>
+          <option value="生活">生活</option>
+          <option value="其他">其他</option>
+        </select>
+        <input type="text" id="wallet-note" placeholder="备注（可选）" style="flex: 1; min-width: 150px;">
+        <button class="btn btn-primary" onclick="addTransaction()">记一笔</button>
+      </div>
+    </div>
+
+    <!-- Transaction History -->
+    <div class="section-header" style="margin-top: 20px;">
+      <span class="section-title">◆ 交易记录</span>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <select id="wallet-filter" style="width: auto; font-size: 0.75rem;" onchange="renderWalletHistory()">
+          <option value="all">全部</option>
+          <option value="today">今天</option>
+          <option value="week">本周</option>
+          <option value="month">本月</option>
+        </select>
+        <button class="btn btn-sm btn-danger" onclick="clearWalletHistory()" style="padding: 2px 8px; font-size: 0.7rem;">清空</button>
+      </div>
+    </div>
+    <div id="wallet-history-list"></div>
+  </div>
+</div>
 <div class="modal-overlay" id="task-modal">
   <div class="modal">
     <div class="modal-title" id="modal-title">// 新增任务</div>
@@ -774,6 +975,35 @@ label {
       <button class="btn" id="sync-push-btn" onclick="manualPush()" style="display: none;">↑ 上传</button>
       <button class="btn btn-primary" id="sync-save-btn" onclick="saveSyncSettings()">保存并连接</button>
       <button class="btn btn-primary" id="sync-now-btn" onclick="manualSync()" style="display: none;">⟳ 立即同步</button>
+    </div>
+  </div>
+</div>
+
+<!-- Daily Task Manager Modal -->
+<div class="modal-overlay" id="daily-modal" onclick="if(event.target===this)closeDailyModal()">
+  <div class="modal" style="max-width: 520px;">
+    <div class="modal-header">
+      <h3 class="modal-title">⚙ 每日任务管理</h3>
+      <button class="modal-close" onclick="closeDailyModal()">×</button>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <input type="text" id="daily-new-title" placeholder="新任务标题（如：背50个单词）" style="flex: 1;">
+        <input type="number" id="daily-new-xp" placeholder="XP" style="width: 70px;" value="50">
+        <input type="number" id="daily-new-coins" placeholder="💰" style="width: 70px;" value="30">
+        <button class="btn btn-primary" onclick="addDailyTemplate()">添加</button>
+      </div>
+    </div>
+
+    <div id="daily-template-list" style="max-height: 350px; overflow-y: auto;"></div>
+
+    <div style="margin-top: 12px; padding: 10px; background: rgba(0,240,255,0.05); border-radius: 6px; border: 1px solid rgba(0,240,255,0.15); font-size: 0.7rem; color: var(--text-secondary); line-height: 1.6;">
+      <strong style="color: var(--neon-cyan);">说明：</strong>每日0点自动从模板生成今日任务。开关关闭后该任务不会出现。修改后明日生效。
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="closeDailyModal()">完成</button>
     </div>
   </div>
 </div>
@@ -1019,6 +1249,7 @@ function initData() {
     Store.set('bountyRefreshes', 3);
     Store.set('bountyDate', '');
     Store.set('completionLog', {}); // { 'YYYY-MM-DD': count }
+    Store.set('wallet', { balance: 0, initialSet: false, transactions: [] }); // { id, type, amount, category, note, date }
     Store.set('initialized', true);
   }
   // Ensure daily tasks are refreshed
@@ -1634,6 +1865,7 @@ function renderAll() {
   renderShop();
   renderAchievements();
   renderStats();
+  renderWallet();
   updatePomodoroTaskSelect();
 }
 
@@ -2153,6 +2385,271 @@ function updateSyncModalStatus() {
 document.getElementById('sync-modal')?.addEventListener('click', (e) => {
   if (e.target === e.currentTarget) closeSyncModal();
 });
+
+// === Daily Task Template Manager ===
+function openDailyModal() {
+  document.getElementById('daily-modal').classList.add('show');
+  renderDailyTemplates();
+}
+
+function closeDailyModal() {
+  document.getElementById('daily-modal').classList.remove('show');
+}
+
+function renderDailyTemplates() {
+  const templates = Store.get('dailyTemplates', []);
+  const list = document.getElementById('daily-template-list');
+  if (templates.length === 0) {
+    list.innerHTML = '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 16px; text-align: center;">还没有每日任务模板，在上方添加一个吧</div>';
+    return;
+  }
+  list.innerHTML = templates.map(t => `
+    <div style="display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--bg-card); border-radius: 6px; margin-bottom: 8px; border: 1px solid var(--border-subtle);">
+      <label class="checkbox-label" style="flex-shrink: 0; display: flex; align-items: center; gap: 4px;">
+        <input type="checkbox" ${t.enabled ? 'checked' : ''} onchange="toggleDailyTemplate('${t.id}')">
+      </label>
+      <div style="flex: 1; min-width: 0;">
+        <input type="text" value="${t.title.replace(/"/g, '&quot;')}" onchange="editDailyTemplate('${t.id}', 'title', this.value)" style="width: 100%; background: transparent; border: none; color: var(--text-primary); font-size: 0.85rem; border-bottom: 1px solid transparent;" onfocus="this.style.borderColor='var(--border-glow)'" onblur="this.style.borderColor='transparent'">
+      </div>
+      <div style="display: flex; gap: 4px; flex-shrink: 0;">
+        <input type="number" value="${t.xp}" onchange="editDailyTemplate('${t.id}', 'xp', parseInt(this.value)||0)" style="width: 55px; text-align: center; font-size: 0.75rem;" title="XP奖励">
+        <span style="color: var(--text-dim); font-size: 0.7rem; line-height: 28px;">xp</span>
+        <input type="number" value="${t.coins}" onchange="editDailyTemplate('${t.id}', 'coins', parseInt(this.value)||0)" style="width: 55px; text-align: center; font-size: 0.75rem;" title="金币奖励">
+        <span style="color: var(--text-dim); font-size: 0.7rem; line-height: 28px;">💰</span>
+      </div>
+      <button class="btn btn-sm btn-danger" onclick="deleteDailyTemplate('${t.id}')" style="flex-shrink: 0; padding: 2px 8px;">✕</button>
+    </div>
+  `).join('');
+}
+
+function addDailyTemplate() {
+  const title = document.getElementById('daily-new-title').value.trim();
+  const xp = parseInt(document.getElementById('daily-new-xp').value) || 50;
+  const coins = parseInt(document.getElementById('daily-new-coins').value) || 30;
+  if (!title) { showToast('请输入任务标题', 'warning'); return; }
+  const templates = Store.get('dailyTemplates', []);
+  templates.push({ id: 'd' + Date.now(), title, xp, coins, enabled: true });
+  Store.set('dailyTemplates', templates);
+  document.getElementById('daily-new-title').value = '';
+  renderDailyTemplates();
+  showToast('已添加每日任务模板', 'success');
+}
+
+function editDailyTemplate(id, field, value) {
+  const templates = Store.get('dailyTemplates', []);
+  const t = templates.find(t => t.id === id);
+  if (t) { t[field] = value; Store.set('dailyTemplates', templates); }
+}
+
+function toggleDailyTemplate(id) {
+  const templates = Store.get('dailyTemplates', []);
+  const t = templates.find(t => t.id === id);
+  if (t) { t.enabled = !t.enabled; Store.set('dailyTemplates', templates); }
+}
+
+function deleteDailyTemplate(id) {
+  const templates = Store.get('dailyTemplates', []).filter(t => t.id !== id);
+  Store.set('dailyTemplates', templates);
+  renderDailyTemplates();
+  showToast('已删除', 'info');
+}
+
+// Close daily modal on overlay click
+document.getElementById('daily-modal')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeDailyModal();
+});
+
+// === Wallet / Finance Manager ===
+let _walletType = 'expense';
+
+function setWalletType(type) {
+  _walletType = type;
+  document.getElementById('wtype-expense').classList.toggle('active', type === 'expense');
+  document.getElementById('wtype-income').classList.toggle('active', type === 'income');
+  // Swap categories for income
+  const cat = document.getElementById('wallet-category');
+  if (type === 'income') {
+    cat.innerHTML = '<option value="工资">工资</option><option value="兼职">兼职</option><option value="红包">红包</option><option value="理财">理财</option><option value="其他">其他</option>';
+  } else {
+    cat.innerHTML = '<option value="餐饮">餐饮</option><option value="交通">交通</option><option value="购物">购物</option><option value="娱乐">娱乐</option><option value="学习">学习</option><option value="生活">生活</option><option value="其他">其他</option>';
+  }
+}
+
+function renderWallet() {
+  const wallet = Store.get('wallet', { balance: 0, initialSet: false, transactions: [] });
+  if (!wallet.transactions) wallet.transactions = [];
+
+  // Balance
+  document.getElementById('wallet-balance').textContent = '¥ ' + (wallet.balance || 0).toFixed(2);
+
+  // Show/hide set balance button
+  const balanceCard = document.getElementById('wallet-balance-card');
+  const existingBtn = balanceCard.querySelector('.wallet-balance-actions');
+  if (wallet.initialSet) {
+    existingBtn.innerHTML = '<button class="btn btn-sm" onclick="openSetBalanceModal()" style="padding: 4px 12px;">调整余额</button>';
+  } else {
+    existingBtn.innerHTML = '<button class="btn btn-primary btn-sm" onclick="openSetBalanceModal()" style="padding: 4px 12px;">设置初始余额</button>';
+  }
+
+  // Stats
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const monthStr = todayStr.slice(0, 7);
+  let todayExp = 0, todayInc = 0, monthExp = 0, monthInc = 0;
+  wallet.transactions.forEach(t => {
+    const tDate = t.date ? t.date.slice(0, 10) : '';
+    if (t.type === 'expense') {
+      if (tDate === todayStr) todayExp += t.amount;
+      if (tDate.slice(0, 7) === monthStr) monthExp += t.amount;
+    } else {
+      if (tDate === todayStr) todayInc += t.amount;
+      if (tDate.slice(0, 7) === monthStr) monthInc += t.amount;
+    }
+  });
+  document.getElementById('wallet-today-expense').textContent = '¥' + todayExp.toFixed(1);
+  document.getElementById('wallet-today-income').textContent = '¥' + todayInc.toFixed(1);
+  document.getElementById('wallet-month-expense').textContent = '¥' + monthExp.toFixed(1);
+  document.getElementById('wallet-month-income').textContent = '¥' + monthInc.toFixed(1);
+
+  renderWalletHistory();
+}
+
+function renderWalletHistory() {
+  const wallet = Store.get('wallet', { transactions: [] });
+  const txns = wallet.transactions || [];
+  const filter = document.getElementById('wallet-filter')?.value || 'all';
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const weekAgo = new Date(Date.now() - 7 * 86400000);
+  const monthStr = todayStr.slice(0, 7);
+
+  let filtered = txns;
+  if (filter === 'today') {
+    filtered = txns.filter(t => t.date && t.date.slice(0, 10) === todayStr);
+  } else if (filter === 'week') {
+    filtered = txns.filter(t => t.date && new Date(t.date) >= weekAgo);
+  } else if (filter === 'month') {
+    filtered = txns.filter(t => t.date && t.date.slice(0, 7) === monthStr);
+  }
+
+  // Sort by date desc
+  filtered = [...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const list = document.getElementById('wallet-history-list');
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 16px; text-align: center;">暂无交易记录</div>';
+    return;
+  }
+
+  // Group by date
+  const grouped = {};
+  filtered.forEach(t => {
+    const day = t.date ? t.date.slice(0, 10) : '未知';
+    if (!grouped[day]) grouped[day] = [];
+    grouped[day].push(t);
+  });
+
+  const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+  list.innerHTML = Object.entries(grouped).map(([day, items]) => {
+    const d = new Date(day);
+    const isToday = day === todayStr;
+    const dayLabel = isToday ? '今天' : `周${dayNames[d.getDay()] || '?'}`;
+    const dateLabel = `${d.getMonth() + 1}/${d.getDate()}`;
+    const dayExp = items.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    const dayInc = items.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+
+    return `
+      <div style="margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border-subtle); margin-bottom: 6px;">
+          <span style="font-size: 0.75rem; color: ${isToday ? 'var(--neon-cyan)' : 'var(--text-dim)'}; font-family: var(--font-mono);">${dayLabel} ${dateLabel}</span>
+          <span style="font-size: 0.7rem; color: var(--text-dim); font-family: var(--font-mono);">
+            ${dayExp > 0 ? `支 ¥${dayExp.toFixed(1)}` : ''} ${dayInc > 0 ? ` 收 ¥${dayInc.toFixed(1)}` : ''}
+          </span>
+        </div>
+        ${items.map(t => `
+          <div class="wallet-txn-item">
+            <div class="wallet-txn-icon ${t.type}">
+              ${t.type === 'expense' ? '↘' : '↗'}
+            </div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 0.85rem; color: var(--text-primary);">${t.category || '其他'}${t.note ? ' · ' + t.note : ''}</div>
+              <div style="font-size: 0.65rem; color: var(--text-dim); font-family: var(--font-mono);">${t.date ? t.date.slice(11, 16) : ''}</div>
+            </div>
+            <div style="font-size: 0.9rem; font-weight: bold; color: ${t.type === 'expense' ? 'var(--neon-pink)' : 'var(--neon-green)'}; font-family: var(--font-mono);">
+              ${t.type === 'expense' ? '-' : '+'}¥${t.amount.toFixed(2)}
+            </div>
+            <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${t.id}')" style="padding: 2px 6px; font-size: 0.65rem; flex-shrink: 0;">✕</button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }).join('');
+}
+
+function addTransaction() {
+  const amount = parseFloat(document.getElementById('wallet-amount').value);
+  const category = document.getElementById('wallet-category').value;
+  const note = document.getElementById('wallet-note').value.trim();
+  if (!amount || amount <= 0) { showToast('请输入有效金额', 'warning'); return; }
+
+  const wallet = Store.get('wallet', { balance: 0, initialSet: false, transactions: [] });
+  if (!wallet.transactions) wallet.transactions = [];
+
+  const txn = {
+    id: 'w' + Date.now(),
+    type: _walletType,
+    amount: amount,
+    category: category,
+    note: note,
+    date: new Date().toISOString()
+  };
+
+  wallet.transactions.push(txn);
+  // Auto-set initial balance to 0 if not set
+  if (!wallet.initialSet) { wallet.balance = 0; wallet.initialSet = true; }
+  // Update balance
+  if (_walletType === 'expense') wallet.balance -= amount;
+  else wallet.balance += amount;
+
+  Store.set('wallet', wallet);
+  document.getElementById('wallet-amount').value = '';
+  document.getElementById('wallet-note').value = '';
+  renderWallet();
+  showToast(`${_walletType === 'expense' ? '支出' : '收入'} ¥${amount.toFixed(2)} 已记录`, 'success');
+}
+
+function deleteTransaction(id) {
+  const wallet = Store.get('wallet', { transactions: [] });
+  const txn = (wallet.transactions || []).find(t => t.id === id);
+  if (!txn) return;
+  // Reverse balance
+  if (txn.type === 'expense') wallet.balance += txn.amount;
+  else wallet.balance -= txn.amount;
+  wallet.transactions = (wallet.transactions || []).filter(t => t.id !== id);
+  Store.set('wallet', wallet);
+  renderWallet();
+  showToast('已删除该记录', 'info');
+}
+
+function clearWalletHistory() {
+  if (!confirm('确定清空所有交易记录？余额将重置为0。')) return;
+  Store.set('wallet', { balance: 0, initialSet: false, transactions: [] });
+  renderWallet();
+  showToast('已清空所有记录', 'info');
+}
+
+function openSetBalanceModal() {
+  const wallet = Store.get('wallet', { balance: 0 });
+  const input = prompt(wallet.initialSet ? '调整当前余额（直接设置为该数值）' : '设置你的初始余额（你现在有多少钱？）', wallet.balance || '');
+  if (input === null) return;
+  const val = parseFloat(input);
+  if (isNaN(val)) { showToast('请输入有效数字', 'warning'); return; }
+  wallet.balance = val;
+  wallet.initialSet = true;
+  Store.set('wallet', wallet);
+  renderWallet();
+  showToast('余额已设置为 ¥' + val.toFixed(2), 'success');
+}
 
 // === Navigation ===
 document.getElementById('nav').addEventListener('click', (e) => {
