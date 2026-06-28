@@ -860,15 +860,14 @@ const SyncManager = {
     this.updateButton('syncing');
     try {
       const content = JSON.stringify(this.exportData(), null, 2);
-      const params = new URLSearchParams();
-      params.append('access_token', this.config.token);
-      params.append('files[nexus-core-sync.json][content]', content);
+      const fd = new FormData();
+      fd.append('access_token', this.config.token);
+      fd.append('files[nexus-core-sync.json][content]', content);
       const res = await fetch(`https://gitee.com/api/v5/gists/${this.config.gistId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params
+        body: fd
       });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `HTTP ${res.status}`); }
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `HTTP ${res.status}: ${await res.text().catch(() => '')}`); }
       this.config.lastSync = Date.now();
       this.saveConfig();
       this.updateButton('synced');
@@ -918,17 +917,16 @@ const SyncManager = {
     if (!this.config.token) return { success: false, error: '请先输入令牌' };
     try {
       const content = JSON.stringify(this.exportData(), null, 2);
-      const params = new URLSearchParams();
-      params.append('access_token', this.config.token);
-      params.append('description', 'NEXUS CORE Sync Data');
-      params.append('public', 'false');
-      params.append('files[nexus-core-sync.json][content]', content);
+      const fd = new FormData();
+      fd.append('access_token', this.config.token);
+      fd.append('description', 'NEXUS CORE Sync Data');
+      fd.append('public', 'false');
+      fd.append('files[nexus-core-sync.json][content]', content);
       const res = await fetch('https://gitee.com/api/v5/gists', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params
+        body: fd
       });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `HTTP ${res.status}`); }
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `HTTP ${res.status}: ${await res.text().catch(() => '')}`); }
       const gist = await res.json();
       this.config.gistId = gist.id;
       this.config.lastSync = Date.now();
