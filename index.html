@@ -716,17 +716,17 @@ label {
     <!-- Setup Section (not configured) -->
     <div id="sync-setup-section">
       <div class="form-group">
-        <label>Gitee 私人令牌</label>
-        <input type="password" id="sync-token" placeholder="粘贴你的 Gitee 私人令牌">
+        <label>JSONBin API Key</label>
+        <input type="password" id="sync-token" placeholder="粘贴你的 JSONBin API Key">
         <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 4px; line-height: 1.6;">
-          前往 Gitee → 设置 → 私人令牌 → 生成新令牌<br>
-          令牌需要有 <span style="color: var(--neon-cyan);">gists</span> 权限（勾选 snippets）
+          前往 <a href="https://jsonbin.io/login" target="_blank" style="color: var(--neon-cyan);">jsonbin.io</a> 登录/注册<br>
+          → Create API Key → 复制 Key 填入此处（免费）
         </div>
       </div>
 
       <div class="form-group">
-        <label>Gist ID（已有同步则填入，留空自动创建）</label>
-        <input type="text" id="sync-gist-id-input" placeholder="留空将自动创建新的 Gitee Gist">
+        <label>Bin ID（已有同步则填入，留空自动创建）</label>
+        <input type="text" id="sync-gist-id-input" placeholder="留空将自动创建新的存储空间">
       </div>
 
       <div class="form-group">
@@ -745,7 +745,7 @@ label {
           <span id="sync-state-badge" class="badge badge-green">已连接</span>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">Gist ID</span>
+          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">Bin ID</span>
           <span id="sync-gist-display" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--neon-cyan); word-break: break-all; text-align: right; max-width: 280px;"></span>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -760,9 +760,9 @@ label {
 
       <div style="background: rgba(0,240,255,0.05); padding: 10px; border-radius: 6px; border: 1px solid rgba(0,240,255,0.15); font-size: 0.7rem; color: var(--text-secondary); line-height: 1.6;">
         <strong style="color: var(--neon-cyan);">使用方法：</strong><br>
-        1. 在此设备配置完成后，复制上方 Gist ID<br>
+        1. 在此设备配置完成后，复制上方 Bin ID<br>
         2. 在另一台设备（手机/电脑）打开此页面<br>
-        3. 输入相同的 Gitee 令牌和 Gist ID 即可同步
+        3. 输入相同的 API Key 和 Bin ID 即可同步
       </div>
     </div>
 
@@ -802,23 +802,28 @@ const Store = {
   }
 };
 
-// === Cloud Sync Manager (Gitee Gist) ===
+// === Cloud Sync Manager (JSONBin.io) ===
 const SyncManager = {
-  config: { token: '', gistId: '', autoSync: true, lastSync: 0, lastLocalModify: 0 },
+  config: { apiKey: '', binId: '', autoSync: true, lastSync: 0, lastLocalModify: 0 },
   _pushTimer: null,
   _isSyncing: false,
   _initialized: false,
   _suppressAutoPush: false,
+  API_BASE: 'https://api.jsonbin.io/v3',
 
   init() {
     const saved = Store.get('syncConfig');
     if (saved) this.config = { ...this.config, ...saved };
     this._initialized = true;
     this.updateButton();
+    // Auto-pull on startup if configured
+    if (this.isConfigured() && this.config.autoSync) {
+      setTimeout(() => this.pull().catch(() => {}), 1000);
+    }
   },
 
   isConfigured() {
-    return !!(this.config.token && this.config.gistId);
+    return !!(this.config.apiKey && this.config.binId);
   },
 
   // Export all nexus data (excluding syncConfig)
@@ -858,15 +863,15 @@ const SyncManager = {
     this._isSyncing = true;
     this.updateButton('syncing');
     try {
-      const content = JSON.stringify(this.exportData(), null, 2);
-      const res = await fetch(
-        `https://gitee.com/api/v5/gists/${this.config.gistId}?access_token=${this.config.token}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ files: { 'nexus-core-sync.json': { content } } })
-        }
-      );
+      const data = this.exportData();
+      const res = await fetch(`${this.API_BASE}/b/${this.config.binId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': this.config.apiKey,
+        },
+        body: JSON.stringify({ 'nexus-core-sync': data }),
+      });
       if (!res.ok) {
         const t = await res.text().catch(() => '');
         let msg;
@@ -878,6 +883,7 @@ const SyncManager = {
       this.updateButton('synced');
       return { success: true };
     } catch (e) {
+      console.error('[NEXUS Sync] Push error:', e.message);
       this.updateButton('error', e.message);
       return { success: false, error: e.message };
     } finally {
@@ -885,19 +891,24 @@ const SyncManager = {
     }
   },
 
-  // Pull remote data from Gitee Gist
   async pull() {
     if (!this.isConfigured()) return { success: false, error: '未配置同步' };
     if (this._isSyncing) return { success: false, error: '正在同步中' };
     this._isSyncing = true;
     this.updateButton('syncing');
     try {
-      const res = await fetch(`https://gitee.com/api/v5/gists/${this.config.gistId}?access_token=${this.config.token}`);
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `HTTP ${res.status}`); }
-      const gist = await res.json();
-      const file = gist.files['nexus-core-sync.json'];
-      if (!file || !file.content) throw new Error('Gist 中未找到同步数据');
-      const payload = JSON.parse(file.content);
+      const res = await fetch(`${this.API_BASE}/b/${this.config.binId}/latest`, {
+        headers: { 'X-Master-Key': this.config.apiKey },
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        let msg;
+        try { msg = JSON.parse(t).message || t; } catch { msg = t; }
+        throw new Error(`HTTP ${res.status}: ${msg}`);
+      }
+      const result = await res.json();
+      const payload = result.record['nexus-core-sync'];
+      if (!payload) throw new Error('云端数据格式异常');
       // Only import if remote is newer than last sync
       if (payload.timestamp > (this.config.lastSync || 0)) {
         this.importData(payload);
@@ -910,6 +921,7 @@ const SyncManager = {
       this.updateButton('synced');
       return { success: true, pulled: false, message: '本地数据已是最新' };
     } catch (e) {
+      console.error('[NEXUS Sync] Pull error:', e.message);
       this.updateButton('error', e.message);
       return { success: false, error: e.message };
     } finally {
@@ -917,36 +929,34 @@ const SyncManager = {
     }
   },
 
-  // Create a new secret Gist for sync
-  async createGist() {
-    if (!this.config.token) return { success: false, error: '请先输入令牌' };
+  // Create a new JSONBin for sync
+  async createBin() {
+    if (!this.config.apiKey) return { success: false, error: '请先输入 API Key' };
     try {
-      const content = JSON.stringify(this.exportData(), null, 2);
-      const res = await fetch(
-        `https://gitee.com/api/v5/gists?access_token=${this.config.token}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            description: 'NEXUS CORE Sync Data',
-            public: false,
-            files: { 'nexus-core-sync.json': { content } }
-          })
-        }
-      );
+      const data = this.exportData();
+      const res = await fetch(`${this.API_BASE}/b`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': this.config.apiKey,
+          'X-Bin-Name': 'nexus-core-sync',
+        },
+        body: JSON.stringify({ 'nexus-core-sync': data }),
+      });
       if (!res.ok) {
         const t = await res.text().catch(() => '');
         let msg;
         try { msg = JSON.parse(t).message || t; } catch { msg = t; }
         throw new Error(`HTTP ${res.status}: ${msg}`);
       }
-      const gist = await res.json();
-      this.config.gistId = gist.id;
+      const result = await res.json();
+      this.config.binId = result.metadata.id;
       this.config.lastSync = Date.now();
       this.config.lastLocalModify = Date.now();
       this.saveConfig();
-      return { success: true, gistId: gist.id };
+      return { success: true, binId: result.metadata.id };
     } catch (e) {
+      console.error('[NEXUS Sync] Create bin error:', e.message);
       return { success: false, error: e.message };
     }
   },
@@ -959,7 +969,7 @@ const SyncManager = {
     clearTimeout(this._pushTimer);
     this._pushTimer = setTimeout(async () => {
       const r = await this.push();
-      if (!r.success) console.warn('Auto-push failed:', r.error);
+      if (!r.success) console.warn('[NEXUS Sync] Auto-push failed:', r.error);
     }, 3000);
   },
 
@@ -2047,18 +2057,18 @@ function closeSyncModal() {
 }
 
 async function saveSyncSettings() {
-  const token = document.getElementById('sync-token').value.trim();
-  const gistId = document.getElementById('sync-gist-id-input').value.trim();
+  const apiKey = document.getElementById('sync-token').value.trim();
+  const binId = document.getElementById('sync-gist-id-input').value.trim();
   const autoSync = document.getElementById('sync-auto').checked;
-  if (!token) { showToast('请输入 Gitee 令牌', 'warning'); return; }
+  if (!apiKey) { showToast('请输入 JSONBin API Key', 'warning'); return; }
 
-  SyncManager.config.token = token;
+  SyncManager.config.apiKey = apiKey;
   SyncManager.config.autoSync = autoSync;
   SyncManager._initialized = true;
 
-  if (gistId) {
-    // Connect to existing Gist
-    SyncManager.config.gistId = gistId;
+  if (binId) {
+    // Connect to existing Bin
+    SyncManager.config.binId = binId;
     SyncManager.saveConfig();
     showToast('正在连接...', 'info');
     const result = await SyncManager.pull();
@@ -2071,12 +2081,12 @@ async function saveSyncSettings() {
       showToast('连接失败: ' + result.error, 'warning');
     }
   } else {
-    // Create new Gist
-    showToast('正在创建同步...', 'info');
+    // Create new Bin
+    showToast('正在创建同步空间...', 'info');
     SyncManager.saveConfig();
-    const result = await SyncManager.createGist();
+    const result = await SyncManager.createBin();
     if (result.success) {
-      showToast('同步创建成功！', 'success');
+      showToast('同步空间创建成功！', 'success');
       SyncManager.updateButton('synced');
       openSyncModal();
     } else {
@@ -2116,7 +2126,7 @@ async function manualPull() {
 
 function disconnectSync() {
   if (!confirm('确定断开云同步？本地数据不会被删除，但将不再自动同步。')) return;
-  SyncManager.config = { token: '', gistId: '', autoSync: true, lastSync: 0, lastLocalModify: 0 };
+  SyncManager.config = { apiKey: '', binId: '', autoSync: true, lastSync: 0, lastLocalModify: 0 };
   SyncManager.saveConfig();
   SyncManager.updateButton();
   showToast('已断开云同步', 'info');
@@ -2125,7 +2135,7 @@ function disconnectSync() {
 
 function updateSyncModalStatus() {
   if (!SyncManager.isConfigured()) return;
-  document.getElementById('sync-gist-display').textContent = SyncManager.config.gistId;
+  document.getElementById('sync-gist-display').textContent = SyncManager.config.binId;
   const ls = SyncManager.config.lastSync;
   if (ls) {
     const d = new Date(ls);
