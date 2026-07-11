@@ -966,26 +966,9 @@ label {
   </div>
 
   <!-- Panel: Stats -->
-  <div class="panel" id="panel-stats">
-    <div class="grid-2">
-      <div class="chart-container">
-        <div class="section-title" style="margin-bottom: 12px;">◆ 近7日完成趋势</div>
-        <canvas id="chart-weekly"></canvas>
-      </div>
-      <div class="chart-container">
-        <div class="section-title" style="margin-bottom: 12px;">◆ 任务类型分布</div>
-        <canvas id="chart-types"></canvas>
-      </div>
-    </div>
-    <div class="chart-container" style="margin-top: 12px;">
-      <div class="section-title" style="margin-bottom: 12px;">◆ 本周每日完成数</div>
-      <div id="weekly-breakdown" style="display: flex; gap: 8px; justify-content: space-around; padding: 16px 0;"></div>
-    </div>
-  </div>
-
-  <!-- Panel: Wallet -->
-  <div class="panel" id="panel-wallet">
-    <!-- Balance Card -->
+  <!-- Panel: Data (Stats + Wallet + Review) -->
+  <div class="panel" id="panel-data">
+    <!-- Wallet Balance -->
     <div class="wallet-balance-card" id="wallet-balance-card">
       <div class="wallet-balance-label">当前余额</div>
       <div class="wallet-balance-amount" id="wallet-balance">¥ 0.00</div>
@@ -994,7 +977,7 @@ label {
       </div>
     </div>
 
-    <!-- Stats Row -->
+    <!-- Quick Stats -->
     <div class="wallet-stats-row">
       <div class="wallet-stat-card expense">
         <div class="wallet-stat-value" id="wallet-today-expense" style="color: var(--neon-pink);">¥0</div>
@@ -1015,7 +998,7 @@ label {
     </div>
 
     <!-- Add Transaction -->
-    <div class="section-header" style="margin-top: 20px;">
+    <div class="section-header" style="margin-top: 16px;">
       <span class="section-title">◆ 记一笔</span>
     </div>
     <div class="wallet-add-form">
@@ -1039,8 +1022,31 @@ label {
       </div>
     </div>
 
+    <!-- Charts -->
+    <div class="grid-2" style="margin-top: 16px;">
+      <div class="chart-container">
+        <div class="section-title" style="margin-bottom: 12px;">◆ 近7日完成趋势</div>
+        <canvas id="chart-weekly"></canvas>
+      </div>
+      <div class="chart-container">
+        <div class="section-title" style="margin-bottom: 12px;">◆ 任务类型分布</div>
+        <canvas id="chart-types"></canvas>
+      </div>
+    </div>
+
+    <!-- Transaction Review -->
+    <div class="section-header" style="margin-top: 16px;">
+      <span class="section-title">◆ 交易复盘</span>
+      <select id="review-period" style="width:auto;font-size:0.75rem;" onchange="renderTransactionReview()">
+        <option value="week">本周</option>
+        <option value="month" selected>本月</option>
+        <option value="quarter">本季度</option>
+      </select>
+    </div>
+    <div id="transaction-review"></div>
+
     <!-- Transaction History -->
-    <div class="section-header" style="margin-top: 20px;">
+    <div class="section-header" style="margin-top: 16px;">
       <span class="section-title">◆ 交易记录</span>
       <div style="display: flex; gap: 8px; align-items: center;">
         <select id="wallet-filter" style="width: auto; font-size: 0.75rem;" onchange="renderWalletHistory()">
@@ -2387,6 +2393,7 @@ function renderAll() {
   renderAchievements();
   renderStats();
   renderWallet();
+  renderTransactionReview();
   renderSettings();
   updatePomodoroTaskSelect();
 }
@@ -3034,6 +3041,75 @@ function renderWallet() {
   document.getElementById('wallet-month-income').textContent = '¥' + monthInc.toFixed(1);
 
   renderWalletHistory();
+}
+
+// === Transaction Review ===
+function renderTransactionReview() {
+  const wallet = Store.get('wallet', { transactions: [] });
+  const txns = wallet.transactions || [];
+  const period = document.getElementById('review-period')?.value || 'month';
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+
+  // Filter by period
+  let startDate;
+  if (period === 'week') {
+    startDate = new Date(now); startDate.setDate(now.getDate() - now.getDay());
+  } else if (period === 'quarter') {
+    startDate = new Date(now.getFullYear(), Math.floor(now.getMonth()/3)*3, 1);
+  } else {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  const startStr = startDate.toISOString().split('T')[0];
+  const filtered = txns.filter(t => t.date && t.date.slice(0,10) >= startStr);
+
+  const expTxns = filtered.filter(t => t.type === 'expense');
+  const incTxns = filtered.filter(t => t.type === 'income');
+  const totalExp = expTxns.reduce((s,t) => s + t.amount, 0);
+  const totalInc = incTxns.reduce((s,t) => s + t.amount, 0);
+
+  // Category breakdown
+  const categories = {};
+  expTxns.forEach(t => { categories[t.category] = (categories[t.category]||0) + t.amount; });
+  const sortedCats = Object.entries(categories).sort((a,b) => b[1]-a[1]);
+  const catColors = ['var(--neon-pink)','var(--neon-orange)','var(--neon-yellow)','var(--neon-cyan)','var(--neon-purple)','var(--neon-green)','var(--text-dim)'];
+
+  // Daily average
+  const dayCount = Math.max(1, Math.ceil((now - startDate) / 86400000) + 1);
+  const dailyAvg = totalExp / dayCount;
+
+  const container = document.getElementById('transaction-review');
+  if (!container) return;
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:12px;text-align:center;">暂无交易记录</div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">
+        <div><div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--neon-pink);">¥${totalExp.toFixed(1)}</div><div style="font-size:0.65rem;color:var(--text-dim);">总支出</div></div>
+        <div><div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--neon-green);">¥${totalInc.toFixed(1)}</div><div style="font-size:0.65rem;color:var(--text-dim);">总收入</div></div>
+        <div><div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--neon-cyan);">¥${dailyAvg.toFixed(1)}</div><div style="font-size:0.65rem;color:var(--text-dim);">日均支出</div></div>
+      </div>
+    </div>
+    ${sortedCats.length > 0 ? `
+    <div class="card">
+      <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:8px;font-family:var(--font-mono);">◆ 支出分类</div>
+      ${sortedCats.map(([cat, amt], i) => {
+        const pct = totalExp > 0 ? (amt/totalExp*100).toFixed(0) : 0;
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${catColors[i%catColors.length]};flex-shrink:0;"></span>
+          <span style="flex:1;font-size:0.8rem;">${cat}</span>
+          <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-dim);">¥${amt.toFixed(1)} (${pct}%)</span>
+        </div>
+        <div style="height:4px;background:var(--bg-deep);border-radius:2px;margin-bottom:8px;">
+          <div style="height:100%;width:${pct}%;background:${catColors[i%catColors.length]};border-radius:2px;opacity:0.7;"></div>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
+  `;
 }
 
 function renderWalletHistory() {
