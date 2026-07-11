@@ -536,6 +536,7 @@ label {
   color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
 }
 .daily-time-tag:hover { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.history-filter.active { background: rgba(0,240,255,0.15); border-color: rgba(0,240,255,0.4); color: var(--neon-cyan); }
 
 /* === Bottom Tab Bar === */
 .bottom-tab-bar {
@@ -1091,6 +1092,40 @@ label {
       </div>
     </div>
     <div id="wallet-history-list"></div>
+  </div>
+
+  <!-- Panel: History (每日统计合集) -->
+  <div class="panel" id="panel-history">
+    <div class="daily-date-header" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:8px;padding:20px;margin-bottom:16px;">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:2px;">DAILY LOG COLLECTION</div>
+        <div style="font-size:1.8rem;font-weight:bold;color:var(--text-primary);margin:4px 0;">每日统计</div>
+        <div style="font-size:0.8rem;color:var(--text-dim);">打卡合集 · <span id="history-year"></span></div>
+      </div>
+      <div style="text-align:right;">
+        <div id="history-total-days" style="font-family:var(--font-mono);font-size:2.5rem;color:var(--text-dim);opacity:0.3;">365</div>
+      </div>
+    </div>
+
+    <!-- Filter Tags -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <button class="btn btn-sm history-filter active" data-filter="all" onclick="filterHistory('all')">全部</button>
+      <button class="btn btn-sm history-filter" data-filter="calories" onclick="filterHistory('calories')">有饮食</button>
+      <button class="btn btn-sm history-filter" data-filter="habits" onclick="filterHistory('habits')">有打卡</button>
+      <button class="btn btn-sm history-filter" data-filter="expense" onclick="filterHistory('expense')">有支出</button>
+      <button class="btn btn-sm history-filter" data-filter="journal" onclick="filterHistory('journal')">有日记</button>
+    </div>
+
+    <!-- Entries List -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:1px;">ENTRIES</span>
+      <span id="history-entry-count" style="font-size:0.7rem;color:var(--text-dim);"></span>
+    </div>
+    <div id="history-entries-list"></div>
+
+    <div style="text-align:center;padding:16px 0;">
+      <button class="btn" onclick="switchTab('daily');">查看今日 →</button>
+    </div>
   </div>
 
   <!-- Panel: Settings -->
@@ -2427,6 +2462,7 @@ function renderAll() {
   renderStats();
   renderWallet();
   renderInvestJournal();
+  renderHistory();
   renderSettings();
   updatePomodoroTaskSelect();
 }
@@ -3124,6 +3160,165 @@ function showInvestEntry(date) {
   const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
   const label = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 ${weekdays[d.getDay()]}`;
   prompt(`${label}的复盘记录：`, text);
+}
+
+// === History (每日统计合集) ===
+let _historyFilter = 'all';
+
+function filterHistory(filter) {
+  _historyFilter = filter;
+  document.querySelectorAll('.history-filter').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.history-filter[data-filter="${filter}"]`)?.classList.add('active');
+  renderHistory();
+}
+
+function renderHistory() {
+  const dailyLog = Store.get('dailyLog', {});
+  const habits = Store.get('habits', { logs: {} });
+  const wallet = Store.get('wallet', { transactions: [] });
+  const journal = Store.get('journal', {});
+  const completionLog = Store.get('completionLog', {});
+  const sleep = Store.get('sleep', {});
+  const timeAlloc = Store.get('timeAlloc', {});
+
+  // Collect all dates that have any data
+  const allDates = new Set();
+  Object.keys(dailyLog).forEach(d => allDates.add(d));
+  Object.keys(habits.logs || {}).forEach(d => allDates.add(d));
+  Object.keys(journal).forEach(d => { if (journal[d]?.trim()) allDates.add(d); });
+  Object.keys(completionLog).forEach(d => allDates.add(d));
+  Object.keys(sleep).forEach(d => allDates.add(d));
+  Object.keys(timeAlloc).forEach(d => allDates.add(d));
+  (wallet.transactions || []).forEach(t => { if (t.date) allDates.add(t.date.slice(0,10)); });
+
+  // Filter
+  let dates = [...allDates].sort((a,b) => b.localeCompare(a));
+
+  if (_historyFilter === 'calories') dates = dates.filter(d => dailyLog[d]?.meals?.length > 0);
+  else if (_historyFilter === 'habits') dates = dates.filter(d => habits.logs[d] && Object.values(habits.logs[d]).some(v => v));
+  else if (_historyFilter === 'expense') dates = dates.filter(d => (wallet.transactions||[]).some(t => t.date?.slice(0,10) === d && t.type === 'expense'));
+  else if (_historyFilter === 'journal') dates = dates.filter(d => journal[d]?.trim());
+
+  // Update header
+  document.getElementById('history-year').textContent = new Date().getFullYear();
+  document.getElementById('history-total-days').textContent = allDates.size;
+  document.getElementById('history-entry-count').textContent = `${dates.length} 条记录`;
+
+  const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+  const list = document.getElementById('history-entries-list');
+
+  if (dates.length === 0) {
+    list.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem;padding:24px;text-align:center;">暂无记录，去「每日」页面开始打卡吧</div>';
+    return;
+  }
+
+  list.innerHTML = dates.map(date => {
+    const d = new Date(date + 'T00:00:00');
+    const isToday = date === TODAY();
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    const weekday = weekdays[d.getDay()];
+
+    // Calorie summary
+    const kcal = dailyLog[date]?.totalKcal || 0;
+
+    // Habits summary
+    const dayHabits = habits.logs[date] || {};
+    const habitTotal = habits.templates.filter(t => t.enabled).length;
+    const habitDone = Object.values(dayHabits).filter(v => v).length;
+
+    // Tasks completed
+    const tasksDone = completionLog[date] || 0;
+
+    // Expense
+    const dayExp = (wallet.transactions||[]).filter(t => t.date?.slice(0,10) === date && t.type === 'expense').reduce((s,t) => s + t.amount, 0);
+
+    // Journal preview
+    const journalText = journal[date] || '';
+    const journalPreview = journalText.length > 30 ? journalText.slice(0, 30) + '...' : journalText;
+
+    // Time alloc summary
+    const time = timeAlloc[date] || {};
+    const totalMins = Object.values(time).reduce((s,v) => s + v, 0);
+    const timeStr = totalMins > 0 ? `${Math.floor(totalMins/60)}h${totalMins%60}m` : '';
+
+    return `<div class="card" style="padding:14px;margin-bottom:10px;cursor:pointer;" onclick="showDayDetail('${date}')">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="text-align:center;min-width:44px;">
+          <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:bold;color:${isToday ? 'var(--neon-cyan)' : 'var(--text-primary)'};">${month} / ${day}</div>
+          <div style="font-size:0.65rem;color:var(--text-dim);">${weekday}</div>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:0.75rem;color:var(--text-secondary);margin-bottom:4px;">
+            ${tasksDone > 0 ? `<span>✅ ${tasksDone}项任务</span>` : ''}
+            ${habitDone > 0 ? `<span>🎯 ${habitDone}/${habitTotal}习惯</span>` : ''}
+            ${kcal > 0 ? `<span>🍽️ ${kcal}kcal</span>` : ''}
+            ${dayExp > 0 ? `<span style="color:var(--neon-pink);">💰 ¥${dayExp.toFixed(0)}</span>` : ''}
+            ${timeStr ? `<span>⏱️ ${timeStr}</span>` : ''}
+          </div>
+          ${journalPreview ? `<div style="font-size:0.8rem;color:var(--text-dim);line-height:1.4;margin-top:4px;">${journalPreview}</div>` : ''}
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-dim);flex-shrink:0;">→</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showDayDetail(date) {
+  const d = new Date(date + 'T00:00:00');
+  const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+  const label = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 ${weekdays[d.getDay()]}`;
+
+  const dailyLog = Store.get('dailyLog', {});
+  const habits = Store.get('habits', { templates: [], logs: {} });
+  const wallet = Store.get('wallet', { transactions: [] });
+  const journal = Store.get('journal', {});
+  const sleep = Store.get('sleep', {});
+  const timeAlloc = Store.get('timeAlloc', {});
+
+  let details = [`📅 ${label}\n`];
+
+  // Sleep
+  const s = sleep[date];
+  if (s && (s.bed || s.wake)) details.push(`😴 睡眠: ${s.bed || '?'} → ${s.wake || '?'}`);
+
+  // Time
+  const time = timeAlloc[date] || {};
+  const totalMins = Object.values(time).reduce((s,v) => s + v, 0);
+  if (totalMins > 0) {
+    const timeParts = Object.entries(time).filter(([,v]) => v > 0).map(([k,v]) => `${k}${v}m`).join(' · ');
+    details.push(`⏱️ 时间: ${timeParts}`);
+  }
+
+  // Meals
+  const meals = dailyLog[date]?.meals || [];
+  if (meals.length > 0) {
+    const mealStr = meals.map(m => `${m.name}(${m.kcal}kcal)`).join(', ');
+    details.push(`🍽️ 饮食: ${mealStr}`);
+    details.push(`   合计: ${dailyLog[date].totalKcal}kcal`);
+  }
+
+  // Habits
+  const dayHabits = habits.logs[date] || {};
+  const doneHabits = habits.templates.filter(t => t.enabled && dayHabits[t.id]);
+  if (doneHabits.length > 0) {
+    details.push(`🎯 习惯: ${doneHabits.map(t => t.icon + t.name).join(' · ')}`);
+  }
+
+  // Expense
+  const dayTxns = (wallet.transactions||[]).filter(t => t.date?.slice(0,10) === date);
+  if (dayTxns.length > 0) {
+    const exp = dayTxns.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0);
+    const inc = dayTxns.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
+    if (exp > 0) details.push(`💸 支出: ¥${exp.toFixed(2)}`);
+    if (inc > 0) details.push(`💰 收入: ¥${inc.toFixed(2)}`);
+  }
+
+  // Journal
+  const j = journal[date];
+  if (j?.trim()) details.push(`📝 日记: ${j}`);
+
+  prompt(label, details.join('\n'));
 }
 
 // === Theme Toggle ===
