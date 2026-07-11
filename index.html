@@ -36,6 +36,30 @@
   --glow-magenta: 0 0 10px rgba(255, 0, 255, 0.5), 0 0 30px rgba(255, 0, 255, 0.2);
 }
 
+/* Light Mode */
+html.light {
+  --bg-deep: #f5f5f7;
+  --bg-panel: #ffffff;
+  --bg-card: #f0f0f2;
+  --bg-hover: #e8e8ec;
+  --border-subtle: #d8d8e0;
+  --border-glow: #0088cc;
+  --text-primary: #1a1a2e;
+  --text-secondary: #555568;
+  --text-dim: #999;
+  --neon-cyan: #0088cc;
+  --neon-magenta: #cc00aa;
+  --neon-yellow: #cc9900;
+  --neon-green: #009955;
+  --neon-red: #cc2233;
+  --neon-pink: #cc2266;
+  --neon-purple: #8833cc;
+  --neon-orange: #cc6600;
+  --xp-bar: #0088cc;
+  --glow-cyan: none;
+  --glow-magenta: none;
+}
+
 /* === Reset & Base === */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 14px; }
@@ -678,10 +702,15 @@ label {
   <header class="header">
     <div class="header-title">N E X U S &nbsp; C O R E</div>
     <div class="header-subtitle">// 任务核心系统 v1.0</div>
-    <button class="sync-btn" id="sync-btn" onclick="openSyncModal()">
-      <span class="sync-dot"></span>
-      <span id="sync-btn-text">云同步</span>
-    </button>
+    <div style="display:flex;gap:8px;position:absolute;top:24px;right:0;">
+      <button class="sync-btn" id="theme-toggle" onclick="toggleTheme()" title="切换主题">
+        <span id="theme-icon">☀️</span>
+      </button>
+      <button class="sync-btn" id="sync-btn" onclick="openSyncModal()">
+        <span class="sync-dot"></span>
+        <span id="sync-btn-text">云同步</span>
+      </button>
+    </div>
   </header>
 
   <!-- Bottom Tab Bar -->
@@ -1034,16 +1063,19 @@ label {
       </div>
     </div>
 
-    <!-- Transaction Review -->
+    <!-- 交易复盘 (投资思考日记) -->
     <div class="section-header" style="margin-top: 16px;">
       <span class="section-title">◆ 交易复盘</span>
-      <select id="review-period" style="width:auto;font-size:0.75rem;" onchange="renderTransactionReview()">
-        <option value="week">本周</option>
-        <option value="month" selected>本月</option>
-        <option value="quarter">本季度</option>
-      </select>
+      <span style="font-size:0.7rem;color:var(--text-dim);">记录你的投资思考</span>
     </div>
-    <div id="transaction-review"></div>
+    <div class="card">
+      <textarea id="invest-journal" placeholder="今天对市场/基金/股票有什么想法？记录下来方便以后回顾..." style="min-height:100px;" oninput="saveInvestJournal()"></textarea>
+    </div>
+    <!-- 历史复盘 -->
+    <div class="section-header" style="margin-top:12px;">
+      <span class="section-title" style="font-size:0.75rem;">◆ 历史复盘</span>
+    </div>
+    <div id="invest-history-list"></div>
 
     <!-- Transaction History -->
     <div class="section-header" style="margin-top: 16px;">
@@ -1497,6 +1529,7 @@ function initData() {
     Store.set('sleep', {}); // { "YYYY-MM-DD": { bed: "HH:MM", wake: "HH:MM" } }
     Store.set('timeAlloc', {}); // { "YYYY-MM-DD": { 学习:30, 工作:60, ... } }
     Store.set('journal', {}); // { "YYYY-MM-DD": "text" }
+    Store.set('investJournal', {}); // { "YYYY-MM-DD": "投资思考文本" }
     Store.set('initialized', true);
   }
   // Ensure daily tasks are refreshed
@@ -2393,7 +2426,7 @@ function renderAll() {
   renderAchievements();
   renderStats();
   renderWallet();
-  renderTransactionReview();
+  renderInvestJournal();
   renderSettings();
   updatePomodoroTaskSelect();
 }
@@ -3043,73 +3076,71 @@ function renderWallet() {
   renderWalletHistory();
 }
 
-// === Transaction Review ===
-function renderTransactionReview() {
-  const wallet = Store.get('wallet', { transactions: [] });
-  const txns = wallet.transactions || [];
-  const period = document.getElementById('review-period')?.value || 'month';
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
+// === Investment Journal (交易复盘) ===
+function renderInvestJournal() {
+  const journal = Store.get('investJournal', {});
+  const today = TODAY();
+  const textarea = document.getElementById('invest-journal');
+  if (textarea && journal[today] !== undefined) textarea.value = journal[today];
+  else if (textarea) textarea.value = '';
+  renderInvestHistory();
+}
 
-  // Filter by period
-  let startDate;
-  if (period === 'week') {
-    startDate = new Date(now); startDate.setDate(now.getDate() - now.getDay());
-  } else if (period === 'quarter') {
-    startDate = new Date(now.getFullYear(), Math.floor(now.getMonth()/3)*3, 1);
-  } else {
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+function saveInvestJournal() {
+  const journal = Store.get('investJournal', {});
+  const val = document.getElementById('invest-journal').value;
+  if (val.trim()) {
+    journal[TODAY()] = val;
+    Store.set('investJournal', journal);
   }
-  const startStr = startDate.toISOString().split('T')[0];
-  const filtered = txns.filter(t => t.date && t.date.slice(0,10) >= startStr);
+  renderInvestHistory();
+}
 
-  const expTxns = filtered.filter(t => t.type === 'expense');
-  const incTxns = filtered.filter(t => t.type === 'income');
-  const totalExp = expTxns.reduce((s,t) => s + t.amount, 0);
-  const totalInc = incTxns.reduce((s,t) => s + t.amount, 0);
-
-  // Category breakdown
-  const categories = {};
-  expTxns.forEach(t => { categories[t.category] = (categories[t.category]||0) + t.amount; });
-  const sortedCats = Object.entries(categories).sort((a,b) => b[1]-a[1]);
-  const catColors = ['var(--neon-pink)','var(--neon-orange)','var(--neon-yellow)','var(--neon-cyan)','var(--neon-purple)','var(--neon-green)','var(--text-dim)'];
-
-  // Daily average
-  const dayCount = Math.max(1, Math.ceil((now - startDate) / 86400000) + 1);
-  const dailyAvg = totalExp / dayCount;
-
-  const container = document.getElementById('transaction-review');
+function renderInvestHistory() {
+  const journal = Store.get('investJournal', {});
+  const entries = Object.entries(journal).filter(([k,v]) => v && v.trim()).sort((a,b) => b[0].localeCompare(a[0]));
+  const container = document.getElementById('invest-history-list');
   if (!container) return;
+  if (entries.length <= 1) { container.innerHTML = ''; return; }
 
-  if (filtered.length === 0) {
-    container.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:12px;text-align:center;">暂无交易记录</div>';
-    return;
-  }
-
-  container.innerHTML = `
-    <div class="card" style="margin-bottom:12px;">
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">
-        <div><div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--neon-pink);">¥${totalExp.toFixed(1)}</div><div style="font-size:0.65rem;color:var(--text-dim);">总支出</div></div>
-        <div><div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--neon-green);">¥${totalInc.toFixed(1)}</div><div style="font-size:0.65rem;color:var(--text-dim);">总收入</div></div>
-        <div><div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--neon-cyan);">¥${dailyAvg.toFixed(1)}</div><div style="font-size:0.65rem;color:var(--text-dim);">日均支出</div></div>
+  container.innerHTML = entries.slice(1, 10).map(([date, text]) => {
+    const d = new Date(date);
+    const weekdays = ['日','一','二','三','四','五','六'];
+    const label = `${d.getMonth()+1}/${d.getDate()} 周${weekdays[d.getDay()]}`;
+    const preview = text.length > 60 ? text.slice(0, 60) + '...' : text;
+    return `<div class="card" style="padding:10px;margin-bottom:8px;cursor:pointer;" onclick="showInvestEntry('${date}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--neon-cyan);">${label}</span>
       </div>
-    </div>
-    ${sortedCats.length > 0 ? `
-    <div class="card">
-      <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:8px;font-family:var(--font-mono);">◆ 支出分类</div>
-      ${sortedCats.map(([cat, amt], i) => {
-        const pct = totalExp > 0 ? (amt/totalExp*100).toFixed(0) : 0;
-        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-          <span style="width:8px;height:8px;border-radius:50%;background:${catColors[i%catColors.length]};flex-shrink:0;"></span>
-          <span style="flex:1;font-size:0.8rem;">${cat}</span>
-          <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-dim);">¥${amt.toFixed(1)} (${pct}%)</span>
-        </div>
-        <div style="height:4px;background:var(--bg-deep);border-radius:2px;margin-bottom:8px;">
-          <div style="height:100%;width:${pct}%;background:${catColors[i%catColors.length]};border-radius:2px;opacity:0.7;"></div>
-        </div>`;
-      }).join('')}
-    </div>` : ''}
-  `;
+      <div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.4;">${preview}</div>
+    </div>`;
+  }).join('');
+}
+
+function showInvestEntry(date) {
+  const journal = Store.get('investJournal', {});
+  const text = journal[date] || '';
+  const d = new Date(date);
+  const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+  const label = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 ${weekdays[d.getDay()]}`;
+  prompt(`${label}的复盘记录：`, text);
+}
+
+// === Theme Toggle ===
+function toggleTheme() {
+  const html = document.documentElement;
+  const isLight = html.classList.toggle('light');
+  localStorage.setItem('nexus_theme', isLight ? 'light' : 'dark');
+  document.getElementById('theme-icon').textContent = isLight ? '🌙' : '☀️';
+}
+
+function loadTheme() {
+  const saved = localStorage.getItem('nexus_theme');
+  if (saved === 'light') {
+    document.documentElement.classList.add('light');
+    const icon = document.getElementById('theme-icon');
+    if (icon) icon.textContent = '🌙';
+  }
 }
 
 function renderWalletHistory() {
@@ -3456,6 +3487,7 @@ function initParticles() {
 
 // === Initialize ===
 document.addEventListener('DOMContentLoaded', async () => {
+  loadTheme();
   SyncManager.init();
   initData();
   initParticles();
