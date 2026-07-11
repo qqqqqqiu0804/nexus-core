@@ -1130,32 +1130,72 @@ label {
 
   <!-- Panel: Settings -->
   <div class="panel" id="panel-settings">
-    <div class="section-header">
-      <span class="section-title">◆ 云同步</span>
-    </div>
-    <div class="card" style="cursor:pointer;" onclick="openSyncModal()">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span style="color:var(--text-secondary);font-size:0.85rem;">同步状态</span>
-        <span id="settings-sync-status" style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-dim);">未配置</span>
+    <!-- 个人等级 -->
+    <div class="card" id="settings-level-info" style="margin-bottom:16px;"></div>
+
+    <!-- 云同步 -->
+    <div class="card" style="cursor:pointer;padding:14px;" onclick="openSyncModal()">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:1.3rem;">☁️</span>
+        <div style="flex:1;">
+          <div style="font-size:0.9rem;color:var(--text-primary);">云同步</div>
+          <div style="font-size:0.7rem;color:var(--text-dim);margin-top:2px;" id="settings-sync-status">未配置</div>
+        </div>
+        <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
       </div>
     </div>
 
-    <div class="section-header" style="margin-top:16px;">
-      <span class="section-title">◆ 每日模板管理</span>
-      <button class="btn btn-sm btn-primary" onclick="addDailyTemplate()">+ 新增</button>
+    <!-- 每日模板 -->
+    <div style="margin-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:1rem;">📋</span>
+          <span style="font-size:0.85rem;color:var(--text-primary);">每日模板</span>
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="addDailyTemplate()" style="padding:3px 10px;">+ 新增</button>
+      </div>
+      <div id="settings-daily-templates"></div>
     </div>
-    <div id="settings-daily-templates"></div>
 
-    <div class="section-header" style="margin-top:16px;">
-      <span class="section-title">◆ 习惯管理</span>
-      <button class="btn btn-sm btn-primary" onclick="addHabit()">+ 新增</button>
+    <!-- 习惯管理 -->
+    <div style="margin-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:1rem;">🎯</span>
+          <span style="font-size:0.85rem;color:var(--text-primary);">习惯管理</span>
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="addHabit()" style="padding:3px 10px;">+ 新增</button>
+      </div>
+      <div id="settings-habits"></div>
     </div>
-    <div id="settings-habits"></div>
 
-    <div class="section-header" style="margin-top:16px;">
-      <span class="section-title">◆ 等级信息</span>
+    <!-- 数据管理 -->
+    <div style="margin-top:16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="font-size:1rem;">💾</span>
+        <span style="font-size:0.85rem;color:var(--text-primary);">数据管理</span>
+      </div>
+      <div class="card" style="cursor:pointer;padding:12px;" onclick="exportData()">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1rem;">📤</span>
+          <span style="flex:1;font-size:0.85rem;">导出数据</span>
+          <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
+        </div>
+      </div>
+      <div class="card" style="cursor:pointer;padding:12px;margin-top:8px;" onclick="importDataPrompt()">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1rem;">📥</span>
+          <span style="flex:1;font-size:0.85rem;">导入数据</span>
+          <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
+        </div>
+      </div>
     </div>
-    <div class="card" id="settings-level-info"></div>
+
+    <!-- 关于 -->
+    <div style="margin-top:20px;text-align:center;padding:12px;">
+      <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-dim);letter-spacing:2px;">NEXUS CORE v2.0</div>
+      <div style="font-size:0.65rem;color:var(--text-dim);margin-top:4px;">赛博朋克个人管理面板</div>
+    </div>
   </div>
 </div>
 <div class="modal-overlay" id="task-modal">
@@ -3600,6 +3640,54 @@ function renderSettingsLevel() {
       <div style="text-align:center;"><div style="font-family:var(--font-mono);color:var(--neon-green);">${profile.totalCompleted||0}</div><div style="font-size:0.65rem;color:var(--text-dim);">完成任务</div></div>
     </div>
   `;
+}
+
+// === Data Export/Import ===
+function exportData() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('nexus_')) {
+      try { data[key] = JSON.parse(localStorage.getItem(key)); }
+      catch { data[key] = localStorage.getItem(key); }
+    }
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `nexus-core-backup-${TODAY()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('数据已导出', 'success');
+}
+
+function importDataPrompt() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!confirm('导入将覆盖当前所有数据，确定继续？')) return;
+        Object.entries(data).forEach(([key, value]) => {
+          if (key.startsWith('nexus_')) {
+            localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+          }
+        });
+        showToast('数据已导入，刷新页面生效', 'success');
+        setTimeout(() => location.reload(), 1000);
+      } catch (e) {
+        showToast('导入失败：文件格式错误', 'warning');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
 }
 
 // === Navigation ===
