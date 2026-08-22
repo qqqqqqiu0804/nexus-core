@@ -1,0 +1,4269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NEXUS CORE // 任务核心</title>
+<style>
+/* ============================================================
+   NEXUS CORE v1.0 - 赛博朋克个人任务面板
+   单文件 HTML/CSS/JS 应用，数据存 localStorage
+   ============================================================ */
+
+/* === CSS Variables === */
+:root {
+  --bg-deep: #0a0a0f;
+  --bg-panel: #111119;
+  --bg-card: #16161f;
+  --bg-hover: #1c1c28;
+  --border-subtle: #1e1e2e;
+  --border-glow: #00f0ff;
+  --text-primary: #e0e0e8;
+  --text-secondary: #8888a0;
+  --text-dim: #555568;
+  --neon-cyan: #00f0ff;
+  --neon-magenta: #ff00ff;
+  --neon-yellow: #ffe500;
+  --neon-green: #00ff88;
+  --neon-red: #ff3344;
+  --neon-pink: #ff3380;
+  --neon-purple: #b44dff;
+  --neon-orange: #ff8800;
+  --xp-bar: #00f0ff;
+  --font-mono: 'Courier New', 'Consolas', 'Monaco', monospace;
+  --font-sans: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --glow-cyan: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 30px rgba(0, 240, 255, 0.2);
+  --glow-magenta: 0 0 10px rgba(255, 0, 255, 0.5), 0 0 30px rgba(255, 0, 255, 0.2);
+}
+
+/* Light Mode */
+html.light {
+  --bg-deep: #faf5f0;
+  --bg-panel: #fff8f2;
+  --bg-card: #f5ece3;
+  --bg-hover: #ede3d8;
+  --border-subtle: #e0d5c8;
+  --border-glow: #c8885a;
+  --text-primary: #3d2e1e;
+  --text-secondary: #7a6a58;
+  --text-dim: #a89888;
+  --neon-cyan: #c8885a;
+  --neon-magenta: #b84a7a;
+  --neon-yellow: #c89a30;
+  --neon-green: #5a9a5a;
+  --neon-red: #c84a4a;
+  --neon-pink: #c86080;
+  --neon-purple: #8a60b8;
+  --neon-orange: #c87830;
+  --xp-bar: #c8885a;
+  --glow-cyan: none;
+  --glow-magenta: none;
+}
+
+/* === Reset & Base === */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+/* === Canvas Background === */
+#bg-canvas {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 0; pointer-events: none;
+}
+
+/* === Scanlines Overlay === */
+.scanlines {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent, transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px, rgba(0, 0, 0, 0.03) 4px
+  );
+}
+
+/* === Main Container === */
+.app-container {
+  position: relative; z-index: 2;
+  max-width: 1100px; margin: 0 auto;
+  padding: 16px;
+}
+
+/* === Header === */
+.header {
+  text-align: center; padding: 24px 0 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 20px;
+  position: relative;
+}
+.header::after {
+  content: ''; position: absolute; bottom: -1px; left: 50%;
+  transform: translateX(-50%);
+  width: 60%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+  box-shadow: var(--glow-cyan);
+}
+.header-title {
+  font-family: var(--font-mono);
+  font-size: 2rem; font-weight: bold;
+  letter-spacing: 4px;
+  color: var(--neon-cyan);
+  text-shadow: var(--glow-cyan);
+  margin-bottom: 4px;
+}
+.header-subtitle {
+  font-family: var(--font-mono);
+  font-size: 0.75rem; color: var(--text-dim);
+  letter-spacing: 6px;
+}
+
+/* === Navigation === */
+.nav {
+  display: flex; gap: 4px; margin-bottom: 20px;
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 4px; flex-wrap: wrap;
+}
+.nav-btn {
+  flex: 1; min-width: 80px;
+  padding: 10px 16px; border: none;
+  background: transparent; color: var(--text-secondary);
+  font-family: var(--font-mono); font-size: 0.8rem;
+  cursor: pointer; border-radius: 4px;
+  transition: all 0.2s; letter-spacing: 1px;
+  white-space: nowrap;
+}
+.nav-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.nav-btn.active {
+  background: rgba(0, 240, 255, 0.1);
+  color: var(--neon-cyan);
+  box-shadow: inset 0 0 0 1px rgba(0, 240, 255, 0.3);
+}
+
+/* === Panel (Content Area) === */
+.panel {
+  display: none;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px; padding: 20px;
+  min-height: 500px;
+  position: relative;
+}
+.panel.active { display: block; }
+.panel::before {
+  content: ''; position: absolute; top: -1px; left: 20px; right: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.3), transparent);
+}
+
+/* === Cards === */
+.card {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 16px; margin-bottom: 12px;
+  transition: all 0.2s;
+}
+.card:hover { border-color: rgba(0, 240, 255, 0.3); }
+.card-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.card-title {
+  font-family: var(--font-mono); font-size: 0.9rem;
+  color: var(--neon-cyan); letter-spacing: 1px;
+}
+.card-subtitle { font-size: 0.75rem; color: var(--text-dim); }
+
+/* === Progress Bar === */
+.progress-bar {
+  height: 6px; background: var(--bg-deep); border-radius: 3px;
+  overflow: hidden; margin: 8px 0;
+}
+.progress-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+  transition: width 0.5s ease;
+}
+
+/* === Status Badge === */
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 3px;
+  font-family: var(--font-mono); font-size: 0.65rem; letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.badge-cyan { background: rgba(0,240,255,0.15); color: var(--neon-cyan); border: 1px solid rgba(0,240,255,0.3); }
+.badge-magenta { background: rgba(255,0,255,0.15); color: var(--neon-magenta); border: 1px solid rgba(255,0,255,0.3); }
+.badge-green { background: rgba(0,255,136,0.15); color: var(--neon-green); border: 1px solid rgba(0,255,136,0.3); }
+.badge-yellow { background: rgba(255,229,0,0.15); color: var(--neon-yellow); border: 1px solid rgba(255,229,0,0.3); }
+.badge-red { background: rgba(255,51,68,0.15); color: var(--neon-red); border: 1px solid rgba(255,51,68,0.3); }
+.badge-purple { background: rgba(180,77,255,0.15); color: var(--neon-purple); border: 1px solid rgba(180,77,255,0.3); }
+.badge-orange { background: rgba(255,136,0,0.15); color: var(--neon-orange); border: 1px solid rgba(255,136,0,0.3); }
+
+/* === Buttons === */
+.btn {
+  padding: 8px 16px; border: 1px solid var(--border-subtle);
+  background: var(--bg-card); color: var(--text-secondary);
+  font-family: var(--font-mono); font-size: 0.75rem;
+  border-radius: 4px; cursor: pointer;
+  letter-spacing: 1px; transition: all 0.2s;
+}
+.btn:hover { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.btn-primary {
+  background: rgba(0,240,255,0.1); border-color: rgba(0,240,255,0.4);
+  color: var(--neon-cyan);
+}
+.btn-primary:hover {
+  background: rgba(0,240,255,0.2);
+  box-shadow: var(--glow-cyan);
+}
+.btn-danger { border-color: rgba(255,51,68,0.4); color: var(--neon-red); }
+.btn-danger:hover { background: rgba(255,51,68,0.1); }
+.btn-sm { padding: 4px 10px; font-size: 0.65rem; }
+
+/* === Forms === */
+input, select, textarea {
+  background: var(--bg-deep); border: 1px solid var(--border-subtle);
+  color: var(--text-primary); font-family: var(--font-sans);
+  font-size: 0.85rem; padding: 8px 12px; border-radius: 4px;
+  width: 100%; outline: none; transition: border-color 0.2s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.2);
+}
+textarea { resize: vertical; min-height: 60px; }
+select { cursor: pointer; appearance: none; }
+select option { background: var(--bg-panel); color: var(--text-primary); }
+label {
+  display: block; font-size: 0.75rem; color: var(--text-secondary);
+  margin-bottom: 4px; font-family: var(--font-mono); letter-spacing: 1px;
+}
+.form-group { margin-bottom: 12px; }
+.form-row { display: flex; gap: 12px; }
+.form-row .form-group { flex: 1; }
+
+/* === Grid Layouts === */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+/* === Stats Row === */
+.stats-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 16px; text-align: center;
+  position: relative; overflow: hidden;
+}
+.stat-card::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+  opacity: 0.5;
+}
+.stat-value {
+  font-family: var(--font-mono); font-size: 1.5rem; font-weight: bold;
+  color: var(--neon-cyan); text-shadow: var(--glow-cyan);
+}
+.stat-label { font-size: 0.7rem; color: var(--text-dim); letter-spacing: 2px; margin-top: 4px; }
+
+/* === Level Display === */
+.level-display {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px; background: var(--bg-card);
+  border: 1px solid var(--border-subtle); border-radius: 6px;
+  margin-bottom: 20px;
+}
+.level-badge {
+  width: 60px; height: 60px; border-radius: 50%;
+  border: 2px solid var(--neon-cyan);
+  box-shadow: var(--glow-cyan);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 1.5rem; font-weight: bold;
+  color: var(--neon-cyan); flex-shrink: 0;
+}
+.level-info { flex: 1; }
+.level-title {
+  font-family: var(--font-mono); font-size: 0.85rem;
+  color: var(--neon-magenta); letter-spacing: 2px;
+  text-shadow: var(--glow-magenta);
+}
+.level-xp { font-size: 0.7rem; color: var(--text-dim); margin-top: 4px; }
+
+/* === Task List === */
+.task-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; background: var(--bg-card);
+  border: 1px solid var(--border-subtle); border-radius: 6px;
+  margin-bottom: 6px; transition: all 0.2s;
+  cursor: pointer;
+}
+.task-item:hover { border-color: rgba(0, 240, 255, 0.3); }
+.task-item.completed { opacity: 0.5; }
+.task-item.completed .task-title { text-decoration: line-through; }
+.task-check {
+  width: 20px; height: 20px; border: 2px solid var(--border-subtle);
+  border-radius: 3px; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; font-size: 0.7rem;
+}
+.task-check:hover { border-color: var(--neon-cyan); }
+.task-check.checked {
+  background: var(--neon-cyan); border-color: var(--neon-cyan);
+  color: var(--bg-deep);
+}
+.task-info { flex: 1; min-width: 0; }
+.task-title { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-meta {
+  font-size: 0.7rem; color: var(--text-dim);
+  display: flex; gap: 12px; margin-top: 2px;
+}
+.task-reward { font-size: 0.7rem; color: var(--neon-yellow); flex-shrink: 0; }
+.task-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+/* === Section Header === */
+.section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.section-title {
+  font-family: var(--font-mono); font-size: 0.85rem;
+  color: var(--text-primary); letter-spacing: 2px;
+}
+.section-count {
+  font-family: var(--font-mono); font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+/* === Modal === */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7); z-index: 100;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: 8px; padding: 24px; width: 90%; max-width: 500px;
+  position: relative;
+  box-shadow: 0 0 40px rgba(0, 240, 255, 0.1);
+}
+.modal::before {
+  content: ''; position: absolute; top: 0; left: 20px; right: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+}
+.modal-title {
+  font-family: var(--font-mono); font-size: 1rem;
+  color: var(--neon-cyan); margin-bottom: 16px;
+  letter-spacing: 2px;
+}
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+/* === Pomodoro Timer === */
+.pomodoro-display {
+  font-family: var(--font-mono); font-size: 4rem; font-weight: bold;
+  text-align: center; color: var(--neon-cyan);
+  text-shadow: var(--glow-cyan); margin: 20px 0;
+  letter-spacing: 8px;
+}
+.pomodoro-status {
+  text-align: center; font-family: var(--font-mono);
+  color: var(--text-secondary); letter-spacing: 2px;
+}
+.pomodoro-controls {
+  display: flex; gap: 8px; justify-content: center; margin-top: 16px;
+}
+
+/* === Achievement Grid === */
+.achievement-card {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 14px; text-align: center;
+  transition: all 0.2s;
+}
+.achievement-card.unlocked { border-color: rgba(255, 229, 0, 0.4); }
+.achievement-card.locked { opacity: 0.5; }
+.achievement-icon { font-size: 2rem; margin-bottom: 6px; }
+.achievement-name { font-size: 0.8rem; margin-bottom: 2px; }
+.achievement-desc { font-size: 0.65rem; color: var(--text-dim); }
+
+/* === Bounty Board === */
+.bounty-item {
+  background: var(--bg-card); border: 1px solid rgba(255, 136, 0, 0.3);
+  border-radius: 6px; padding: 14px; margin-bottom: 10px;
+  position: relative; overflow: hidden;
+}
+.bounty-item::before {
+  content: '悬赏'; position: absolute; top: 8px; right: 12px;
+  font-family: var(--font-mono); font-size: 0.6rem;
+  color: var(--neon-orange); letter-spacing: 2px;
+}
+.bounty-reward {
+  color: var(--neon-yellow); font-size: 0.8rem; font-weight: bold;
+}
+.bounty-timer {
+  font-family: var(--font-mono); font-size: 0.65rem;
+  color: var(--neon-red);
+}
+
+/* === Shop === */
+.shop-item {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 14px; margin-bottom: 10px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.shop-price {
+  color: var(--neon-yellow); font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+/* === Charts Area === */
+.chart-container {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 16px; margin-bottom: 12px;
+  min-height: 200px; position: relative;
+}
+.chart-container canvas { width: 100%; }
+
+/* === Toast === */
+.toast-container {
+  position: fixed; top: 16px; right: 16px; z-index: 200;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  padding: 10px 16px; border-radius: 4px;
+  font-family: var(--font-mono); font-size: 0.75rem;
+  animation: slideIn 0.3s ease;
+  border: 1px solid;
+}
+.toast-success { background: rgba(0,255,136,0.1); border-color: var(--neon-green); color: var(--neon-green); }
+.toast-info { background: rgba(0,240,255,0.1); border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.toast-warning { background: rgba(255,229,0,0.1); border-color: var(--neon-yellow); color: var(--neon-yellow); }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* === Scrollbar === */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-deep); }
+::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* === Sync Button === */
+.sync-btn {
+  position: absolute; top: 24px; right: 0;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; background: var(--bg-card);
+  border: 1px solid var(--border-subtle); border-radius: 4px;
+  cursor: pointer; font-family: var(--font-mono);
+  font-size: 0.7rem; color: var(--text-secondary);
+  transition: all 0.2s; letter-spacing: 1px;
+}
+.sync-btn:hover { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.sync-btn.synced { border-color: rgba(0,255,136,0.4); color: var(--neon-green); }
+.sync-btn.syncing { border-color: rgba(255,229,0,0.4); color: var(--neon-yellow); }
+.sync-btn.error { border-color: rgba(255,51,68,0.4); color: var(--neon-red); }
+.sync-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor; animation: syncPulse 2s infinite;
+}
+@keyframes syncPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+.checkbox-label {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-sans); font-size: 0.8rem;
+  cursor: pointer; letter-spacing: 0;
+}
+.checkbox-label input[type="checkbox"] { width: auto; margin: 0; }
+
+/* === Daily Hub Styles === */
+.daily-date-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px; background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 8px; margin-bottom: 16px;
+}
+.daily-date-main { display: flex; align-items: center; gap: 12px; }
+.daily-date-big {
+  font-family: var(--font-mono); font-size: 2.5rem; font-weight: bold;
+  color: var(--neon-cyan); text-shadow: var(--glow-cyan); line-height: 1;
+}
+.daily-date-info { font-size: 0.8rem; color: var(--text-secondary); }
+.daily-streak-badge {
+  font-family: var(--font-mono); font-size: 0.75rem;
+  padding: 4px 10px; border-radius: 12px;
+  background: rgba(255,136,0,0.1); border: 1px solid rgba(255,136,0,0.3);
+  color: var(--neon-orange);
+}
+.daily-section {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 8px; padding: 14px; margin-bottom: 12px;
+}
+.daily-meals-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.daily-meal-card {
+  background: var(--bg-deep); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 10px 6px; text-align: center;
+  cursor: pointer; transition: all 0.2s;
+}
+.daily-meal-card:hover { border-color: rgba(0,240,255,0.3); }
+.daily-meal-icon { font-size: 1.3rem; margin-bottom: 4px; }
+.daily-meal-label { font-size: 0.65rem; color: var(--text-dim); margin-bottom: 4px; }
+.daily-meal-content { font-size: 0.7rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.daily-sleep-row { display: flex; gap: 12px; }
+.daily-sleep-item { flex: 1; }
+.daily-sleep-item label { display: block; font-size: 0.7rem; color: var(--text-dim); margin-bottom: 4px; }
+.daily-sleep-item input { width: 100%; }
+.daily-habit-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle); cursor: pointer;
+}
+.daily-habit-item:last-child { border-bottom: none; }
+.daily-habit-icon { font-size: 1.2rem; width: 28px; text-align: center; }
+.daily-habit-name { flex: 1; font-size: 0.85rem; }
+.daily-habit-check {
+  width: 22px; height: 22px; border: 2px solid var(--border-subtle);
+  border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; font-size: 0.7rem; flex-shrink: 0;
+}
+.daily-habit-check.checked { background: var(--neon-green); border-color: var(--neon-green); color: var(--bg-deep); }
+.daily-time-tag {
+  padding: 4px 10px; border-radius: 12px; font-size: 0.7rem;
+  background: var(--bg-deep); border: 1px solid var(--border-subtle);
+  color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
+}
+.daily-time-tag:hover { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.history-filter.active { background: rgba(0,240,255,0.15); border-color: rgba(0,240,255,0.4); color: var(--neon-cyan); }
+
+/* === Bottom Tab Bar === */
+.bottom-tab-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  display: flex; background: var(--bg-panel);
+  border-top: 1px solid var(--border-subtle);
+  z-index: 50; padding: 6px 0 env(safe-area-inset-bottom, 6px);
+}
+.tab-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 2px; padding: 6px 0; border: none; background: transparent;
+  color: var(--text-dim); cursor: pointer; transition: all 0.2s;
+  font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 1px;
+}
+.tab-item:hover { color: var(--text-secondary); }
+.tab-item.active { color: var(--neon-cyan); }
+.tab-icon { font-size: 1.2rem; }
+.tab-label { font-size: 0.6rem; }
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .form-row { flex-direction: column; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .header-title { font-size: 1.5rem; }
+  .level-display { flex-direction: column; text-align: center; }
+  .sync-btn { position: static; margin-top: 12px; }
+  .app-container { padding-bottom: 70px; }
+  .daily-meals-grid { grid-template-columns: repeat(2, 1fr); }
+  .task-item { min-height: 48px; }
+  .tab-item { min-height: 48px; }
+  .btn { min-height: 36px; }
+  input, select, textarea { font-size: 16px; }
+}
+
+/* === Wallet === */
+.wallet-balance-card {
+  background: linear-gradient(135deg, rgba(0,240,255,0.08), rgba(255,0,128,0.05));
+  border: 1px solid rgba(0,240,255,0.2);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.wallet-balance-card::before {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: radial-gradient(circle, rgba(0,240,255,0.06) 0%, transparent 60%);
+  animation: wallet-glow 4s ease-in-out infinite;
+}
+@keyframes wallet-glow {
+  0%, 100% { transform: rotate(0deg); opacity: 0.5; }
+  50% { transform: rotate(180deg); opacity: 1; }
+}
+.wallet-balance-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  position: relative;
+}
+.wallet-balance-amount {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: var(--neon-cyan);
+  font-family: var(--font-mono);
+  margin: 8px 0 12px;
+  text-shadow: 0 0 20px rgba(0,240,255,0.4);
+  position: relative;
+}
+.wallet-balance-actions { position: relative; }
+
+.wallet-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+.wallet-stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 14px 10px;
+  text-align: center;
+}
+.wallet-stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.wallet-stat-label {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.wallet-add-form {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 16px;
+}
+.wallet-type-toggle {
+  display: flex;
+  gap: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-glow);
+}
+.wallet-type-btn {
+  flex: 1;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font-mono);
+}
+.wallet-type-btn.active {
+  background: var(--neon-cyan);
+  color: var(--bg-darker);
+  font-weight: 700;
+}
+#wtype-expense.active { background: var(--neon-pink); }
+#wtype-income.active { background: var(--neon-green); }
+
+.wallet-txn-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+.wallet-txn-item:hover { background: rgba(0,240,255,0.04); }
+.wallet-txn-icon {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+.wallet-txn-icon.expense {
+  background: rgba(255,51,68,0.15);
+  color: var(--neon-pink);
+}
+.wallet-txn-icon.income {
+  background: rgba(0,255,136,0.15);
+  color: var(--neon-green);
+}
+
+/* === Plan Panel === */
+.plan-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+.plan-nav-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+.plan-nav-btn.active {
+  background: rgba(0,240,255,0.12);
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+}
+.plan-section { display: none; }
+.plan-section.active { display: block; }
+.plan-phase {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.plan-phase-title {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--neon-cyan);
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+.plan-phase-sub {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+.plan-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.plan-list li {
+  position: relative;
+  padding-left: 16px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+.plan-list li::before {
+  content: '◆';
+  position: absolute;
+  left: 0;
+  color: var(--neon-magenta);
+  font-size: 0.6rem;
+  top: 2px;
+}
+.plan-note {
+  background: rgba(0,240,255,0.05);
+  border: 1px solid rgba(0,240,255,0.15);
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-top: 12px;
+}
+.plan-diet-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin-top: 8px;
+}
+.plan-diet-table th,
+.plan-diet-table td {
+  border: 1px solid var(--border-subtle);
+  padding: 8px;
+  text-align: left;
+}
+.plan-diet-table th {
+  background: var(--bg-deep);
+  color: var(--neon-cyan);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+}
+.plan-diet-table td {
+  color: var(--text-secondary);
+}
+.plan-goal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.plan-goal-card {
+  background: var(--bg-deep);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+}
+.plan-goal-card .icon {
+  font-size: 1.4rem;
+  margin-bottom: 4px;
+}
+.plan-goal-card .label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="scanlines"></div>
+
+<div class="app-container">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-title">N E X U S &nbsp; C O R E</div>
+    <div class="header-subtitle">// 任务核心系统 v1.0</div>
+    <div style="display:flex;gap:8px;position:absolute;top:24px;right:0;">
+      <button class="sync-btn" onclick="switchTab('plan')" title="燃脂规划">
+        <span>🎯</span>
+        <span>规划</span>
+      </button>
+      <button class="sync-btn" id="theme-toggle" onclick="toggleTheme()" title="切换主题">
+        <span id="theme-icon">☀️</span>
+      </button>
+      <button class="sync-btn" id="sync-btn" onclick="openSyncModal()">
+        <span class="sync-dot"></span>
+        <span id="sync-btn-text">云同步</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Bottom Tab Bar -->
+  <nav class="bottom-tab-bar" id="nav">
+    <button class="tab-item active" data-panel="daily"><span class="tab-icon">📋</span><span class="tab-label">每日</span></button>
+    <button class="tab-item" data-panel="tasks"><span class="tab-icon">⚡</span><span class="tab-label">任务</span></button>
+    <button class="tab-item" data-panel="data"><span class="tab-icon">📊</span><span class="tab-label">数据</span></button>
+    <button class="tab-item" data-panel="shop"><span class="tab-icon">🎁</span><span class="tab-label">商店</span></button>
+    <button class="tab-item" data-panel="settings"><span class="tab-icon">⚙️</span><span class="tab-label">设置</span></button>
+  </nav>
+
+  <!-- Panel: Daily Hub (首页) -->
+  <div class="panel active" id="panel-daily">
+    <!-- ① Date Header -->
+    <div class="daily-date-header" id="daily-date-header">
+      <div class="daily-date-main">
+        <div class="daily-date-big" id="daily-day-num"></div>
+        <div class="daily-date-info">
+          <div id="daily-month-year"></div>
+          <div id="daily-weekday" style="color: var(--text-dim); font-size: 0.75rem;"></div>
+        </div>
+      </div>
+      <div class="daily-streak-badge" id="daily-streak-badge">🔥 连续 0 天</div>
+    </div>
+
+    <!-- ② Time Allocation -->
+    <div class="daily-section">
+      <div class="section-header">
+        <span class="section-title">◆ 时间分配</span>
+        <button class="btn btn-sm" onclick="openTimeModal()">+ 添加</button>
+      </div>
+      <div style="display: flex; gap: 16px; align-items: center;">
+        <canvas id="daily-time-chart" width="120" height="120"></canvas>
+        <div id="daily-time-legend" style="flex: 1; font-size: 0.75rem;"></div>
+      </div>
+      <div id="daily-time-tags" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;"></div>
+    </div>
+
+    <!-- ③ Daily Check-in -->
+    <div class="daily-section">
+      <div class="section-header">
+        <span class="section-title">◆ 今日打卡</span>
+        <span class="section-count" id="daily-checkin-count"></span>
+      </div>
+      <div id="daily-checkin-list"></div>
+    </div>
+
+    <!-- ④ Meals -->
+    <div class="daily-section">
+      <div class="section-header">
+        <span class="section-title">◆ 饮食记录</span>
+        <span id="daily-kcal-total" style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--neon-orange);"></span>
+      </div>
+      <div class="daily-meals-grid">
+        <div class="daily-meal-card" onclick="addMeal('breakfast')">
+          <div class="daily-meal-icon">🌅</div>
+          <div class="daily-meal-label">早餐</div>
+          <div class="daily-meal-content" id="meal-breakfast">点击记录</div>
+        </div>
+        <div class="daily-meal-card" onclick="addMeal('lunch')">
+          <div class="daily-meal-icon">☀️</div>
+          <div class="daily-meal-label">午餐</div>
+          <div class="daily-meal-content" id="meal-lunch">点击记录</div>
+        </div>
+        <div class="daily-meal-card" onclick="addMeal('dinner')">
+          <div class="daily-meal-icon">🌙</div>
+          <div class="daily-meal-label">晚餐</div>
+          <div class="daily-meal-content" id="meal-dinner">点击记录</div>
+        </div>
+        <div class="daily-meal-card" onclick="addMeal('snack')">
+          <div class="daily-meal-icon">🍿</div>
+          <div class="daily-meal-label">零食</div>
+          <div class="daily-meal-content" id="meal-snack">点击记录</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⑤ Habits -->
+    <div class="daily-section">
+      <div class="section-header">
+        <span class="section-title">◆ 习惯打卡</span>
+        <span id="daily-habit-count" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim);"></span>
+      </div>
+      <div id="daily-habit-list"></div>
+    </div>
+
+    <!-- ⑥ Sleep -->
+    <div class="daily-section">
+      <div class="section-header">
+        <span class="section-title">◆ 睡眠记录</span>
+      </div>
+      <div class="daily-sleep-row">
+        <div class="daily-sleep-item">
+          <label>入睡</label>
+          <input type="time" id="sleep-bed" onchange="saveSleep()">
+        </div>
+        <div class="daily-sleep-item">
+          <label>起床</label>
+          <input type="time" id="sleep-wake" onchange="saveSleep()">
+        </div>
+        <div class="daily-sleep-item" style="text-align: center;">
+          <label>时长</label>
+          <div id="sleep-duration" style="font-family: var(--font-mono); color: var(--neon-cyan); font-size: 0.9rem;">--</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⑦ Today Expense -->
+    <div class="daily-section" style="cursor: pointer;" onclick="switchTab('data')">
+      <div class="section-header">
+        <span class="section-title">◆ 今日支出</span>
+        <span style="font-size: 0.7rem; color: var(--text-dim);">查看全部 →</span>
+      </div>
+      <div style="display: flex; gap: 16px;">
+        <div style="flex: 1; text-align: center; padding: 8px; background: var(--bg-card); border-radius: 6px;">
+          <div id="daily-expense-amt" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--neon-pink);">¥0</div>
+          <div style="font-size: 0.65rem; color: var(--text-dim);">今日支出</div>
+        </div>
+        <div style="flex: 1; text-align: center; padding: 8px; background: var(--bg-card); border-radius: 6px;">
+          <div id="daily-income-amt" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--neon-green);">¥0</div>
+          <div style="font-size: 0.65rem; color: var(--text-dim);">今日收入</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⑧ Journal -->
+    <div class="daily-section">
+      <div class="section-header">
+        <span class="section-title">◆ 今日记</span>
+      </div>
+      <textarea id="daily-journal" placeholder="写下今天的心情和想法..." style="min-height: 80px;" oninput="saveJournal()"></textarea>
+    </div>
+
+    <!-- History Link -->
+    <div style="text-align: center; padding: 12px 0 20px;">
+      <button class="btn" onclick="switchTab('data'); setTimeout(()=>showPanel('panel-history'),100);">📅 查看历史日志 →</button>
+    </div>
+  </div>
+
+  <!-- Panel: Plan (规划集合) -->
+  <div class="panel" id="panel-plan">
+    <div class="daily-date-header" style="margin-bottom:12px;">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:2px;">PLAN HUB</div>
+        <div style="font-size:1.4rem;font-weight:bold;color:var(--neon-cyan);margin:4px 0;">我的规划</div>
+      </div>
+      <div class="daily-streak-badge" style="background:rgba(0,240,255,0.1);border-color:rgba(0,240,255,0.3);color:var(--neon-cyan);">🎯 进行中</div>
+    </div>
+
+    <div class="plan-nav">
+      <button class="plan-nav-btn active" onclick="switchPlan('fatburn')">🔥 14天燃脂</button>
+      <button class="plan-nav-btn" onclick="switchPlan('makeup')">💄 15天化妆入门</button>
+    </div>
+
+    <!-- Plan: Fat Burn -->
+    <div class="plan-section active" id="plan-fatburn">
+    <div style="margin-bottom:16px;">
+      <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:2px;">14-DAY HOME FAT BURN PLAN</div>
+      <div style="font-size:1.2rem;font-weight:bold;color:var(--neon-cyan);margin:4px 0;">14天居家燃脂规划</div>
+      <div style="font-size:0.8rem;color:var(--text-dim);">8月22日 — 9月5日 · 目标：紧致精神见偶像</div>
+    </div>
+
+    <div class="plan-note" style="margin-bottom:16px;">
+      <strong style="color:var(--neon-cyan);">先交代两个重要情况：</strong><br>
+      1. 经期 8月20-24日，前两天不做剧烈运动，以舒缓活动为主。<br>
+      2. 日常步数偏低（约3400步/天），这14天除了运动还要多走动。
+    </div>
+
+    <div class="plan-phase">
+      <div class="plan-phase-title">第一阶段 · 8月22日-24日</div>
+      <div class="plan-phase-sub">经期适应期 · 目标：让身体动起来，但不过度刺激 · 每天约60-90分钟</div>
+      <ul class="plan-list">
+        <li>散步/慢走 30-40分钟（晚饭后出门，微微出汗即可）</li>
+        <li>温和拉伸 15分钟（重点拉伸腿部和腰背）</li>
+        <li>腹式呼吸 10分钟（睡前做，帮助放松）</li>
+      </ul>
+    </div>
+
+    <div class="plan-phase">
+      <div class="plan-phase-title">第二阶段 · 8月25日-29日</div>
+      <div class="plan-phase-sub">正式燃脂期第1周 · 目标：建立运动习惯，开始真正燃脂 · 每天约90-120分钟</div>
+      <ul class="plan-list">
+        <li><strong>早上（7:30-8:00）</strong>：快走20分钟 + 拉伸10分钟</li>
+        <li><strong>晚上（18:30-20:00）</strong>：快走30分钟 + 居家力量训练20分钟</li>
+        <li>力量训练内容：深蹲10个×3组、臀桥15个×3组、跪姿俯卧撑8个×3组、平板支撑20秒×3组、卷腹12个×3组</li>
+        <li>睡前拉伸 10分钟</li>
+      </ul>
+    </div>
+
+    <div class="plan-phase">
+      <div class="plan-phase-title">第三阶段 · 8月30日-9月5日上午</div>
+      <div class="plan-phase-sub">燃脂期第2周 · 目标：加量加强度，最大化燃脂 · 每天约2小时</div>
+      <ul class="plan-list">
+        <li><strong>早上（7:30-8:00）</strong>：快走25分钟（速度比上周稍快）+ 拉伸5分钟</li>
+        <li><strong>晚上（18:30-20:30）</strong>：快走40分钟（可尝试快走3分钟+慢走2分钟交替）+ 居家力量训练25分钟</li>
+        <li>力量训练进阶：深蹲12个×3组、臀桥18个×3组、跪姿俯卧撑10个×3组、平板支撑30秒×3组、卷腹15个×3组</li>
+        <li>拉伸 10分钟</li>
+      </ul>
+    </div>
+
+    <div class="plan-phase">
+      <div class="plan-phase-title">饮食部分 · 14天全程执行</div>
+      <div class="plan-phase-sub">少油少盐、主食减半、戒奶茶</div>
+      <table class="plan-diet-table">
+        <tr><th>餐次</th><th>内容</th><th>要点</th></tr>
+        <tr><td>早餐</td><td>肠粉（少油）+ 水煮蛋1个</td><td>或无糖豆浆 + 全麦面包</td></tr>
+        <tr><td>午餐</td><td>湖南菜（少油少盐）+ 米饭减半</td><td>肉正常吃，蔬菜多吃</td></tr>
+        <tr><td>晚餐</td><td>主食减半或不吃主食</td><td>清淡为主，睡前3小时不进食</td></tr>
+        <tr><td>零食</td><td>水果或原味坚果一小把</td><td>饼干、奶茶、含糖饮料戒掉</td></tr>
+        <tr><td>饮水</td><td>每天2000ml以上</td><td>帮助代谢和消浮肿</td></tr>
+      </table>
+    </div>
+
+    <div class="plan-phase">
+      <div class="plan-phase-title">关键提醒</div>
+      <ul class="plan-list">
+        <li><strong>经期（8月20-24日）：</strong>不做剧烈运动，以散步和拉伸为主。</li>
+        <li><strong>小腿疼：</strong>全程不安排跑步，快走时小腿酸就放慢速度、多拉伸。</li>
+        <li><strong>睡眠：</strong>尽量23:00前睡，7.5小时以上。睡眠不足会脸浮肿。</li>
+        <li><strong>每天步数：</strong>除了运动，上班时多走动，午休散步10分钟，目标每天8000步以上。</li>
+      </ul>
+    </div>
+
+    <div class="plan-phase">
+      <div class="plan-phase-title">9月5日早上 · 你能期待什么</div>
+      <div class="plan-goal-grid">
+        <div class="plan-goal-card"><div class="icon">⚖️</div><div class="label">体重减2-3kg</div></div>
+        <div class="plan-goal-card"><div class="icon">✨</div><div class="label">脸浮肿消退，轮廓清晰</div></div>
+        <div class="plan-goal-card"><div class="icon">📏</div><div class="label">腰围细2-3cm</div></div>
+        <div class="plan-goal-card"><div class="icon">🔋</div><div class="label">整个人更精神有活力</div></div>
+      </div>
+      <div class="plan-note">
+        9月6号见偶像那天，你会以一个更紧致、更有精神的状态出现。别人看的是你的整体状态，不是体重秤上的数字。
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:12px 0 20px;">
+      <button class="btn btn-primary" onclick="switchTab('settings'); setTimeout(()=>document.getElementById('plan-apply-section').scrollIntoView({behavior:'smooth'}),100);">⚙ 应用燃脂规划到每日打卡</button>
+    </div>
+    </div>
+
+    <!-- Plan: Makeup -->
+    <div class="plan-section" id="plan-makeup">
+    <div style="margin-bottom:16px;">
+      <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:2px;">15-DAY MAKEUP STARTER PLAN</div>
+      <div style="font-size:1.2rem;font-weight:bold;color:var(--neon-magenta);margin:4px 0;">新手化妆 15 天入门规划</div>
+      <div style="font-size:0.8rem;color:var(--text-dim);">8月22日 — 9月6日 · 目标：9月6日从容出门见偶像</div>
+    </div>
+
+    <div class="plan-note" style="margin-bottom:16px;">
+      皮肤底子好（光滑细腻、肤色均匀），其实不需要太多东西就能画出好看的自然妆。控制在预算内，够用就好。
+    </div>
+
+    <div class="plan-phase">
+      <div class="plan-phase-title">第一梯队 · 必须买（约150-250元）</div>
+      <div class="plan-phase-sub">先买这四样，练熟基础妆</div>
+      <table class="plan-diet-table">
+        <tr><th>品类</th><th>推荐选择</th><th>预算</th></tr>
+        <tr><td>防晒霜</td><td>日常通勤 SPF30+ 即可</td><td>30-60元</td></tr>
+        <tr><td>气垫/粉底液</td><td>选轻薄款，色号选和脖子肤色接近的</td><td>50-100元</td></tr>
+        <tr><td>口红</td><td>豆沙色或奶茶色，日常百搭</td><td>30-60元</td></tr>
+        <tr><td>眉笔</td><td>选灰色或棕色，比发色浅一号</td><td>10-20元</td></tr>
+      </table>
+    </div>
+
+    <div class="plan-phase">
+      <div class="plan-phase-title">第二梯队 · 锦上添花（约100-150元）</div>
+      <div class="plan-phase-sub">第一梯队练熟后再买</div>
+      <table class="plan-diet-table">
+        <tr><th>品类</th><th>推荐选择</th><th>预算</th></tr>
+        <tr><td>散粉</td><td>定妆用，控油防脱妆</td><td>30-50元</td></tr>
+        <tr><td>腮红</td><td>杏色或粉色，少量提气色</td><td>20-40元</td></tr>
+        <tr><td>眼影盘</td><td>大地色系小盘（3-4色就够）</td><td>30-60元</td></tr>
+        <tr><td>睫毛膏</td><td>纤长款，不容易苍蝇腿</td><td>20-40元</td></tr>
+      </table>
+    </div>
+
+    <div class="plan-phase">
+      <div class="plan-phase-title">第三梯队 · 可以后面再补</div>
+      <div class="plan-phase-sub">进阶之后再考虑</div>
+      <ul class="plan-list">
+        <li>眼线笔（新手容易画不好，先用眼影代替）</li>
+        <li>遮瑕膏（你皮肤底子好，暂时不需要）</li>
+        <li>高光修容（进阶再学）</li>
+      </ul>
+    </div>
+
+    <div class="plan-phase">
+      <div class="plan-phase-title">购买建议</div>
+      <ul class="plan-list">
+        <li><strong>不要一次买齐所有东西</strong>——先买第一梯队，练熟了再补第二梯队。</li>
+        <li><strong>平价品牌完全够用</strong>——新手不需要买大牌，国货平价品牌（如橘朵、完美日记、花西子等）性价比很高。</li>
+        <li><strong>色号选择</strong>：粉底色号不确定的话，去实体店试最稳妥；网购选“自然色”通常不会出错。</li>
+        <li><strong>口红选日常色</strong>：豆沙色、奶茶色、肉桂色，见偶像那天既提气色又不会太夸张。</li>
+      </ul>
+    </div>
+
+    <div class="plan-phase">
+      <div class="plan-phase-title">时间安排 · 8月22日-9月6日</div>
+      <div class="plan-phase-sub">今天到9月6日还有15天，时间完全够</div>
+      <ul class="plan-list">
+        <li><strong>本周（8月22-29日）</strong>：买齐第一梯队，每天晚上运动后花20-30分钟练基础化妆（底妆+眉毛+口红）。</li>
+        <li><strong>下周（8月30日-9月5日）</strong>：练熟了之后加腮红、眼影、睫毛膏，把整套流程走一遍。</li>
+        <li><strong>9月5日晚</strong>：完整化一次妆，看看效果，调整细节。</li>
+        <li><strong>9月6日当天</strong>：按练好的流程来，从容出门。</li>
+      </ul>
+    </div>
+
+    <div class="plan-phase">
+      <div class="plan-phase-title">一个提醒</div>
+      <ul class="plan-list">
+        <li>你现在减脂计划里运动后出汗多，<strong>化妆练习最好在洗漱后、睡前进行，不要带妆运动</strong>。</li>
+        <li>这15天饮食清淡、多喝水、睡好觉，皮肤状态会越来越好，上妆会更服帖自然。</li>
+        <li>先去把第一梯队买了吧：防晒 + 气垫 + 眉笔 + 口红，够你练好几天的了。</li>
+      </ul>
+    </div>
+
+    <div style="text-align:center;padding:12px 0 20px;">
+      <button class="btn btn-primary" style="background:var(--neon-magenta);border-color:var(--neon-magenta);" onclick="switchTab('settings'); setTimeout(()=>document.getElementById('plan-apply-section').scrollIntoView({behavior:'smooth'}),100);">⚙ 应用化妆规划到每日打卡</button>
+    </div>
+    </div>
+  </div>
+
+  <!-- Panel: Dashboard (保留但隐藏) -->
+  <div class="panel" id="panel-dashboard">
+    <!-- Level Display -->
+    <div class="level-display" id="level-display">
+      <div class="level-badge" id="level-num">Lv.1</div>
+      <div class="level-info">
+        <div class="level-title" id="level-title">数据残片</div>
+        <div class="progress-bar" style="margin-top: 8px;">
+          <div class="progress-fill" id="xp-bar" style="width: 0%"></div>
+        </div>
+        <div class="level-xp" id="xp-text">EXP 0 / 100</div>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-streak">0</div>
+        <div class="stat-label">连续打卡天数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-coins">0</div>
+        <div class="stat-label">积分余额</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total">0</div>
+        <div class="stat-label">累计完成任务</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-today">0</div>
+        <div class="stat-label">今日完成</div>
+      </div>
+    </div>
+
+    <!-- Daily Tasks -->
+    <div class="section-header">
+      <span class="section-title">◆ 每日任务</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="section-count" id="daily-count">剩余 0/0</span>
+        <button class="btn btn-sm" onclick="openDailyModal()" style="padding: 2px 8px; font-size: 0.7rem;">⚙ 管理</button>
+      </div>
+    </div>
+    <div id="daily-tasks-list"></div>
+
+    <!-- Main Quest -->
+    <div class="section-header" style="margin-top: 20px;">
+      <span class="section-title">◆ 主线任务</span>
+    </div>
+    <div id="main-quests-list"></div>
+
+    <!-- Urgent Tasks -->
+    <div class="section-header" style="margin-top: 20px;">
+      <span class="section-title">◆ 临近截止</span>
+    </div>
+    <div id="urgent-tasks-list"></div>
+  </div>
+
+  <!-- Panel: Tasks -->
+  <div class="panel" id="panel-tasks">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <div style="display: flex; gap: 8px;">
+        <select id="task-filter" style="width: auto;">
+          <option value="all">全部任务</option>
+          <option value="main">主线任务</option>
+          <option value="side">支线任务</option>
+          <option value="daily">每日任务</option>
+          <option value="timed">限时任务</option>
+        </select>
+        <select id="task-sort" style="width: auto;">
+          <option value="newest">最新</option>
+          <option value="priority">优先级</option>
+          <option value="deadline">截止日期</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="openTaskModal()">+ 新增任务</button>
+    </div>
+    <div id="all-tasks-list"></div>
+  </div>
+
+  <!-- Panel: Bounty Board -->
+  <div class="panel" id="panel-bounty">
+    <div class="section-header">
+      <span class="section-title">◆ 悬赏板</span>
+      <span class="section-count" style="color: var(--neon-orange);">双倍奖励 · 限时刷新</span>
+    </div>
+    <div id="bounty-list"></div>
+    <div style="text-align: center; margin-top: 12px;">
+      <button class="btn btn-primary" onclick="refreshBounties()">⟳ 刷新悬赏（每日3次）</button>
+      <span id="bounty-refresh-count" style="font-size: 0.7rem; color: var(--text-dim); margin-left: 8px;">剩余刷新: 3</span>
+    </div>
+  </div>
+
+  <!-- Panel: Pomodoro -->
+  <div class="panel" id="panel-pomodoro">
+    <div style="text-align: center; margin-bottom: 16px;">
+      <label style="text-align: left;">关联任务</label>
+      <select id="pomodoro-task-select">
+        <option value="">-- 选择要专注的任务 --</option>
+      </select>
+    </div>
+    <div class="pomodoro-display" id="pomodoro-time">25:00</div>
+    <div class="pomodoro-status" id="pomodoro-status">准备就绪</div>
+    <div class="progress-bar" style="max-width: 300px; margin: 12px auto;">
+      <div class="progress-fill" id="pomodoro-progress" style="width: 100%;"></div>
+    </div>
+    <div class="pomodoro-controls">
+      <button class="btn btn-primary" id="pomodoro-start" onclick="startPomodoro()">▶ 开始专注</button>
+      <button class="btn" onclick="pausePomodoro()">⏸ 暂停</button>
+      <button class="btn" onclick="resetPomodoro()">↺ 重置</button>
+    </div>
+    <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: center;">
+      <button class="btn btn-sm" onclick="setPomodoroPreset(25)">25分钟</button>
+      <button class="btn btn-sm" onclick="setPomodoroPreset(45)">45分钟</button>
+      <button class="btn btn-sm" onclick="setPomodoroPreset(5)">5分钟休息</button>
+    </div>
+    <div style="text-align: center; margin-top: 12px; font-size: 0.7rem; color: var(--text-dim);">
+      今日专注: <span id="pomodoro-today-count" style="color: var(--neon-cyan);">0</span> 个番茄
+    </div>
+  </div>
+
+  <!-- Panel: Shop -->
+  <div class="panel" id="panel-shop">
+    <div class="section-header">
+      <span class="section-title">◆ 积分商店</span>
+      <span class="section-count" style="color: var(--neon-yellow);">余额: <span id="shop-balance">0</span> 💰</span>
+    </div>
+    <div id="shop-items"></div>
+    <div style="margin-top: 20px;">
+      <div class="section-header">
+        <span class="section-title">◆ 兑换记录</span>
+      </div>
+      <div id="shop-history" style="font-size: 0.75rem; color: var(--text-dim);"></div>
+    </div>
+  </div>
+
+  <!-- Panel: Achievements -->
+  <div class="panel" id="panel-achievements">
+    <div class="section-header">
+      <span class="section-title">◆ 成就殿堂</span>
+      <span class="section-count" id="achievement-progress">已解锁 0/15</span>
+    </div>
+    <div class="grid-3" id="achievements-grid"></div>
+  </div>
+
+  <!-- Panel: Stats -->
+  <!-- Panel: Data (Stats + Wallet + Review) -->
+  <div class="panel" id="panel-data">
+    <!-- Wallet Balance -->
+    <div class="wallet-balance-card" id="wallet-balance-card">
+      <div class="wallet-balance-label">当前余额</div>
+      <div class="wallet-balance-amount" id="wallet-balance">¥ 0.00</div>
+      <div class="wallet-balance-actions">
+        <button class="btn btn-sm" onclick="openSetBalanceModal()" style="padding: 4px 12px;">设置初始余额</button>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="wallet-stats-row">
+      <div class="wallet-stat-card expense">
+        <div class="wallet-stat-value" id="wallet-today-expense" style="color: var(--neon-pink);">¥0</div>
+        <div class="wallet-stat-label">今日支出</div>
+      </div>
+      <div class="wallet-stat-card income">
+        <div class="wallet-stat-value" id="wallet-today-income" style="color: var(--neon-green);">¥0</div>
+        <div class="wallet-stat-label">今日收入</div>
+      </div>
+      <div class="wallet-stat-card expense">
+        <div class="wallet-stat-value" id="wallet-month-expense" style="color: var(--neon-pink);">¥0</div>
+        <div class="wallet-stat-label">本月支出</div>
+      </div>
+      <div class="wallet-stat-card income">
+        <div class="wallet-stat-value" id="wallet-month-income" style="color: var(--neon-green);">¥0</div>
+        <div class="wallet-stat-label">本月收入</div>
+      </div>
+    </div>
+
+    <!-- Add Transaction -->
+    <div class="section-header" style="margin-top: 16px;">
+      <span class="section-title">◆ 记一笔</span>
+    </div>
+    <div class="wallet-add-form">
+      <div class="wallet-type-toggle">
+        <button class="wallet-type-btn active" id="wtype-expense" onclick="setWalletType('expense')">支出</button>
+        <button class="wallet-type-btn" id="wtype-income" onclick="setWalletType('income')">收入</button>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
+        <input type="number" id="wallet-amount" placeholder="金额" step="0.01" min="0" style="width: 120px;">
+        <select id="wallet-category" style="width: auto;">
+          <option value="餐饮">餐饮</option>
+          <option value="交通">交通</option>
+          <option value="购物">购物</option>
+          <option value="娱乐">娱乐</option>
+          <option value="学习">学习</option>
+          <option value="生活">生活</option>
+          <option value="其他">其他</option>
+        </select>
+        <input type="text" id="wallet-note" placeholder="备注（可选）" style="flex: 1; min-width: 150px;">
+        <button class="btn btn-primary" onclick="addTransaction()">记一笔</button>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid-2" style="margin-top: 16px;">
+      <div class="chart-container">
+        <div class="section-title" style="margin-bottom: 12px;">◆ 近7日完成趋势</div>
+        <canvas id="chart-weekly"></canvas>
+      </div>
+      <div class="chart-container">
+        <div class="section-title" style="margin-bottom: 12px;">◆ 任务类型分布</div>
+        <canvas id="chart-types"></canvas>
+      </div>
+    </div>
+
+    <!-- 交易复盘 (投资思考日记) -->
+    <div class="section-header" style="margin-top: 16px;">
+      <span class="section-title">◆ 交易复盘</span>
+      <span style="font-size:0.7rem;color:var(--text-dim);">记录你的投资思考</span>
+    </div>
+    <div class="card">
+      <textarea id="invest-journal" placeholder="今天对市场/基金/股票有什么想法？记录下来方便以后回顾..." style="min-height:100px;" oninput="saveInvestJournal()"></textarea>
+    </div>
+    <!-- 历史复盘 -->
+    <div class="section-header" style="margin-top:12px;">
+      <span class="section-title" style="font-size:0.75rem;">◆ 历史复盘</span>
+    </div>
+    <div id="invest-history-list"></div>
+
+    <!-- Transaction History -->
+    <div class="section-header" style="margin-top: 16px;">
+      <span class="section-title">◆ 交易记录</span>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <select id="wallet-filter" style="width: auto; font-size: 0.75rem;" onchange="renderWalletHistory()">
+          <option value="all">全部</option>
+          <option value="today">今天</option>
+          <option value="week">本周</option>
+          <option value="month">本月</option>
+        </select>
+        <button class="btn btn-sm btn-danger" onclick="clearWalletHistory()" style="padding: 2px 8px; font-size: 0.7rem;">清空</button>
+      </div>
+    </div>
+    <div id="wallet-history-list"></div>
+  </div>
+
+  <!-- Panel: History (每日统计合集) -->
+  <div class="panel" id="panel-history">
+    <div class="daily-date-header" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:8px;padding:20px;margin-bottom:16px;">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:2px;">DAILY LOG COLLECTION</div>
+        <div style="font-size:1.8rem;font-weight:bold;color:var(--text-primary);margin:4px 0;">每日统计</div>
+        <div style="font-size:0.8rem;color:var(--text-dim);">打卡合集 · <span id="history-year"></span></div>
+      </div>
+      <div style="text-align:right;">
+        <div id="history-total-days" style="font-family:var(--font-mono);font-size:2.5rem;color:var(--text-dim);opacity:0.3;">365</div>
+      </div>
+    </div>
+
+    <!-- Filter Tags -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <button class="btn btn-sm history-filter active" data-filter="all" onclick="filterHistory('all')">全部</button>
+      <button class="btn btn-sm history-filter" data-filter="calories" onclick="filterHistory('calories')">有饮食</button>
+      <button class="btn btn-sm history-filter" data-filter="habits" onclick="filterHistory('habits')">有打卡</button>
+      <button class="btn btn-sm history-filter" data-filter="expense" onclick="filterHistory('expense')">有支出</button>
+      <button class="btn btn-sm history-filter" data-filter="journal" onclick="filterHistory('journal')">有日记</button>
+    </div>
+
+    <!-- Entries List -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:1px;">ENTRIES</span>
+      <span id="history-entry-count" style="font-size:0.7rem;color:var(--text-dim);"></span>
+    </div>
+    <div id="history-entries-list"></div>
+
+    <div style="text-align:center;padding:16px 0;">
+      <button class="btn" onclick="switchTab('daily');">查看今日 →</button>
+    </div>
+  </div>
+
+  <!-- Panel: Settings -->
+  <div class="panel" id="panel-settings">
+    <!-- 个人等级 -->
+    <div class="card" id="settings-level-info" style="margin-bottom:16px;"></div>
+
+    <!-- 云同步 -->
+    <div class="card" style="cursor:pointer;padding:14px;" onclick="openSyncModal()">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:1.3rem;">☁️</span>
+        <div style="flex:1;">
+          <div style="font-size:0.9rem;color:var(--text-primary);">云同步</div>
+          <div style="font-size:0.7rem;color:var(--text-dim);margin-top:2px;" id="settings-sync-status">未配置</div>
+        </div>
+        <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
+      </div>
+    </div>
+
+    <!-- 应用规划 -->
+    <div id="plan-apply-section" style="margin-top:16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="font-size:1rem;">⚙</span>
+        <span style="font-size:0.85rem;color:var(--text-primary);">规划应用</span>
+      </div>
+      <div class="card" style="padding:12px; margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="font-size:1rem;">🔥</span>
+          <span style="font-size:0.85rem;color:var(--text-primary);">14 天居家燃脂规划</span>
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">
+          将运动打卡、饮食控制、睡眠、饮水等条目写入「每日模板」和「习惯管理」。
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="applyBurnPlan()" style="padding:4px 12px;">✅ 应用燃脂规划</button>
+          <button class="btn btn-sm" onclick="switchTab('plan'); switchPlan('fatburn')" style="padding:4px 12px;">📖 查看</button>
+        </div>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="font-size:1rem;">💄</span>
+          <span style="font-size:0.85rem;color:var(--text-primary);">新手化妆 15 天入门规划</span>
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">
+          将化妆练习、卸妆、护肤、早睡等条目写入「每日模板」和「习惯管理」。
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="applyMakeupPlan()" style="padding:4px 12px; background:var(--neon-magenta); border-color:var(--neon-magenta);">✅ 应用化妆规划</button>
+          <button class="btn btn-sm" onclick="switchTab('plan'); switchPlan('makeup')" style="padding:4px 12px;">📖 查看</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 每日模板 -->
+    <div style="margin-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:1rem;">📋</span>
+          <span style="font-size:0.85rem;color:var(--text-primary);">每日模板</span>
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="addDailyTemplate()" style="padding:3px 10px;">+ 新增</button>
+      </div>
+      <div id="settings-daily-templates"></div>
+    </div>
+
+    <!-- 习惯管理 -->
+    <div style="margin-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:1rem;">🎯</span>
+          <span style="font-size:0.85rem;color:var(--text-primary);">习惯管理</span>
+        </div>
+        <button class="btn btn-sm btn-primary" onclick="addHabit()" style="padding:3px 10px;">+ 新增</button>
+      </div>
+      <div id="settings-habits"></div>
+    </div>
+
+    <!-- 数据管理 -->
+    <div style="margin-top:16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="font-size:1rem;">💾</span>
+        <span style="font-size:0.85rem;color:var(--text-primary);">数据管理</span>
+      </div>
+      <div class="card" style="cursor:pointer;padding:12px;" onclick="exportData()">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1rem;">📤</span>
+          <span style="flex:1;font-size:0.85rem;">导出数据</span>
+          <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
+        </div>
+      </div>
+      <div class="card" style="cursor:pointer;padding:12px;margin-top:8px;" onclick="importDataPrompt()">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1rem;">📥</span>
+          <span style="flex:1;font-size:0.85rem;">导入数据</span>
+          <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 关于 -->
+    <div style="margin-top:20px;text-align:center;padding:12px;">
+      <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-dim);letter-spacing:2px;">NEXUS CORE v2.0</div>
+      <div style="font-size:0.65rem;color:var(--text-dim);margin-top:4px;">赛博朋克个人管理面板</div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="task-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">// 新增任务</div>
+    <div class="form-group">
+      <label>任务名称</label>
+      <input type="text" id="task-name" placeholder="输入任务名称...">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>任务类型</label>
+        <select id="task-type">
+          <option value="main">主线任务</option>
+          <option value="side">支线任务</option>
+          <option value="daily">每日任务</option>
+          <option value="timed">限时任务</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>优先级</label>
+        <select id="task-priority">
+          <option value="low">低</option>
+          <option value="medium" selected>中</option>
+          <option value="high">高</option>
+          <option value="urgent">紧急</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>经验值奖励</label>
+        <input type="number" id="task-xp" value="50" min="10" max="500">
+      </div>
+      <div class="form-group">
+        <label>积分奖励</label>
+        <input type="number" id="task-coins" value="30" min="5" max="300">
+      </div>
+    </div>
+    <div class="form-group" id="deadline-group">
+      <label>截止日期（限时任务）</label>
+      <input type="date" id="task-deadline">
+    </div>
+    <div class="form-group">
+      <label>备注</label>
+      <textarea id="task-note" placeholder="任务详情..."></textarea>
+    </div>
+    <input type="hidden" id="task-edit-id" value="">
+    <div class="modal-actions">
+      <button class="btn" onclick="closeTaskModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveTask()">保存任务</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sync Modal -->
+<div class="modal-overlay" id="sync-modal">
+  <div class="modal" style="max-width: 520px;">
+    <div class="modal-title">// 云同步设置</div>
+
+    <!-- Setup Section (not configured) -->
+    <div id="sync-setup-section">
+      <div class="form-group">
+        <label>JSONBin API Key</label>
+        <input type="password" id="sync-token" placeholder="粘贴你的 JSONBin API Key">
+        <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 4px; line-height: 1.6;">
+          前往 <a href="https://jsonbin.io/login" target="_blank" style="color: var(--neon-cyan);">jsonbin.io</a> 登录/注册<br>
+          → Create API Key → 复制 Key 填入此处（免费）
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Bin ID（已有同步则填入，留空自动创建）</label>
+        <input type="text" id="sync-gist-id-input" placeholder="留空将自动创建新的存储空间">
+      </div>
+
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="sync-auto" checked>
+          自动同步（数据变更后自动上传，3秒延迟）
+        </label>
+      </div>
+    </div>
+
+    <!-- Connected Section (configured) -->
+    <div id="sync-connected-section" style="display: none;">
+      <div style="background: var(--bg-card); padding: 14px; border-radius: 6px; margin-bottom: 12px; border: 1px solid var(--border-subtle);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">同步状态</span>
+          <span id="sync-state-badge" class="badge badge-green">已连接</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">Bin ID</span>
+          <span id="sync-gist-display" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--neon-cyan); word-break: break-all; text-align: right; max-width: 280px;"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">上次同步</span>
+          <span id="sync-last-time" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim);"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">自动同步</span>
+          <span id="sync-auto-status" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--neon-green);">已开启</span>
+        </div>
+      </div>
+
+      <div style="background: rgba(0,240,255,0.05); padding: 10px; border-radius: 6px; border: 1px solid rgba(0,240,255,0.15); font-size: 0.7rem; color: var(--text-secondary); line-height: 1.6;">
+        <strong style="color: var(--neon-cyan);">使用方法：</strong><br>
+        1. 在此设备配置完成后，复制上方 Bin ID<br>
+        2. 在另一台设备（手机/电脑）打开此页面<br>
+        3. 输入相同的 API Key 和 Bin ID 即可同步
+      </div>
+    </div>
+
+    <div class="modal-actions" style="flex-wrap: wrap; gap: 8px;">
+      <button class="btn btn-danger btn-sm" id="sync-disconnect-btn" onclick="disconnectSync()" style="display: none;">断开</button>
+      <div style="flex: 1;"></div>
+      <button class="btn" onclick="closeSyncModal()">关闭</button>
+      <button class="btn" id="sync-pull-btn" onclick="manualPull()" style="display: none;">↓ 下载</button>
+      <button class="btn" id="sync-push-btn" onclick="manualPush()" style="display: none;">↑ 上传</button>
+      <button class="btn btn-primary" id="sync-save-btn" onclick="saveSyncSettings()">保存并连接</button>
+      <button class="btn btn-primary" id="sync-now-btn" onclick="manualSync()" style="display: none;">⟳ 立即同步</button>
+    </div>
+  </div>
+</div>
+
+<!-- Daily Task Manager Modal -->
+<div class="modal-overlay" id="daily-modal" onclick="if(event.target===this)closeDailyModal()">
+  <div class="modal" style="max-width: 520px;">
+    <div class="modal-header">
+      <h3 class="modal-title">⚙ 每日任务管理</h3>
+      <button class="modal-close" onclick="closeDailyModal()">×</button>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <input type="text" id="daily-new-title" placeholder="新任务标题（如：背50个单词）" style="flex: 1;">
+        <input type="number" id="daily-new-xp" placeholder="XP" style="width: 70px;" value="50">
+        <input type="number" id="daily-new-coins" placeholder="💰" style="width: 70px;" value="30">
+        <button class="btn btn-primary" onclick="addDailyTemplate()">添加</button>
+      </div>
+    </div>
+
+    <div id="daily-template-list" style="max-height: 350px; overflow-y: auto;"></div>
+
+    <div style="margin-top: 12px; padding: 10px; background: rgba(0,240,255,0.05); border-radius: 6px; border: 1px solid rgba(0,240,255,0.15); font-size: 0.7rem; color: var(--text-secondary); line-height: 1.6;">
+      <strong style="color: var(--neon-cyan);">说明：</strong>每日0点自动从模板生成今日任务。开关关闭后该任务不会出现。修改后明日生效。
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="closeDailyModal()">完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ============================================================
+// NEXUS CORE - Main Application Script
+// ============================================================
+
+// === Data Store (localStorage wrapper) ===
+const Store = {
+  _listeners: [],
+  onSet(callback) { this._listeners.push(callback); },
+  get(key, def = null) {
+    try { const v = localStorage.getItem('nexus_' + key); return v ? JSON.parse(v) : def; }
+    catch { return def; }
+  },
+  set(key, val) {
+    try {
+      localStorage.setItem('nexus_' + key, JSON.stringify(val));
+      this._listeners.forEach(cb => { try { cb(key, val); } catch(e) { console.error('Listener error:', e); } });
+    } catch(e) { console.error('Store error:', e); }
+  }
+};
+
+// === Cloud Sync Manager (JSONBin.io) ===
+const SyncManager = {
+  config: { apiKey: '', binId: '', autoSync: true, lastSync: 0, lastLocalModify: 0 },
+  _pushTimer: null,
+  _isSyncing: false,
+  _initialized: false,
+  _suppressAutoPush: false,
+  API_BASE: 'https://api.jsonbin.io/v3',
+
+  init() {
+    const saved = Store.get('syncConfig');
+    if (saved) this.config = { ...this.config, ...saved };
+    this._initialized = true;
+    this.updateButton();
+    // Auto-pull on startup if configured
+    if (this.isConfigured() && this.config.autoSync) {
+      setTimeout(() => this.pull().catch(() => {}), 1000);
+    }
+  },
+
+  isConfigured() {
+    return !!(this.config.apiKey && this.config.binId);
+  },
+
+  // Export all nexus data (excluding syncConfig)
+  exportData() {
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('nexus_') && key !== 'nexus_syncConfig') {
+        try { data[key] = JSON.parse(localStorage.getItem(key)); }
+        catch { data[key] = localStorage.getItem(key); }
+      }
+    }
+    return { app: 'nexus-core', version: '1.0', timestamp: Date.now(), data: data };
+  },
+
+  // Import remote data (replaces all local nexus data)
+  importData(payload) {
+    if (!payload || !payload.data) return;
+    this._suppressAutoPush = true;
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('nexus_') && key !== 'nexus_syncConfig') keysToRemove.push(key);
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    for (const [key, value] of Object.entries(payload.data)) {
+      if (key.startsWith('nexus_')) {
+        localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+      }
+    }
+    this._suppressAutoPush = false;
+  },
+
+  async push() {
+    if (!this.isConfigured()) return { success: false, error: '未配置同步' };
+    if (this._isSyncing) return { success: false, error: '正在同步中' };
+    this._isSyncing = true;
+    this.updateButton('syncing');
+    try {
+      const data = this.exportData();
+      const res = await fetch(`${this.API_BASE}/b/${this.config.binId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': this.config.apiKey,
+        },
+        body: JSON.stringify({ 'nexus-core-sync': data }),
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        let msg;
+        try { msg = JSON.parse(t).message || t; } catch { msg = t; }
+        throw new Error(`HTTP ${res.status}: ${msg}`);
+      }
+      this.config.lastSync = Date.now();
+      this.saveConfig();
+      this.updateButton('synced');
+      return { success: true };
+    } catch (e) {
+      console.error('[NEXUS Sync] Push error:', e.message);
+      this.updateButton('error', e.message);
+      return { success: false, error: e.message };
+    } finally {
+      this._isSyncing = false;
+    }
+  },
+
+  async pull() {
+    if (!this.isConfigured()) return { success: false, error: '未配置同步' };
+    if (this._isSyncing) return { success: false, error: '正在同步中' };
+    this._isSyncing = true;
+    this.updateButton('syncing');
+    try {
+      const res = await fetch(`${this.API_BASE}/b/${this.config.binId}/latest`, {
+        headers: { 'X-Master-Key': this.config.apiKey },
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        let msg;
+        try { msg = JSON.parse(t).message || t; } catch { msg = t; }
+        throw new Error(`HTTP ${res.status}: ${msg}`);
+      }
+      const result = await res.json();
+      const payload = result.record['nexus-core-sync'];
+      if (!payload) throw new Error('云端数据格式异常');
+      // Only import if remote is newer than last sync
+      if (payload.timestamp > (this.config.lastSync || 0)) {
+        this.importData(payload);
+        this.config.lastSync = Date.now();
+        this.config.lastLocalModify = payload.timestamp;
+        this.saveConfig();
+        this.updateButton('synced');
+        return { success: true, pulled: true };
+      }
+      this.updateButton('synced');
+      return { success: true, pulled: false, message: '本地数据已是最新' };
+    } catch (e) {
+      console.error('[NEXUS Sync] Pull error:', e.message);
+      this.updateButton('error', e.message);
+      return { success: false, error: e.message };
+    } finally {
+      this._isSyncing = false;
+    }
+  },
+
+  // Create a new JSONBin for sync
+  async createBin() {
+    if (!this.config.apiKey) return { success: false, error: '请先输入 API Key' };
+    try {
+      const data = this.exportData();
+      const res = await fetch(`${this.API_BASE}/b`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': this.config.apiKey,
+          'X-Bin-Name': 'nexus-core-sync',
+        },
+        body: JSON.stringify({ 'nexus-core-sync': data }),
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        let msg;
+        try { msg = JSON.parse(t).message || t; } catch { msg = t; }
+        throw new Error(`HTTP ${res.status}: ${msg}`);
+      }
+      const result = await res.json();
+      this.config.binId = result.metadata.id;
+      this.config.lastSync = Date.now();
+      this.config.lastLocalModify = Date.now();
+      this.saveConfig();
+      return { success: true, binId: result.metadata.id };
+    } catch (e) {
+      console.error('[NEXUS Sync] Create bin error:', e.message);
+      return { success: false, error: e.message };
+    }
+  },
+
+  // Debounced auto-push (3s delay)
+  autoPush() {
+    if (!this._initialized || this._suppressAutoPush || !this.config.autoSync || !this.isConfigured()) return;
+    this.config.lastLocalModify = Date.now();
+    this.saveConfig();
+    clearTimeout(this._pushTimer);
+    this._pushTimer = setTimeout(async () => {
+      const r = await this.push();
+      if (!r.success) console.warn('[NEXUS Sync] Auto-push failed:', r.error);
+    }, 3000);
+  },
+
+  saveConfig() { localStorage.setItem('nexus_syncConfig', JSON.stringify(this.config)); },
+
+  updateButton(state, error = '') {
+    const btn = document.getElementById('sync-btn');
+    const text = document.getElementById('sync-btn-text');
+    if (!btn || !text) return;
+    btn.classList.remove('synced', 'syncing', 'error');
+    if (!this.isConfigured()) { text.textContent = '云同步'; return; }
+    if (state === 'syncing') { btn.classList.add('syncing'); text.textContent = '同步中...'; }
+    else if (state === 'error') { btn.classList.add('error'); text.textContent = '同步失败'; }
+    else {
+      btn.classList.add('synced');
+      const t = this.config.lastSync ? new Date(this.config.lastSync) : null;
+      text.textContent = t ? `已同步 ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}` : '已连接';
+    }
+  }
+};
+
+// Subscribe Store changes to auto-push (exclude syncConfig & initialized)
+Store.onSet((key) => {
+  if (key !== 'syncConfig' && key !== 'initialized') SyncManager.autoPush();
+});
+
+// === Initialize Default Data ===
+function initData() {
+  if (!Store.get('initialized')) {
+    Store.set('profile', {
+      level: 1, xp: 0, coins: 0, streak: 0, lastCheckin: '',
+      totalCompleted: 0, pomodoroToday: 0, pomodoroDate: ''
+    });
+    Store.set('tasks', []);
+    Store.set('dailyTemplates', [
+      { id: 'd1', title: '背30个英语单词', xp: 50, coins: 30, enabled: true },
+      { id: 'd2', title: '阅读30分钟', xp: 50, coins: 30, enabled: true },
+      { id: 'd3', title: '运动20分钟', xp: 80, coins: 50, enabled: true },
+      { id: 'd4', title: '复习当天所学内容', xp: 60, coins: 40, enabled: true },
+      { id: 'd5', title: '整理桌面/房间', xp: 30, coins: 20, enabled: true }
+    ]);
+    Store.set('dailyTasks', []); // { id, templateId, title, xp, coins, done, date }
+    Store.set('achievements', generateAchievements());
+    Store.set('shopItems', generateShopItems());
+    Store.set('shopHistory', []);
+    Store.set('bounties', []);
+    Store.set('bountyRefreshes', 3);
+    Store.set('bountyDate', '');
+    Store.set('completionLog', {}); // { 'YYYY-MM-DD': count }
+    Store.set('wallet', { balance: 0, initialSet: false, transactions: [] });
+    Store.set('dailyLog', {}); // { "YYYY-MM-DD": { meals: [{type,name,kcal}], totalKcal } }
+    Store.set('habits', {
+      templates: [
+        { id: 'h1', name: '喝水8杯', icon: '💧', enabled: true },
+        { id: 'h2', name: '运动30分钟', icon: '🏃', enabled: true },
+        { id: 'h3', name: '早起(7点前)', icon: '🌅', enabled: true }
+      ],
+      logs: {}
+    });
+    Store.set('sleep', {}); // { "YYYY-MM-DD": { bed: "HH:MM", wake: "HH:MM" } }
+    Store.set('timeAlloc', {}); // { "YYYY-MM-DD": { 学习:30, 工作:60, ... } }
+    Store.set('journal', {}); // { "YYYY-MM-DD": "text" }
+    Store.set('investJournal', {}); // { "YYYY-MM-DD": "投资思考文本" }
+    Store.set('initialized', true);
+  }
+  // Ensure daily tasks are refreshed
+  refreshDailyTasks();
+  // Ensure bounties are refreshed
+  refreshBountiesCheck();
+  // Check streak
+  updateStreak();
+}
+
+// === Daily Hub Functions ===
+const TODAY = () => new Date().toISOString().split('T')[0];
+
+function renderDailyHub() {
+  const today = TODAY();
+  const now = new Date();
+
+  // ① Date Header
+  document.getElementById('daily-day-num').textContent = now.getDate();
+  document.getElementById('daily-month-year').textContent = `${now.getFullYear()}年${now.getMonth()+1}月`;
+  const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+  document.getElementById('daily-weekday').textContent = weekdays[now.getDay()];
+  const profile = Store.get('profile', {});
+  document.getElementById('daily-streak-badge').textContent = `🔥 连续 ${(profile.streak||0)} 天`;
+
+  // ② Time Allocation
+  renderTimeAlloc();
+
+  // ③ Daily Check-in
+  renderDailyCheckin();
+
+  // ④ Meals
+  renderMeals();
+
+  // ⑤ Habits
+  renderHabits();
+
+  // ⑥ Sleep
+  renderSleep();
+
+  // ⑦ Today Expense
+  renderDailyExpense();
+
+  // ⑧ Journal
+  const journal = Store.get('journal', {});
+  const journalEl = document.getElementById('daily-journal');
+  if (journalEl && journal[today] !== undefined) journalEl.value = journal[today];
+  else if (journalEl) journalEl.value = '';
+}
+
+// --- Time Allocation ---
+const TIME_CATEGORIES = ['学习','工作','娱乐','运动','其他'];
+const TIME_COLORS = ['#00f0ff','#b44dff','#ff3380','#00ff88','#ffe500'];
+
+function renderTimeAlloc() {
+  const timeAlloc = Store.get('timeAlloc', {});
+  const today = timeAlloc[TODAY()] || {};
+  const total = Object.values(today).reduce((s,v)=>s+v, 0) || 1;
+
+  // Legend
+  const legend = document.getElementById('daily-time-legend');
+  legend.innerHTML = TIME_CATEGORIES.map((cat, i) => {
+    const mins = today[cat] || 0;
+    const h = Math.floor(mins/60), m = mins%60;
+    const pct = ((mins/total)*100).toFixed(0);
+    return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+      <span style="width:8px;height:8px;border-radius:50%;background:${TIME_COLORS[i]};flex-shrink:0;"></span>
+      <span style="flex:1;color:var(--text-secondary);">${cat}</span>
+      <span style="font-family:var(--font-mono);color:var(--text-dim);font-size:0.7rem;">${h>0?h+'h':''}${m}m</span>
+    </div>`;
+  }).join('');
+
+  // Tags
+  const tags = document.getElementById('daily-time-tags');
+  tags.innerHTML = TIME_CATEGORIES.map((cat, i) =>
+    `<span class="daily-time-tag" onclick="addTimeBlock('${cat}')" style="border-color:${TIME_COLORS[i]}33;color:${TIME_COLORS[i]};">+ ${cat}</span>`
+  ).join('');
+
+  // Canvas pie chart
+  drawTimePie(today, total);
+}
+
+function drawTimePie(data, total) {
+  const canvas = document.getElementById('daily-time-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const size = 120, cx = 60, cy = 60, r = 45, inner = 28;
+  canvas.width = size; canvas.height = size;
+  ctx.clearRect(0, 0, size, size);
+
+  let angle = -Math.PI / 2;
+  TIME_CATEGORIES.forEach((cat, i) => {
+    const val = data[cat] || 0;
+    if (val === 0) return;
+    const slice = (val / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, angle, angle + slice);
+    ctx.arc(cx, cy, inner, angle + slice, angle, true);
+    ctx.closePath();
+    ctx.fillStyle = TIME_COLORS[i];
+    ctx.globalAlpha = 0.8;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    angle += slice;
+  });
+  // Center text
+  ctx.fillStyle = '#e0e0e8';
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const totalH = Math.floor(total/60), totalM = total%60;
+  ctx.fillText(`${totalH}h${totalM}m`, cx, cy);
+}
+
+function addTimeBlock(category) {
+  const mins = prompt(`添加「${category}」时长（分钟）：`, '30');
+  if (mins === null) return;
+  const val = parseInt(mins);
+  if (isNaN(val) || val <= 0) { showToast('请输入有效分钟数', 'warning'); return; }
+  const timeAlloc = Store.get('timeAlloc', {});
+  if (!timeAlloc[TODAY()]) timeAlloc[TODAY()] = {};
+  timeAlloc[TODAY()][category] = (timeAlloc[TODAY()][category] || 0) + val;
+  Store.set('timeAlloc', timeAlloc);
+  renderTimeAlloc();
+  showToast(`+${val}分钟 ${category}`, 'success');
+}
+
+function openTimeModal() { addTimeBlock('学习'); }
+
+// --- Daily Check-in ---
+function renderDailyCheckin() {
+  const dailyTasks = Store.get('dailyTasks', []);
+  const doneCount = dailyTasks.filter(t => t.done).length;
+  document.getElementById('daily-checkin-count').textContent = `${doneCount}/${dailyTasks.length}`;
+
+  const list = document.getElementById('daily-checkin-list');
+  list.innerHTML = dailyTasks.map(t => `
+    <div class="task-item ${t.done?'completed':''}">
+      <div class="task-check ${t.done?'checked':''}" onclick="${t.done?'':`completeDailyTask('${t.id}');renderDailyHub();`}">${t.done?'✓':''}</div>
+      <div class="task-info" onclick="${t.done?'':`completeDailyTask('${t.id}');renderDailyHub();`}"><div class="task-title">${t.title}</div></div>
+      <div class="task-reward">+${t.xp}XP</div>
+      <button class="btn btn-sm" onclick="event.stopPropagation();editDailyTask('${t.id}')" style="padding:2px 6px;font-size:0.65rem;">✏️</button>
+    </div>
+  `).join('') || '<div style="color:var(--text-dim);font-size:0.8rem;padding:8px;">暂无打卡任务</div>';
+}
+
+function editDailyTask(id) {
+  const dailyTasks = Store.get('dailyTasks', []);
+  const task = dailyTasks.find(t => t.id === id);
+  if (!task) return;
+  const newTitle = prompt('修改任务名称：', task.title);
+  if (newTitle === null || !newTitle.trim()) return;
+  task.title = newTitle.trim();
+  Store.set('dailyTasks', dailyTasks);
+  renderDailyCheckin();
+  showToast('任务名称已更新', 'success');
+}
+
+// --- Meals ---
+function renderMeals() {
+  const logs = Store.get('dailyLog', {});
+  const todayLog = logs[TODAY()] || { meals: [], totalKcal: 0 };
+  const types = ['breakfast','lunch','dinner','snack'];
+  const names = {breakfast:'早餐',lunch:'午餐',dinner:'晚餐',snack:'零食'};
+
+  types.forEach(type => {
+    const meal = todayLog.meals.find(m => m.type === type);
+    const el = document.getElementById('meal-' + type);
+    if (el) {
+      el.textContent = meal ? `${meal.name} ${meal.kcal}kcal` : '点击记录';
+      el.style.color = meal ? 'var(--text-primary)' : 'var(--text-dim)';
+    }
+  });
+  document.getElementById('daily-kcal-total').textContent = todayLog.totalKcal > 0 ? `合计 ${todayLog.totalKcal} kcal` : '';
+}
+
+function addMeal(type) {
+  const logs = Store.get('dailyLog', {});
+  if (!logs[TODAY()]) logs[TODAY()] = { meals: [], totalKcal: 0 };
+  const todayLog = logs[TODAY()];
+  const existing = todayLog.meals.findIndex(m => m.type === type);
+
+  const names = {breakfast:'早餐',lunch:'午餐',dinner:'晚餐',snack:'零食'};
+  const input = prompt(`记录${names[type]}（格式：食物名,卡路里，如：辣椒炒肉饭,680）`, '');
+  if (input === null || !input.trim()) return;
+  const parts = input.split(',');
+  const name = parts[0].trim();
+  const kcal = parseInt(parts[1]) || 0;
+  if (!name) return;
+
+  const meal = { type, name, kcal };
+  if (existing >= 0) todayLog.meals[existing] = meal;
+  else todayLog.meals.push(meal);
+  todayLog.totalKcal = todayLog.meals.reduce((s,m) => s + (m.kcal||0), 0);
+
+  logs[TODAY()] = todayLog;
+  Store.set('dailyLog', logs);
+  renderMeals();
+  showToast(`${names[type]}已记录`, 'success');
+}
+
+// --- Habits ---
+function renderHabits() {
+  const habits = Store.get('habits', { templates: [], logs: {} });
+  const todayLog = habits.logs[TODAY()] || {};
+  const enabled = habits.templates.filter(t => t.enabled);
+  const doneCount = enabled.filter(t => todayLog[t.id]).length;
+  document.getElementById('daily-habit-count').textContent = `${doneCount}/${enabled.length}`;
+
+  const list = document.getElementById('daily-habit-list');
+  list.innerHTML = enabled.map(h => {
+    const checked = todayLog[h.id];
+    return `<div class="daily-habit-item" onclick="toggleHabit('${h.id}')">
+      <span class="daily-habit-icon">${h.icon}</span>
+      <span class="daily-habit-name">${h.name}</span>
+      <span class="daily-habit-check ${checked?'checked':''}">${checked?'✓':''}</span>
+    </div>`;
+  }).join('') || '<div style="color:var(--text-dim);font-size:0.8rem;padding:8px;">暂无习惯，在设置中添加</div>';
+}
+
+function toggleHabit(id) {
+  const habits = Store.get('habits', { templates: [], logs: {} });
+  if (!habits.logs[TODAY()]) habits.logs[TODAY()] = {};
+  habits.logs[TODAY()][id] = !habits.logs[TODAY()][id];
+  Store.set('habits', habits);
+  renderHabits();
+}
+
+// --- Sleep ---
+function renderSleep() {
+  const sleep = Store.get('sleep', {});
+  const today = sleep[TODAY()];
+  const bedEl = document.getElementById('sleep-bed');
+  const wakeEl = document.getElementById('sleep-wake');
+  const durEl = document.getElementById('sleep-duration');
+
+  if (today) {
+    if (bedEl) bedEl.value = today.bed || '';
+    if (wakeEl) wakeEl.value = today.wake || '';
+    if (durEl && today.bed && today.wake) {
+      const bedM = parseInt(today.bed.split(':')[0])*60 + parseInt(today.bed.split(':')[1]);
+      const wakeM = parseInt(today.wake.split(':')[0])*60 + parseInt(today.wake.split(':')[1]);
+      let diff = wakeM - bedM;
+      if (diff < 0) diff += 24*60;
+      const h = Math.floor(diff/60), m = diff%60;
+      durEl.textContent = `${h}h${m}m`;
+    } else if (durEl) {
+      durEl.textContent = '--';
+    }
+  }
+}
+
+function saveSleep() {
+  const sleep = Store.get('sleep', {});
+  const bed = document.getElementById('sleep-bed').value;
+  const wake = document.getElementById('sleep-wake').value;
+  sleep[TODAY()] = { bed, wake };
+  Store.set('sleep', sleep);
+  renderSleep();
+}
+
+// --- Daily Expense ---
+function renderDailyExpense() {
+  const wallet = Store.get('wallet', { transactions: [] });
+  const today = TODAY();
+  let exp = 0, inc = 0;
+  (wallet.transactions || []).forEach(t => {
+    const d = t.date ? t.date.slice(0,10) : '';
+    if (d === today) {
+      if (t.type === 'expense') exp += t.amount;
+      else inc += t.amount;
+    }
+  });
+  document.getElementById('daily-expense-amt').textContent = '¥' + exp.toFixed(1);
+  document.getElementById('daily-income-amt').textContent = '¥' + inc.toFixed(1);
+}
+
+// --- Journal ---
+function saveJournal() {
+  const journal = Store.get('journal', {});
+  const val = document.getElementById('daily-journal').value;
+  journal[TODAY()] = val;
+  Store.set('journal', journal);
+}
+
+// --- Tab Switch Helper ---
+function switchTab(panel) {
+  document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`.tab-item[data-panel="${panel}"]`);
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById('panel-' + panel);
+  if (target) target.classList.add('active');
+  renderAll();
+}
+
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+// === Toast System ===
+function showToast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2000);
+  setTimeout(() => toast.remove(), 2500);
+}
+
+// === Level System ===
+const LEVELS = [
+  { level: 1, xp: 100, title: '数据残片' },
+  { level: 2, xp: 250, title: '数据残片' },
+  { level: 3, xp: 450, title: '数据残片' },
+  { level: 4, xp: 700, title: '数据残片' },
+  { level: 5, xp: 1000, title: '数据残片' },
+  { level: 6, xp: 1400, title: '街头佣兵' },
+  { level: 7, xp: 1900, title: '街头佣兵' },
+  { level: 8, xp: 2500, title: '街头佣兵' },
+  { level: 9, xp: 3200, title: '街头佣兵' },
+  { level: 10, xp: 4000, title: '街头佣兵' },
+  { level: 11, xp: 5000, title: '网络行者' },
+  { level: 12, xp: 6200, title: '网络行者' },
+  { level: 13, xp: 7600, title: '网络行者' },
+  { level: 14, xp: 9200, title: '网络行者' },
+  { level: 15, xp: 11000, title: '网络行者' },
+  { level: 16, xp: 13200, title: '赛博武士' },
+  { level: 17, xp: 15800, title: '赛博武士' },
+  { level: 18, xp: 18800, title: '赛博武士' },
+  { level: 19, xp: 22200, title: '赛博武士' },
+  { level: 20, xp: 26000, title: '赛博武士' },
+  { level: 21, xp: 31000, title: '系统骇客' },
+  { level: 22, xp: 37000, title: '系统骇客' },
+  { level: 23, xp: 44000, title: '系统骇客' },
+  { level: 24, xp: 52000, title: '系统骇客' },
+  { level: 25, xp: 61000, title: '系统骇客' },
+  { level: 26, xp: 999999, title: '核心之主' }
+];
+
+function getLevelInfo(xp) {
+  for (let i = 0; i < LEVELS.length; i++) {
+    if (xp < LEVELS[i].xp) {
+      const prev = i > 0 ? LEVELS[i - 1].xp : 0;
+      const needed = LEVELS[i].xp;
+      return {
+        level: LEVELS[i].level,
+        title: LEVELS[i].title,
+        current: xp - prev,
+        needed: needed - prev,
+        progress: ((xp - prev) / (needed - prev)) * 100
+      };
+    }
+  }
+  return { level: 26, title: '核心之主', current: 999999, needed: 999999, progress: 100 };
+}
+
+function addXP(amount) {
+  const profile = Store.get('profile');
+  profile.xp += amount;
+  const oldLevel = profile.level;
+  const info = getLevelInfo(profile.xp);
+  profile.level = info.level;
+  Store.set('profile', profile);
+  if (profile.level > oldLevel) {
+    showToast(`⬆ 等级提升！Lv.${profile.level} ${info.title}`, 'success');
+  }
+  updateDashboard();
+}
+
+function addCoins(amount) {
+  const profile = Store.get('profile');
+  profile.coins += amount;
+  Store.set('profile', profile);
+  updateDashboard();
+}
+
+// === Task Management ===
+function generateId() { return 't_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6); }
+
+function getTasks() { return Store.get('tasks', []); }
+
+function saveTasks(tasks) { Store.set('tasks', tasks); }
+
+function addTask(taskData) {
+  const tasks = getTasks();
+  const task = {
+    id: generateId(),
+    title: taskData.title,
+    type: taskData.type || 'side',
+    priority: taskData.priority || 'medium',
+    xp: parseInt(taskData.xp) || 50,
+    coins: parseInt(taskData.coins) || 30,
+    deadline: taskData.deadline || '',
+    note: taskData.note || '',
+    progress: 0,
+    status: 'active', // active, completed, failed
+    createdAt: new Date().toISOString(),
+    completedAt: null
+  };
+  tasks.push(task);
+  saveTasks(tasks);
+  return task;
+}
+
+function updateTask(id, updates) {
+  const tasks = getTasks();
+  const idx = tasks.findIndex(t => t.id === id);
+  if (idx >= 0) {
+    tasks[idx] = { ...tasks[idx], ...updates };
+    saveTasks(tasks);
+  }
+}
+
+function deleteTask(id) {
+  const tasks = getTasks().filter(t => t.id !== id);
+  saveTasks(tasks);
+}
+
+function completeTask(id) {
+  const tasks = getTasks();
+  const task = tasks.find(t => t.id === id);
+  if (!task || task.status === 'completed') return;
+
+  task.status = 'completed';
+  task.completedAt = new Date().toISOString();
+  task.progress = 100;
+  saveTasks(tasks);
+
+  // Rewards
+  addXP(task.xp);
+  addCoins(task.coins);
+
+  // Update completion log
+  const today = new Date().toISOString().split('T')[0];
+  const log = Store.get('completionLog', {});
+  log[today] = (log[today] || 0) + 1;
+  Store.set('completionLog', log);
+
+  // Update profile
+  const profile = Store.get('profile');
+  profile.totalCompleted = (profile.totalCompleted || 0) + 1;
+  Store.set('profile', profile);
+
+  showToast(`✓ 任务完成！+${task.xp}XP +${task.coins}💰`, 'success');
+  checkAchievements();
+  renderAll();
+}
+
+function completeDailyTask(taskId) {
+  const dailyTasks = Store.get('dailyTasks', []);
+  const dt = dailyTasks.find(t => t.id === taskId);
+  if (!dt || dt.done) return;
+
+  dt.done = true;
+  Store.set('dailyTasks', dailyTasks);
+
+  addXP(dt.xp);
+  addCoins(dt.coins);
+
+  const today = new Date().toISOString().split('T')[0];
+  const log = Store.get('completionLog', {});
+  log[today] = (log[today] || 0) + 1;
+  Store.set('completionLog', log);
+
+  const profile = Store.get('profile');
+  profile.totalCompleted = (profile.totalCompleted || 0) + 1;
+  Store.set('profile', profile);
+
+  showToast(`✓ 每日任务完成！+${dt.xp}XP +${dt.coins}💰`, 'success');
+  checkAchievements();
+  renderAll();
+}
+
+// === Daily Tasks System ===
+function refreshDailyTasks() {
+  const today = new Date().toISOString().split('T')[0];
+  let dailyTasks = Store.get('dailyTasks', []);
+  const dailyDate = dailyTasks.length > 0 ? dailyTasks[0].date : '';
+
+  if (dailyDate !== today) {
+    const templates = Store.get('dailyTemplates', []).filter(t => t.enabled);
+    dailyTasks = templates.map(t => ({
+      id: 'd_' + today + '_' + t.id,
+      templateId: t.id,
+      title: t.title,
+      xp: t.xp,
+      coins: t.coins,
+      done: false,
+      date: today
+    }));
+    Store.set('dailyTasks', dailyTasks);
+  }
+}
+
+function updateStreak() {
+  const profile = Store.get('profile');
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+  if (profile.lastCheckin === today) return; // Already checked today
+
+  const log = Store.get('completionLog', {});
+  const todayDone = (log[today] || 0) > 0;
+
+  if (todayDone) {
+    if (profile.lastCheckin === yesterday) {
+      profile.streak = (profile.streak || 0) + 1;
+    } else if (profile.lastCheckin !== today) {
+      profile.streak = 1;
+    }
+    profile.lastCheckin = today;
+    Store.set('profile', profile);
+  }
+}
+
+// === Bounty System ===
+const BOUNTY_POOL = [
+  { title: '清理电脑桌面文件', xp: 40, coins: 25 },
+  { title: '做10分钟拉伸运动', xp: 50, coins: 30 },
+  { title: '喝8杯水（今日记录）', xp: 30, coins: 20 },
+  { title: '给家人/朋友发一条消息', xp: 20, coins: 15 },
+  { title: '整理手机相册（删10张）', xp: 35, coins: 20 },
+  { title: '学一个快捷键/小技巧', xp: 45, coins: 25 },
+  { title: '写50字今日总结', xp: 40, coins: 25 },
+  { title: '整理书桌/工位5分钟', xp: 30, coins: 20 },
+  { title: '听一首新歌并记录感受', xp: 25, coins: 15 },
+  { title: '做5分钟冥想/深呼吸', xp: 35, coins: 20 },
+  { title: '复习10个已学单词', xp: 50, coins: 30 },
+  { title: '整理浏览器书签', xp: 25, coins: 15 },
+  { title: '站起来活动5分钟', xp: 20, coins: 10 },
+  { title: '读一篇技术/学习文章', xp: 60, coins: 35 },
+  { title: '删除一个不用的APP', xp: 20, coins: 10 },
+];
+
+function refreshBountiesCheck() {
+  const today = new Date().toISOString().split('T')[0];
+  const bountyDate = Store.get('bountyDate', '');
+  if (bountyDate !== today) {
+    Store.set('bountyRefreshes', 3);
+    Store.set('bountyDate', today);
+    generateBounties();
+  }
+}
+
+function generateBounties() {
+  const pool = [...BOUNTY_POOL];
+  // Shuffle and pick 3
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const bounties = pool.slice(0, 3).map(b => ({
+    id: 'b_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+    title: b.title,
+    xp: b.xp * 2, // Double rewards
+    coins: b.coins * 2,
+    claimed: false
+  }));
+  Store.set('bounties', bounties);
+}
+
+function refreshBounties() {
+  const refreshes = Store.get('bountyRefreshes', 0);
+  if (refreshes <= 0) {
+    showToast('今日刷新次数已用完', 'warning');
+    return;
+  }
+  Store.set('bountyRefreshes', refreshes - 1);
+  generateBounties();
+  showToast('悬赏板已刷新！', 'info');
+  renderBounties();
+}
+
+function claimBounty(id) {
+  const bounties = Store.get('bounties', []);
+  const bounty = bounties.find(b => b.id === id);
+  if (!bounty || bounty.claimed) return;
+
+  bounty.claimed = true;
+  Store.set('bounties', bounties);
+  addXP(bounty.xp);
+  addCoins(bounty.coins);
+
+  const today = new Date().toISOString().split('T')[0];
+  const log = Store.get('completionLog', {});
+  log[today] = (log[today] || 0) + 1;
+  Store.set('completionLog', log);
+
+  const profile = Store.get('profile');
+  profile.totalCompleted = (profile.totalCompleted || 0) + 1;
+  Store.set('profile', profile);
+
+  showToast(`⚡ 悬赏完成！双倍奖励 +${bounty.xp}XP +${bounty.coins}💰`, 'success');
+  checkAchievements();
+  renderAll();
+}
+
+// === Shop System ===
+function generateShopItems() {
+  return [
+    { id: 's1', name: '看一集动漫/剧', cost: 100, icon: '📺', description: '奖励自己看一集喜欢的剧' },
+    { id: 's2', name: '打30分钟游戏', cost: 150, icon: '🎮', description: '游戏时间放松一下' },
+    { id: 's3', name: '吃一份零食', cost: 80, icon: '🍿', description: '来点零食犒劳自己' },
+    { id: 's4', name: '买一个小物件', cost: 300, icon: '🛍️', description: '给自己买个小礼物' },
+    { id: 's5', name: '睡懒觉1小时', cost: 120, icon: '😴', description: '明天多睡一小时' },
+    { id: 's6', name: '刷30分钟社交媒体', cost: 60, icon: '📱', description: '刷手机放松一下' },
+    { id: 's7', name: '喝一杯奶茶', cost: 100, icon: '🧋', description: '来杯奶茶犒劳自己' },
+    { id: 's8', name: '休息日（不安排任务）', cost: 500, icon: '🏖️', description: '给自己放一天假' },
+  ];
+}
+
+function redeemItem(itemId) {
+  const profile = Store.get('profile');
+  const items = Store.get('shopItems', []);
+  const item = items.find(i => i.id === itemId);
+  if (!item) return;
+  if (profile.coins < item.cost) {
+    showToast('积分不足！', 'warning');
+    return;
+  }
+
+  profile.coins -= item.cost;
+  Store.set('profile', profile);
+
+  const history = Store.get('shopHistory', []);
+  history.unshift({
+    item: item.name,
+    cost: item.cost,
+    date: new Date().toISOString()
+  });
+  if (history.length > 20) history.pop();
+  Store.set('shopHistory', history);
+
+  showToast(`🎉 兑换成功：${item.name}！-${item.cost}💰`, 'success');
+  renderShop();
+  updateDashboard();
+}
+
+// === Achievement System ===
+function generateAchievements() {
+  return [
+    { id: 'a1', name: '初次觉醒', desc: '完成第一个任务', icon: '🌟', unlocked: false, hidden: false },
+    { id: 'a2', name: '连击x3', desc: '连续打卡3天', icon: '🔥', unlocked: false, hidden: false },
+    { id: 'a3', name: '连击x7', desc: '连续打卡7天', icon: '💫', unlocked: false, hidden: false },
+    { id: 'a4', name: '连击x30', desc: '连续打卡30天', icon: '👑', unlocked: false, hidden: false },
+    { id: 'a5', name: '百夫长', desc: '累计完成100个任务', icon: '💯', unlocked: false, hidden: false },
+    { id: 'a6', name: '佣兵新人', desc: '达到等级5', icon: '⚔️', unlocked: false, hidden: false },
+    { id: 'a7', name: '网络行者', desc: '达到等级10', icon: '🌐', unlocked: false, hidden: false },
+    { id: 'a8', name: '赛博武士', desc: '达到等级15', icon: '⚡', unlocked: false, hidden: false },
+    { id: 'a9', name: '积分富豪', desc: '累计获得1000积分', icon: '💰', unlocked: false, hidden: false },
+    { id: 'a10', name: '商店常客', desc: '兑换5次奖励', icon: '🛒', unlocked: false, hidden: false },
+    { id: 'a11', name: '番茄大师', desc: '完成10个番茄钟', icon: '🍅', unlocked: false, hidden: false },
+    { id: 'a12', name: '悬赏猎人', desc: '完成5个悬赏任务', icon: '🎯', unlocked: false, hidden: false },
+    { id: 'a13', name: '任务收割者', desc: '一天内完成5个任务', icon: '💀', unlocked: false, hidden: true },
+    { id: 'a14', name: '主线推进者', desc: '完成3个主线任务', icon: '🏆', unlocked: false, hidden: false },
+    { id: 'a15', name: '终极骇客', desc: '达到等级20', icon: '🔮', unlocked: false, hidden: false },
+  ];
+}
+
+function checkAchievements() {
+  const achievements = Store.get('achievements', []);
+  const profile = Store.get('profile');
+  const tasks = getTasks();
+  const shopHistory = Store.get('shopHistory', []);
+  const bounties = Store.get('bounties', []);
+  let updated = false;
+
+  const checks = {
+    a1: () => profile.totalCompleted >= 1,
+    a2: () => profile.streak >= 3,
+    a3: () => profile.streak >= 7,
+    a4: () => profile.streak >= 30,
+    a5: () => profile.totalCompleted >= 100,
+    a6: () => profile.level >= 5,
+    a7: () => profile.level >= 10,
+    a8: () => profile.level >= 15,
+    a9: () => {
+      // Total coins earned (estimate from completed tasks)
+      const completed = tasks.filter(t => t.status === 'completed');
+      const totalCoins = completed.reduce((s, t) => s + t.coins, 0);
+      return totalCoins >= 1000;
+    },
+    a10: () => shopHistory.length >= 5,
+    a11: () => {
+      const totalPomodoros = parseInt(localStorage.getItem('nexus_totalPomodoros') || '0');
+      return totalPomodoros >= 10;
+    },
+    a12: () => bounties.filter(b => b.claimed).length >= 5,
+    a13: () => {
+      const today = new Date().toISOString().split('T')[0];
+      const log = Store.get('completionLog', {});
+      return (log[today] || 0) >= 5;
+    },
+    a14: () => tasks.filter(t => t.type === 'main' && t.status === 'completed').length >= 3,
+    a15: () => profile.level >= 20,
+  };
+
+  for (const ach of achievements) {
+    if (!ach.unlocked && checks[ach.id] && checks[ach.id]()) {
+      ach.unlocked = true;
+      updated = true;
+      showToast(`🏆 成就解锁：${ach.name} - ${ach.desc}`, 'success');
+    }
+  }
+
+  if (updated) Store.set('achievements', achievements);
+}
+
+// === Pomodoro System ===
+let pomodoroState = {
+  minutes: 25, seconds: 0, totalSeconds: 25 * 60,
+  running: false, paused: false, intervalId: null,
+  taskId: ''
+};
+
+function setPomodoroPreset(min) {
+  pausePomodoro();
+  pomodoroState.minutes = min;
+  pomodoroState.seconds = 0;
+  pomodoroState.totalSeconds = min * 60;
+  updatePomodoroDisplay();
+}
+
+function updatePomodoroDisplay() {
+  const m = String(pomodoroState.minutes).padStart(2, '0');
+  const s = String(pomodoroState.seconds).padStart(2, '0');
+  document.getElementById('pomodoro-time').textContent = `${m}:${s}`;
+  const progress = ((pomodoroState.minutes * 60 + pomodoroState.seconds) / pomodoroState.totalSeconds) * 100;
+  document.getElementById('pomodoro-progress').style.width = progress + '%';
+}
+
+function startPomodoro() {
+  if (pomodoroState.running && !pomodoroState.paused) return;
+
+  const taskId = document.getElementById('pomodoro-task-select').value;
+  pomodoroState.taskId = taskId;
+
+  if (pomodoroState.paused) {
+    pomodoroState.paused = false;
+    document.getElementById('pomodoro-status').textContent = '专注中...';
+  } else {
+    document.getElementById('pomodoro-status').textContent = '专注中...';
+  }
+
+  pomodoroState.running = true;
+  document.getElementById('pomodoro-start').textContent = '⏳ 专注中...';
+
+  pomodoroState.intervalId = setInterval(() => {
+    if (pomodoroState.seconds === 0) {
+      if (pomodoroState.minutes === 0) {
+        // Pomodoro complete
+        clearInterval(pomodoroState.intervalId);
+        pomodoroState.running = false;
+        document.getElementById('pomodoro-status').textContent = '完成！';
+        document.getElementById('pomodoro-start').textContent = '▶ 开始专注';
+        showToast('🍅 番茄钟完成！', 'success');
+
+        // Update count
+        const profile = Store.get('profile');
+        const today = new Date().toISOString().split('T')[0];
+        if (profile.pomodoroDate !== today) {
+          profile.pomodoroToday = 0;
+          profile.pomodoroDate = today;
+        }
+        profile.pomodoroToday = (profile.pomodoroToday || 0) + 1;
+        Store.set('profile', profile);
+
+        // Track total pomodoros
+        const total = parseInt(localStorage.getItem('nexus_totalPomodoros') || '0');
+        localStorage.setItem('nexus_totalPomodoros', total + 1);
+
+        document.getElementById('pomodoro-today-count').textContent = profile.pomodoroToday;
+
+        // Advance task progress if linked
+        if (taskId) {
+          const tasks = getTasks();
+          const task = tasks.find(t => t.id === taskId);
+          if (task && task.status === 'active') {
+            task.progress = Math.min(100, (task.progress || 0) + 10);
+            if (task.progress >= 100) {
+              completeTask(taskId);
+            } else {
+              saveTasks(tasks);
+              showToast(`任务进度 +10% (当前 ${task.progress}%)`, 'info');
+            }
+          }
+        }
+
+        checkAchievements();
+        resetPomodoro();
+        renderAll();
+        return;
+      }
+      pomodoroState.minutes--;
+      pomodoroState.seconds = 59;
+    } else {
+      pomodoroState.seconds--;
+    }
+    updatePomodoroDisplay();
+  }, 1000);
+}
+
+function pausePomodoro() {
+  if (!pomodoroState.running) return;
+  pomodoroState.paused = true;
+  pomodoroState.running = false;
+  clearInterval(pomodoroState.intervalId);
+  document.getElementById('pomodoro-status').textContent = '已暂停';
+  document.getElementById('pomodoro-start').textContent = '▶ 继续';
+}
+
+function resetPomodoro() {
+  clearInterval(pomodoroState.intervalId);
+  pomodoroState.running = false;
+  pomodoroState.paused = false;
+  pomodoroState.minutes = 25;
+  pomodoroState.seconds = 0;
+  pomodoroState.totalSeconds = 25 * 60;
+  pomodoroState.taskId = '';
+  document.getElementById('pomodoro-status').textContent = '准备就绪';
+  document.getElementById('pomodoro-start').textContent = '▶ 开始专注';
+  updatePomodoroDisplay();
+}
+
+// === Task Modal ===
+function openTaskModal(editId = null) {
+  const modal = document.getElementById('task-modal');
+  modal.classList.add('show');
+  document.getElementById('task-edit-id').value = '';
+
+  if (editId) {
+    document.getElementById('modal-title').textContent = '// 编辑任务';
+    const tasks = getTasks();
+    const task = tasks.find(t => t.id === editId);
+    if (task) {
+      document.getElementById('task-edit-id').value = editId;
+      document.getElementById('task-name').value = task.title;
+      document.getElementById('task-type').value = task.type;
+      document.getElementById('task-priority').value = task.priority;
+      document.getElementById('task-xp').value = task.xp;
+      document.getElementById('task-coins').value = task.coins;
+      document.getElementById('task-deadline').value = task.deadline;
+      document.getElementById('task-note').value = task.note || '';
+    }
+  } else {
+    document.getElementById('modal-title').textContent = '// 新增任务';
+    document.getElementById('task-name').value = '';
+    document.getElementById('task-type').value = 'side';
+    document.getElementById('task-priority').value = 'medium';
+    document.getElementById('task-xp').value = '50';
+    document.getElementById('task-coins').value = '30';
+    document.getElementById('task-deadline').value = '';
+    document.getElementById('task-note').value = '';
+  }
+
+  // Show/hide deadline based on type
+  toggleDeadline();
+  document.getElementById('task-type').addEventListener('change', toggleDeadline);
+}
+
+function closeTaskModal() {
+  document.getElementById('task-modal').classList.remove('show');
+}
+
+function toggleDeadline() {
+  const type = document.getElementById('task-type').value;
+  document.getElementById('deadline-group').style.display = type === 'timed' ? 'block' : 'none';
+}
+
+function saveTask() {
+  const editId = document.getElementById('task-edit-id').value;
+  const data = {
+    title: document.getElementById('task-name').value.trim(),
+    type: document.getElementById('task-type').value,
+    priority: document.getElementById('task-priority').value,
+    xp: document.getElementById('task-xp').value,
+    coins: document.getElementById('task-coins').value,
+    deadline: document.getElementById('task-deadline').value,
+    note: document.getElementById('task-note').value.trim()
+  };
+
+  if (!data.title) { showToast('请输入任务名称', 'warning'); return; }
+
+  if (editId) {
+    updateTask(editId, data);
+    showToast('任务已更新', 'info');
+  } else {
+    addTask(data);
+    showToast('任务已创建', 'success');
+  }
+
+  closeTaskModal();
+  renderAll();
+}
+
+// === Render Functions ===
+function renderAll() {
+  renderDailyHub();
+  renderDashboard();
+  renderTasks();
+  renderBounties();
+  renderShop();
+  renderAchievements();
+  renderStats();
+  renderWallet();
+  renderInvestJournal();
+  renderHistory();
+  renderSettings();
+  renderPlan();
+  updatePomodoroTaskSelect();
+}
+
+function updateDashboard() {
+  const profile = Store.get('profile');
+  const info = getLevelInfo(profile.xp);
+
+  document.getElementById('level-num').textContent = 'Lv.' + info.level;
+  document.getElementById('level-title').textContent = info.title;
+  document.getElementById('xp-bar').style.width = info.progress + '%';
+  document.getElementById('xp-text').textContent = `EXP ${info.current} / ${info.needed}`;
+  document.getElementById('stat-streak').textContent = profile.streak || 0;
+  document.getElementById('stat-coins').textContent = profile.coins || 0;
+  document.getElementById('stat-total').textContent = profile.totalCompleted || 0;
+
+  const today = new Date().toISOString().split('T')[0];
+  const log = Store.get('completionLog', {});
+  document.getElementById('stat-today').textContent = log[today] || 0;
+}
+
+function renderDashboard() {
+  updateDashboard();
+
+  // Daily tasks
+  const dailyTasks = Store.get('dailyTasks', []);
+  const doneCount = dailyTasks.filter(t => t.done).length;
+  document.getElementById('daily-count').textContent = `剩余 ${dailyTasks.length - doneCount}/${dailyTasks.length}`;
+
+  const dailyList = document.getElementById('daily-tasks-list');
+  dailyList.innerHTML = dailyTasks.map(t => `
+    <div class="task-item ${t.done ? 'completed' : ''}" onclick="${t.done ? '' : `completeDailyTask('${t.id}')`}">
+      <div class="task-check ${t.done ? 'checked' : ''}">${t.done ? '✓' : ''}</div>
+      <div class="task-info">
+        <div class="task-title">${t.title}</div>
+      </div>
+      <div class="task-reward">+${t.xp}XP +${t.coins}💰</div>
+    </div>
+  `).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无每日任务</div>';
+
+  // Main quests
+  const tasks = getTasks();
+  const mainQuests = tasks.filter(t => t.type === 'main' && t.status === 'active');
+  const mainList = document.getElementById('main-quests-list');
+  mainList.innerHTML = mainQuests.map(t => `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">⚡ ${t.title}</span>
+        <span class="badge badge-${getPriorityColor(t.priority)}">${getPriorityLabel(t.priority)}</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: ${t.progress || 0}%"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span class="card-subtitle">进度 ${t.progress || 0}%</span>
+        <div style="display: flex; gap: 4px;">
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); completeTask('${t.id}')">完成</button>
+          <button class="btn btn-sm" onclick="event.stopPropagation(); openTaskModal('${t.id}')">编辑</button>
+        </div>
+      </div>
+    </div>
+  `).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无主线任务，去任务中心添加吧！</div>';
+
+  // Urgent tasks
+  const now = new Date();
+  const urgentTasks = tasks.filter(t => {
+    if (t.status !== 'active' || t.type !== 'timed' || !t.deadline) return false;
+    const deadline = new Date(t.deadline);
+    const diff = (deadline - now) / (1000 * 60 * 60 * 24);
+    return diff <= 3 && diff >= 0;
+  });
+  const urgentList = document.getElementById('urgent-tasks-list');
+  urgentList.innerHTML = urgentTasks.map(t => {
+    const deadline = new Date(t.deadline);
+    const diff = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+    return `
+      <div class="task-item" onclick="completeTask('${t.id}')">
+        <div class="task-check"></div>
+        <div class="task-info">
+          <div class="task-title">⏰ ${t.title}</div>
+          <div class="task-meta">剩余 ${diff} 天</div>
+        </div>
+        <div class="task-reward">+${t.xp}XP</div>
+      </div>
+    `;
+  }).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无临近截止任务</div>';
+}
+
+function renderTasks() {
+  const tasks = getTasks();
+  const filter = document.getElementById('task-filter')?.value || 'all';
+  const sort = document.getElementById('task-sort')?.value || 'newest';
+
+  let filtered = [...tasks];
+  if (filter !== 'all') filtered = filtered.filter(t => t.type === filter);
+
+  // Sort
+  if (sort === 'priority') {
+    const order = { urgent: 0, high: 1, medium: 2, low: 3 };
+    filtered.sort((a, b) => (order[a.priority] || 2) - (order[b.priority] || 2));
+  } else if (sort === 'deadline') {
+    filtered.sort((a, b) => {
+      if (!a.deadline) return 1;
+      if (!b.deadline) return -1;
+      return new Date(a.deadline) - new Date(b.deadline);
+    });
+  } else {
+    filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  // Active first, completed last
+  filtered.sort((a, b) => {
+    if (a.status === 'completed' && b.status !== 'completed') return 1;
+    if (a.status !== 'completed' && b.status === 'completed') return -1;
+    return 0;
+  });
+
+  const list = document.getElementById('all-tasks-list');
+  list.innerHTML = filtered.map(t => `
+    <div class="task-item ${t.status === 'completed' ? 'completed' : ''}" onclick="${t.status === 'completed' ? '' : `completeTask('${t.id}')`}">
+      <div class="task-check ${t.status === 'completed' ? 'checked' : ''}">${t.status === 'completed' ? '✓' : ''}</div>
+      <div class="task-info">
+        <div class="task-title">${t.title}</div>
+        <div class="task-meta">
+          <span class="badge badge-${getTypeColor(t.type)}">${getTypeLabel(t.type)}</span>
+          <span class="badge badge-${getPriorityColor(t.priority)}">${getPriorityLabel(t.priority)}</span>
+          ${t.deadline ? `<span>📅 ${t.deadline}</span>` : ''}
+          ${t.status === 'active' ? `<span>进度 ${t.progress || 0}%</span>` : ''}
+        </div>
+      </div>
+      <div class="task-reward">+${t.xp}XP +${t.coins}💰</div>
+      <div class="task-actions">
+        <button class="btn btn-sm" onclick="event.stopPropagation(); openTaskModal('${t.id}')">编辑</button>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteTask('${t.id}'); renderAll();">删除</button>
+      </div>
+    </div>
+  `).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无任务，点击右上角"新增任务"开始吧！</div>';
+}
+
+function renderBounties() {
+  const bounties = Store.get('bounties', []);
+  const list = document.getElementById('bounty-list');
+  list.innerHTML = bounties.map(b => `
+    <div class="bounty-item">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-weight: bold; margin-bottom: 4px;">${b.title}</div>
+          <div class="bounty-reward">💰 +${b.coins}积分 &nbsp; ⚡ +${b.xp}XP</div>
+        </div>
+        ${b.claimed
+          ? '<span class="badge badge-green">已完成</span>'
+          : `<button class="btn btn-primary btn-sm" onclick="claimBounty('${b.id}')">领取悬赏</button>`
+        }
+      </div>
+    </div>
+  `).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">悬赏板为空，点击刷新获取悬赏！</div>';
+
+  document.getElementById('bounty-refresh-count').textContent = `剩余刷新: ${Store.get('bountyRefreshes', 0)}`;
+}
+
+function renderShop() {
+  const profile = Store.get('profile');
+  const items = Store.get('shopItems', []);
+  document.getElementById('shop-balance').textContent = profile.coins;
+
+  const list = document.getElementById('shop-items');
+  list.innerHTML = items.map(item => `
+    <div class="shop-item">
+      <div>
+        <div style="font-weight: bold;">${item.icon} ${item.name}</div>
+        <div style="font-size: 0.7rem; color: var(--text-dim);">${item.description}</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="shop-price">${item.cost} 💰</span>
+        <button class="btn btn-primary btn-sm" onclick="redeemItem('${item.id}')"
+          ${profile.coins < item.cost ? 'disabled style="opacity:0.5"' : ''}>兑换</button>
+      </div>
+    </div>
+  `).join('');
+
+  const history = Store.get('shopHistory', []);
+  document.getElementById('shop-history').innerHTML = history.length > 0
+    ? history.map(h => `<div style="padding: 4px 0;">📅 ${h.date.split('T')[0]} — ${h.item} (-${h.cost}💰)</div>`).join('')
+    : '暂无兑换记录';
+}
+
+function renderAchievements() {
+  const achievements = Store.get('achievements', []);
+  const unlocked = achievements.filter(a => a.unlocked).length;
+  document.getElementById('achievement-progress').textContent = `已解锁 ${unlocked}/${achievements.length}`;
+
+  const grid = document.getElementById('achievements-grid');
+  grid.innerHTML = achievements.map(a => {
+    if (a.hidden && !a.unlocked) {
+      return `<div class="achievement-card locked"><div class="achievement-icon">❓</div><div class="achievement-name">???</div><div class="achievement-desc">隐藏成就</div></div>`;
+    }
+    return `
+      <div class="achievement-card ${a.unlocked ? 'unlocked' : 'locked'}">
+        <div class="achievement-icon">${a.icon}</div>
+        <div class="achievement-name">${a.name}</div>
+        <div class="achievement-desc">${a.desc}</div>
+        ${a.unlocked ? '<span class="badge badge-yellow" style="margin-top: 4px;">已解锁</span>' : '<span class="badge" style="margin-top: 4px;">未解锁</span>'}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderStats() {
+  const log = Store.get('completionLog', {});
+  const profile = Store.get('profile');
+
+  // Weekly breakdown
+  const breakdown = document.getElementById('weekly-breakdown');
+  const days = [];
+  const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    const key = d.toISOString().split('T')[0];
+    const day = d.getDay();
+    days.push({ label: `周${dayNames[day]}`, date: key, count: log[key] || 0 });
+  }
+
+  breakdown.innerHTML = days.map(d => {
+    const maxH = Math.max(1, ...days.map(x => x.count));
+    const h = d.count > 0 ? (d.count / maxH) * 100 : 4;
+    const isToday = d.date === new Date().toISOString().split('T')[0];
+    return `
+      <div style="text-align: center; flex: 1;">
+        <div style="font-size: 0.8rem; font-weight: bold; color: ${isToday ? 'var(--neon-cyan)' : 'var(--text-secondary)'};">${d.count}</div>
+        <div style="height: ${Math.max(h, 4)}px; background: ${isToday ? 'var(--neon-cyan)' : 'rgba(0,240,255,0.3)'}; border-radius: 2px; margin: 4px 0; min-width: 20px; box-shadow: ${isToday ? '0 0 8px rgba(0,240,255,0.5)' : 'none'};"></div>
+        <div style="font-size: 0.65rem; color: var(--text-dim);">${d.label}</div>
+      </div>
+    `;
+  }).join('');
+
+  // Weekly chart (simple canvas)
+  drawWeeklyChart(days);
+
+  // Type distribution chart
+  drawTypeChart();
+}
+
+function drawWeeklyChart(days) {
+  const canvas = document.getElementById('chart-weekly');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.parentElement.clientWidth - 32;
+  const h = 160;
+  canvas.width = w;
+  canvas.height = h;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const y = 20 + i * 35;
+    ctx.beginPath();
+    ctx.moveTo(40, y);
+    ctx.lineTo(w - 20, y);
+    ctx.stroke();
+  }
+
+  const maxVal = Math.max(1, ...days.map(d => d.count));
+  const barW = (w - 80) / days.length - 8;
+
+  days.forEach((d, i) => {
+    const x = 50 + i * ((w - 80) / days.length);
+    const barH = (d.count / maxVal) * 120;
+    const y = h - 20 - barH;
+
+    const isToday = d.date === new Date().toISOString().split('T')[0];
+
+    // Bar
+    const gradient = ctx.createLinearGradient(x, y, x, h - 20);
+    gradient.addColorStop(0, isToday ? '#00f0ff' : 'rgba(0, 240, 255, 0.6)');
+    gradient.addColorStop(1, isToday ? 'rgba(0, 240, 255, 0.2)' : 'rgba(0, 240, 255, 0.1)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, y, barW, barH);
+
+    // Value
+    ctx.fillStyle = isToday ? '#00f0ff' : '#8888a0';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(d.count, x + barW / 2, y - 6);
+
+    // Label
+    ctx.fillStyle = '#555568';
+    ctx.font = '9px monospace';
+    ctx.fillText(d.label, x + barW / 2, h - 4);
+  });
+}
+
+function drawTypeChart() {
+  const tasks = getTasks();
+  const completed = tasks.filter(t => t.status === 'completed');
+  const types = { main: 0, side: 0, daily: 0, timed: 0 };
+  completed.forEach(t => { if (types[t.type] !== undefined) types[t.type]++; });
+
+  const canvas = document.getElementById('chart-types');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const size = 150;
+  canvas.width = size;
+  canvas.height = size;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+
+  ctx.clearRect(0, 0, size, size);
+
+  const total = Object.values(types).reduce((a, b) => a + b, 0) || 1;
+  const colors = {
+    main: '#ff00ff', side: '#00f0ff', daily: '#00ff88', timed: '#ffe500'
+  };
+  const labels = {
+    main: '主线', side: '支线', daily: '每日', timed: '限时'
+  };
+
+  const cx = size / 2, cy = size / 2, r = 50;
+  let angle = -Math.PI / 2;
+
+  Object.entries(types).forEach(([key, val]) => {
+    if (val === 0) return;
+    const slice = (val / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, angle, angle + slice);
+    ctx.closePath();
+    ctx.fillStyle = colors[key];
+    ctx.globalAlpha = 0.7;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#0a0a0f';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    angle += slice;
+  });
+
+  // Legend
+  let lx = 10, ly = 110;
+  Object.entries(types).forEach(([key, val]) => {
+    ctx.fillStyle = colors[key];
+    ctx.fillRect(lx, ly, 10, 10);
+    ctx.fillStyle = '#8888a0';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${labels[key]}: ${val}`, lx + 14, ly + 9);
+    ly += 16;
+  });
+}
+
+function updatePomodoroTaskSelect() {
+  const select = document.getElementById('pomodoro-task-select');
+  if (!select) return;
+  const tasks = getTasks().filter(t => t.status === 'active');
+  select.innerHTML = '<option value="">-- 选择要专注的任务 --</option>' +
+    tasks.map(t => `<option value="${t.id}">${t.title} (${t.progress || 0}%)</option>`).join('');
+
+  const profile = Store.get('profile');
+  const today = new Date().toISOString().split('T')[0];
+  if (profile.pomodoroDate !== today) {
+    profile.pomodoroToday = 0;
+    profile.pomodoroDate = today;
+    Store.set('profile', profile);
+  }
+  const el = document.getElementById('pomodoro-today-count');
+  if (el) el.textContent = profile.pomodoroToday || 0;
+}
+
+// === Helper Functions ===
+function getTypeLabel(type) {
+  const map = { main: '主线', side: '支线', daily: '每日', timed: '限时' };
+  return map[type] || type;
+}
+
+function getTypeColor(type) {
+  const map = { main: 'magenta', side: 'cyan', daily: 'green', timed: 'orange' };
+  return map[type] || 'cyan';
+}
+
+function getPriorityLabel(p) {
+  const map = { low: '低', medium: '中', high: '高', urgent: '紧急' };
+  return map[p] || p;
+}
+
+function getPriorityColor(p) {
+  const map = { low: 'cyan', medium: 'green', high: 'orange', urgent: 'red' };
+  return map[p] || 'cyan';
+}
+
+// === Cloud Sync UI ===
+function openSyncModal() {
+  document.getElementById('sync-modal').classList.add('show');
+  if (SyncManager.isConfigured()) {
+    document.getElementById('sync-setup-section').style.display = 'none';
+    document.getElementById('sync-connected-section').style.display = 'block';
+    document.getElementById('sync-save-btn').style.display = 'none';
+    document.getElementById('sync-now-btn').style.display = 'inline-block';
+    document.getElementById('sync-pull-btn').style.display = 'inline-block';
+    document.getElementById('sync-push-btn').style.display = 'inline-block';
+    document.getElementById('sync-disconnect-btn').style.display = 'inline-block';
+    updateSyncModalStatus();
+  } else {
+    document.getElementById('sync-setup-section').style.display = 'block';
+    document.getElementById('sync-connected-section').style.display = 'none';
+    document.getElementById('sync-save-btn').style.display = 'inline-block';
+    document.getElementById('sync-now-btn').style.display = 'none';
+    document.getElementById('sync-pull-btn').style.display = 'none';
+    document.getElementById('sync-push-btn').style.display = 'none';
+    document.getElementById('sync-disconnect-btn').style.display = 'none';
+    document.getElementById('sync-token').value = '';
+    document.getElementById('sync-gist-id-input').value = '';
+    document.getElementById('sync-auto').checked = true;
+  }
+}
+
+function closeSyncModal() {
+  document.getElementById('sync-modal').classList.remove('show');
+}
+
+async function saveSyncSettings() {
+  const apiKey = document.getElementById('sync-token').value.trim();
+  const binId = document.getElementById('sync-gist-id-input').value.trim();
+  const autoSync = document.getElementById('sync-auto').checked;
+  if (!apiKey) { showToast('请输入 JSONBin API Key', 'warning'); return; }
+
+  SyncManager.config.apiKey = apiKey;
+  SyncManager.config.autoSync = autoSync;
+  SyncManager._initialized = true;
+
+  if (binId) {
+    // Connect to existing Bin
+    SyncManager.config.binId = binId;
+    SyncManager.saveConfig();
+    showToast('正在连接...', 'info');
+    const result = await SyncManager.pull();
+    if (result.success) {
+      if (result.pulled) { renderAll(); updateDashboard(); showToast('已从云端同步数据！', 'success'); }
+      else { showToast('连接成功！本地数据已是最新', 'success'); }
+      SyncManager.updateButton('synced');
+      openSyncModal();
+    } else {
+      showToast('连接失败: ' + result.error, 'warning');
+    }
+  } else {
+    // Create new Bin
+    showToast('正在创建同步空间...', 'info');
+    SyncManager.saveConfig();
+    const result = await SyncManager.createBin();
+    if (result.success) {
+      showToast('同步空间创建成功！', 'success');
+      SyncManager.updateButton('synced');
+      openSyncModal();
+    } else {
+      showToast('创建失败: ' + result.error, 'warning');
+    }
+  }
+}
+
+async function manualSync() {
+  showToast('正在同步...', 'info');
+  const pullResult = await SyncManager.pull();
+  if (pullResult.pulled) { renderAll(); updateDashboard(); }
+  const pushResult = await SyncManager.push();
+  if (pushResult.success) showToast('同步完成！', 'success');
+  else showToast('同步出错: ' + (pullResult.error || pushResult.error), 'warning');
+  updateSyncModalStatus();
+}
+
+async function manualPush() {
+  showToast('正在上传...', 'info');
+  const r = await SyncManager.push();
+  showToast(r.success ? '上传成功！' : '上传失败: ' + r.error, r.success ? 'success' : 'warning');
+  updateSyncModalStatus();
+}
+
+async function manualPull() {
+  showToast('正在下载...', 'info');
+  const r = await SyncManager.pull();
+  if (r.success) {
+    if (r.pulled) { renderAll(); updateDashboard(); showToast('下载成功，数据已更新！', 'success'); }
+    else showToast(r.message || '本地数据已是最新', 'info');
+  } else {
+    showToast('下载失败: ' + r.error, 'warning');
+  }
+  updateSyncModalStatus();
+}
+
+function disconnectSync() {
+  if (!confirm('确定断开云同步？本地数据不会被删除，但将不再自动同步。')) return;
+  SyncManager.config = { apiKey: '', binId: '', autoSync: true, lastSync: 0, lastLocalModify: 0 };
+  SyncManager.saveConfig();
+  SyncManager.updateButton();
+  showToast('已断开云同步', 'info');
+  openSyncModal();
+}
+
+function updateSyncModalStatus() {
+  if (!SyncManager.isConfigured()) return;
+  document.getElementById('sync-gist-display').textContent = SyncManager.config.binId;
+  const ls = SyncManager.config.lastSync;
+  if (ls) {
+    const d = new Date(ls);
+    document.getElementById('sync-last-time').textContent =
+      `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  } else {
+    document.getElementById('sync-last-time').textContent = '从未';
+  }
+  const autoEl = document.getElementById('sync-auto-status');
+  autoEl.textContent = SyncManager.config.autoSync ? '已开启' : '已关闭';
+  autoEl.style.color = SyncManager.config.autoSync ? 'var(--neon-green)' : 'var(--text-dim)';
+}
+
+// Close sync modal on overlay click
+document.getElementById('sync-modal')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeSyncModal();
+});
+
+// === Daily Task Template Manager ===
+function openDailyModal() {
+  document.getElementById('daily-modal').classList.add('show');
+  renderDailyTemplates();
+}
+
+function closeDailyModal() {
+  document.getElementById('daily-modal').classList.remove('show');
+}
+
+function renderDailyTemplates() {
+  const templates = Store.get('dailyTemplates', []);
+  const list = document.getElementById('daily-template-list');
+  if (templates.length === 0) {
+    list.innerHTML = '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 16px; text-align: center;">还没有每日任务模板，在上方添加一个吧</div>';
+    return;
+  }
+  list.innerHTML = templates.map(t => `
+    <div style="display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--bg-card); border-radius: 6px; margin-bottom: 8px; border: 1px solid var(--border-subtle);">
+      <label class="checkbox-label" style="flex-shrink: 0; display: flex; align-items: center; gap: 4px;">
+        <input type="checkbox" ${t.enabled ? 'checked' : ''} onchange="toggleDailyTemplate('${t.id}')">
+      </label>
+      <div style="flex: 1; min-width: 0;">
+        <input type="text" value="${t.title.replace(/"/g, '&quot;')}" onchange="editDailyTemplate('${t.id}', 'title', this.value)" style="width: 100%; background: transparent; border: none; color: var(--text-primary); font-size: 0.85rem; border-bottom: 1px solid transparent;" onfocus="this.style.borderColor='var(--border-glow)'" onblur="this.style.borderColor='transparent'">
+      </div>
+      <div style="display: flex; gap: 4px; flex-shrink: 0;">
+        <input type="number" value="${t.xp}" onchange="editDailyTemplate('${t.id}', 'xp', parseInt(this.value)||0)" style="width: 55px; text-align: center; font-size: 0.75rem;" title="XP奖励">
+        <span style="color: var(--text-dim); font-size: 0.7rem; line-height: 28px;">xp</span>
+        <input type="number" value="${t.coins}" onchange="editDailyTemplate('${t.id}', 'coins', parseInt(this.value)||0)" style="width: 55px; text-align: center; font-size: 0.75rem;" title="金币奖励">
+        <span style="color: var(--text-dim); font-size: 0.7rem; line-height: 28px;">💰</span>
+      </div>
+      <button class="btn btn-sm btn-danger" onclick="deleteDailyTemplate('${t.id}')" style="flex-shrink: 0; padding: 2px 8px;">✕</button>
+    </div>
+  `).join('');
+}
+
+function addDailyTemplate() {
+  const title = document.getElementById('daily-new-title').value.trim();
+  const xp = parseInt(document.getElementById('daily-new-xp').value) || 50;
+  const coins = parseInt(document.getElementById('daily-new-coins').value) || 30;
+  if (!title) { showToast('请输入任务标题', 'warning'); return; }
+  const templates = Store.get('dailyTemplates', []);
+  templates.push({ id: 'd' + Date.now(), title, xp, coins, enabled: true });
+  Store.set('dailyTemplates', templates);
+  document.getElementById('daily-new-title').value = '';
+  renderDailyTemplates();
+  showToast('已添加每日任务模板', 'success');
+}
+
+function editDailyTemplate(id, field, value) {
+  const templates = Store.get('dailyTemplates', []);
+  const t = templates.find(t => t.id === id);
+  if (t) { t[field] = value; Store.set('dailyTemplates', templates); }
+}
+
+function toggleDailyTemplate(id) {
+  const templates = Store.get('dailyTemplates', []);
+  const t = templates.find(t => t.id === id);
+  if (t) { t.enabled = !t.enabled; Store.set('dailyTemplates', templates); }
+}
+
+function deleteDailyTemplate(id) {
+  const templates = Store.get('dailyTemplates', []).filter(t => t.id !== id);
+  Store.set('dailyTemplates', templates);
+  renderDailyTemplates();
+  showToast('已删除', 'info');
+}
+
+// Close daily modal on overlay click
+document.getElementById('daily-modal')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeDailyModal();
+});
+
+// === Wallet / Finance Manager ===
+let _walletType = 'expense';
+
+function setWalletType(type) {
+  _walletType = type;
+  document.getElementById('wtype-expense').classList.toggle('active', type === 'expense');
+  document.getElementById('wtype-income').classList.toggle('active', type === 'income');
+  // Swap categories for income
+  const cat = document.getElementById('wallet-category');
+  if (type === 'income') {
+    cat.innerHTML = '<option value="工资">工资</option><option value="兼职">兼职</option><option value="红包">红包</option><option value="理财">理财</option><option value="其他">其他</option>';
+  } else {
+    cat.innerHTML = '<option value="餐饮">餐饮</option><option value="交通">交通</option><option value="购物">购物</option><option value="娱乐">娱乐</option><option value="学习">学习</option><option value="生活">生活</option><option value="其他">其他</option>';
+  }
+}
+
+function renderWallet() {
+  const wallet = Store.get('wallet', { balance: 0, initialSet: false, transactions: [] });
+  if (!wallet.transactions) wallet.transactions = [];
+
+  // Balance
+  document.getElementById('wallet-balance').textContent = '¥ ' + (wallet.balance || 0).toFixed(2);
+
+  // Show/hide set balance button
+  const balanceCard = document.getElementById('wallet-balance-card');
+  const existingBtn = balanceCard.querySelector('.wallet-balance-actions');
+  if (wallet.initialSet) {
+    existingBtn.innerHTML = '<button class="btn btn-sm" onclick="openSetBalanceModal()" style="padding: 4px 12px;">调整余额</button>';
+  } else {
+    existingBtn.innerHTML = '<button class="btn btn-primary btn-sm" onclick="openSetBalanceModal()" style="padding: 4px 12px;">设置初始余额</button>';
+  }
+
+  // Stats
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const monthStr = todayStr.slice(0, 7);
+  let todayExp = 0, todayInc = 0, monthExp = 0, monthInc = 0;
+  wallet.transactions.forEach(t => {
+    const tDate = t.date ? t.date.slice(0, 10) : '';
+    if (t.type === 'expense') {
+      if (tDate === todayStr) todayExp += t.amount;
+      if (tDate.slice(0, 7) === monthStr) monthExp += t.amount;
+    } else {
+      if (tDate === todayStr) todayInc += t.amount;
+      if (tDate.slice(0, 7) === monthStr) monthInc += t.amount;
+    }
+  });
+  document.getElementById('wallet-today-expense').textContent = '¥' + todayExp.toFixed(1);
+  document.getElementById('wallet-today-income').textContent = '¥' + todayInc.toFixed(1);
+  document.getElementById('wallet-month-expense').textContent = '¥' + monthExp.toFixed(1);
+  document.getElementById('wallet-month-income').textContent = '¥' + monthInc.toFixed(1);
+
+  renderWalletHistory();
+}
+
+// === Investment Journal (交易复盘) ===
+function renderInvestJournal() {
+  const journal = Store.get('investJournal', {});
+  const today = TODAY();
+  const textarea = document.getElementById('invest-journal');
+  if (textarea && journal[today] !== undefined) textarea.value = journal[today];
+  else if (textarea) textarea.value = '';
+  renderInvestHistory();
+}
+
+function saveInvestJournal() {
+  const journal = Store.get('investJournal', {});
+  const val = document.getElementById('invest-journal').value;
+  if (val.trim()) {
+    journal[TODAY()] = val;
+    Store.set('investJournal', journal);
+  }
+  renderInvestHistory();
+}
+
+function renderInvestHistory() {
+  const journal = Store.get('investJournal', {});
+  const entries = Object.entries(journal).filter(([k,v]) => v && v.trim()).sort((a,b) => b[0].localeCompare(a[0]));
+  const container = document.getElementById('invest-history-list');
+  if (!container) return;
+  if (entries.length <= 1) { container.innerHTML = ''; return; }
+
+  container.innerHTML = entries.slice(1, 10).map(([date, text]) => {
+    const d = new Date(date);
+    const weekdays = ['日','一','二','三','四','五','六'];
+    const label = `${d.getMonth()+1}/${d.getDate()} 周${weekdays[d.getDay()]}`;
+    const preview = text.length > 60 ? text.slice(0, 60) + '...' : text;
+    return `<div class="card" style="padding:10px;margin-bottom:8px;cursor:pointer;" onclick="showInvestEntry('${date}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--neon-cyan);">${label}</span>
+      </div>
+      <div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.4;">${preview}</div>
+    </div>`;
+  }).join('');
+}
+
+function showInvestEntry(date) {
+  const journal = Store.get('investJournal', {});
+  const text = journal[date] || '';
+  const d = new Date(date);
+  const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+  const label = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 ${weekdays[d.getDay()]}`;
+  prompt(`${label}的复盘记录：`, text);
+}
+
+// === History (每日统计合集) ===
+let _historyFilter = 'all';
+
+function filterHistory(filter) {
+  _historyFilter = filter;
+  document.querySelectorAll('.history-filter').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.history-filter[data-filter="${filter}"]`)?.classList.add('active');
+  renderHistory();
+}
+
+function renderHistory() {
+  const dailyLog = Store.get('dailyLog', {});
+  const habits = Store.get('habits', { logs: {} });
+  const wallet = Store.get('wallet', { transactions: [] });
+  const journal = Store.get('journal', {});
+  const completionLog = Store.get('completionLog', {});
+  const sleep = Store.get('sleep', {});
+  const timeAlloc = Store.get('timeAlloc', {});
+
+  // Collect all dates that have any data
+  const allDates = new Set();
+  Object.keys(dailyLog).forEach(d => allDates.add(d));
+  Object.keys(habits.logs || {}).forEach(d => allDates.add(d));
+  Object.keys(journal).forEach(d => { if (journal[d]?.trim()) allDates.add(d); });
+  Object.keys(completionLog).forEach(d => allDates.add(d));
+  Object.keys(sleep).forEach(d => allDates.add(d));
+  Object.keys(timeAlloc).forEach(d => allDates.add(d));
+  (wallet.transactions || []).forEach(t => { if (t.date) allDates.add(t.date.slice(0,10)); });
+
+  // Filter
+  let dates = [...allDates].sort((a,b) => b.localeCompare(a));
+
+  if (_historyFilter === 'calories') dates = dates.filter(d => dailyLog[d]?.meals?.length > 0);
+  else if (_historyFilter === 'habits') dates = dates.filter(d => habits.logs[d] && Object.values(habits.logs[d]).some(v => v));
+  else if (_historyFilter === 'expense') dates = dates.filter(d => (wallet.transactions||[]).some(t => t.date?.slice(0,10) === d && t.type === 'expense'));
+  else if (_historyFilter === 'journal') dates = dates.filter(d => journal[d]?.trim());
+
+  // Update header
+  document.getElementById('history-year').textContent = new Date().getFullYear();
+  document.getElementById('history-total-days').textContent = allDates.size;
+  document.getElementById('history-entry-count').textContent = `${dates.length} 条记录`;
+
+  const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+  const list = document.getElementById('history-entries-list');
+
+  if (dates.length === 0) {
+    list.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem;padding:24px;text-align:center;">暂无记录，去「每日」页面开始打卡吧</div>';
+    return;
+  }
+
+  list.innerHTML = dates.map(date => {
+    const d = new Date(date + 'T00:00:00');
+    const isToday = date === TODAY();
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    const weekday = weekdays[d.getDay()];
+
+    // Calorie summary
+    const kcal = dailyLog[date]?.totalKcal || 0;
+
+    // Habits summary
+    const dayHabits = habits.logs[date] || {};
+    const habitTotal = habits.templates.filter(t => t.enabled).length;
+    const habitDone = Object.values(dayHabits).filter(v => v).length;
+
+    // Tasks completed
+    const tasksDone = completionLog[date] || 0;
+
+    // Expense
+    const dayExp = (wallet.transactions||[]).filter(t => t.date?.slice(0,10) === date && t.type === 'expense').reduce((s,t) => s + t.amount, 0);
+
+    // Journal preview
+    const journalText = journal[date] || '';
+    const journalPreview = journalText.length > 30 ? journalText.slice(0, 30) + '...' : journalText;
+
+    // Time alloc summary
+    const time = timeAlloc[date] || {};
+    const totalMins = Object.values(time).reduce((s,v) => s + v, 0);
+    const timeStr = totalMins > 0 ? `${Math.floor(totalMins/60)}h${totalMins%60}m` : '';
+
+    return `<div class="card" style="padding:14px;margin-bottom:10px;cursor:pointer;" onclick="showDayDetail('${date}')">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="text-align:center;min-width:44px;">
+          <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:bold;color:${isToday ? 'var(--neon-cyan)' : 'var(--text-primary)'};">${month} / ${day}</div>
+          <div style="font-size:0.65rem;color:var(--text-dim);">${weekday}</div>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:0.75rem;color:var(--text-secondary);margin-bottom:4px;">
+            ${tasksDone > 0 ? `<span>✅ ${tasksDone}项任务</span>` : ''}
+            ${habitDone > 0 ? `<span>🎯 ${habitDone}/${habitTotal}习惯</span>` : ''}
+            ${kcal > 0 ? `<span>🍽️ ${kcal}kcal</span>` : ''}
+            ${dayExp > 0 ? `<span style="color:var(--neon-pink);">💰 ¥${dayExp.toFixed(0)}</span>` : ''}
+            ${timeStr ? `<span>⏱️ ${timeStr}</span>` : ''}
+          </div>
+          ${journalPreview ? `<div style="font-size:0.8rem;color:var(--text-dim);line-height:1.4;margin-top:4px;">${journalPreview}</div>` : ''}
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-dim);flex-shrink:0;">→</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showDayDetail(date) {
+  const d = new Date(date + 'T00:00:00');
+  const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+  const label = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 ${weekdays[d.getDay()]}`;
+
+  const dailyLog = Store.get('dailyLog', {});
+  const habits = Store.get('habits', { templates: [], logs: {} });
+  const wallet = Store.get('wallet', { transactions: [] });
+  const journal = Store.get('journal', {});
+  const sleep = Store.get('sleep', {});
+  const timeAlloc = Store.get('timeAlloc', {});
+
+  let details = [`📅 ${label}\n`];
+
+  // Sleep
+  const s = sleep[date];
+  if (s && (s.bed || s.wake)) details.push(`😴 睡眠: ${s.bed || '?'} → ${s.wake || '?'}`);
+
+  // Time
+  const time = timeAlloc[date] || {};
+  const totalMins = Object.values(time).reduce((s,v) => s + v, 0);
+  if (totalMins > 0) {
+    const timeParts = Object.entries(time).filter(([,v]) => v > 0).map(([k,v]) => `${k}${v}m`).join(' · ');
+    details.push(`⏱️ 时间: ${timeParts}`);
+  }
+
+  // Meals
+  const meals = dailyLog[date]?.meals || [];
+  if (meals.length > 0) {
+    const mealStr = meals.map(m => `${m.name}(${m.kcal}kcal)`).join(', ');
+    details.push(`🍽️ 饮食: ${mealStr}`);
+    details.push(`   合计: ${dailyLog[date].totalKcal}kcal`);
+  }
+
+  // Habits
+  const dayHabits = habits.logs[date] || {};
+  const doneHabits = habits.templates.filter(t => t.enabled && dayHabits[t.id]);
+  if (doneHabits.length > 0) {
+    details.push(`🎯 习惯: ${doneHabits.map(t => t.icon + t.name).join(' · ')}`);
+  }
+
+  // Expense
+  const dayTxns = (wallet.transactions||[]).filter(t => t.date?.slice(0,10) === date);
+  if (dayTxns.length > 0) {
+    const exp = dayTxns.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0);
+    const inc = dayTxns.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
+    if (exp > 0) details.push(`💸 支出: ¥${exp.toFixed(2)}`);
+    if (inc > 0) details.push(`💰 收入: ¥${inc.toFixed(2)}`);
+  }
+
+  // Journal
+  const j = journal[date];
+  if (j?.trim()) details.push(`📝 日记: ${j}`);
+
+  prompt(label, details.join('\n'));
+}
+
+// === Theme Toggle ===
+function toggleTheme() {
+  const html = document.documentElement;
+  const isLight = html.classList.toggle('light');
+  localStorage.setItem('nexus_theme', isLight ? 'light' : 'dark');
+  document.getElementById('theme-icon').textContent = isLight ? '🌙' : '☀️';
+}
+
+function loadTheme() {
+  const saved = localStorage.getItem('nexus_theme');
+  if (saved === 'light') {
+    document.documentElement.classList.add('light');
+    const icon = document.getElementById('theme-icon');
+    if (icon) icon.textContent = '🌙';
+  }
+}
+
+function renderWalletHistory() {
+  const wallet = Store.get('wallet', { transactions: [] });
+  const txns = wallet.transactions || [];
+  const filter = document.getElementById('wallet-filter')?.value || 'all';
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const weekAgo = new Date(Date.now() - 7 * 86400000);
+  const monthStr = todayStr.slice(0, 7);
+
+  let filtered = txns;
+  if (filter === 'today') {
+    filtered = txns.filter(t => t.date && t.date.slice(0, 10) === todayStr);
+  } else if (filter === 'week') {
+    filtered = txns.filter(t => t.date && new Date(t.date) >= weekAgo);
+  } else if (filter === 'month') {
+    filtered = txns.filter(t => t.date && t.date.slice(0, 7) === monthStr);
+  }
+
+  // Sort by date desc
+  filtered = [...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const list = document.getElementById('wallet-history-list');
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 16px; text-align: center;">暂无交易记录</div>';
+    return;
+  }
+
+  // Group by date
+  const grouped = {};
+  filtered.forEach(t => {
+    const day = t.date ? t.date.slice(0, 10) : '未知';
+    if (!grouped[day]) grouped[day] = [];
+    grouped[day].push(t);
+  });
+
+  const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+  list.innerHTML = Object.entries(grouped).map(([day, items]) => {
+    const d = new Date(day);
+    const isToday = day === todayStr;
+    const dayLabel = isToday ? '今天' : `周${dayNames[d.getDay()] || '?'}`;
+    const dateLabel = `${d.getMonth() + 1}/${d.getDate()}`;
+    const dayExp = items.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    const dayInc = items.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+
+    return `
+      <div style="margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border-subtle); margin-bottom: 6px;">
+          <span style="font-size: 0.75rem; color: ${isToday ? 'var(--neon-cyan)' : 'var(--text-dim)'}; font-family: var(--font-mono);">${dayLabel} ${dateLabel}</span>
+          <span style="font-size: 0.7rem; color: var(--text-dim); font-family: var(--font-mono);">
+            ${dayExp > 0 ? `支 ¥${dayExp.toFixed(1)}` : ''} ${dayInc > 0 ? ` 收 ¥${dayInc.toFixed(1)}` : ''}
+          </span>
+        </div>
+        ${items.map(t => `
+          <div class="wallet-txn-item">
+            <div class="wallet-txn-icon ${t.type}">
+              ${t.type === 'expense' ? '↘' : '↗'}
+            </div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 0.85rem; color: var(--text-primary);">${t.category || '其他'}${t.note ? ' · ' + t.note : ''}</div>
+              <div style="font-size: 0.65rem; color: var(--text-dim); font-family: var(--font-mono);">${t.date ? t.date.slice(11, 16) : ''}</div>
+            </div>
+            <div style="font-size: 0.9rem; font-weight: bold; color: ${t.type === 'expense' ? 'var(--neon-pink)' : 'var(--neon-green)'}; font-family: var(--font-mono);">
+              ${t.type === 'expense' ? '-' : '+'}¥${t.amount.toFixed(2)}
+            </div>
+            <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${t.id}')" style="padding: 2px 6px; font-size: 0.65rem; flex-shrink: 0;">✕</button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }).join('');
+}
+
+function addTransaction() {
+  const amount = parseFloat(document.getElementById('wallet-amount').value);
+  const category = document.getElementById('wallet-category').value;
+  const note = document.getElementById('wallet-note').value.trim();
+  if (!amount || amount <= 0) { showToast('请输入有效金额', 'warning'); return; }
+
+  const wallet = Store.get('wallet', { balance: 0, initialSet: false, transactions: [] });
+  if (!wallet.transactions) wallet.transactions = [];
+
+  const txn = {
+    id: 'w' + Date.now(),
+    type: _walletType,
+    amount: amount,
+    category: category,
+    note: note,
+    date: new Date().toISOString()
+  };
+
+  wallet.transactions.push(txn);
+  // Auto-set initial balance to 0 if not set
+  if (!wallet.initialSet) { wallet.balance = 0; wallet.initialSet = true; }
+  // Update balance
+  if (_walletType === 'expense') wallet.balance -= amount;
+  else wallet.balance += amount;
+
+  Store.set('wallet', wallet);
+  document.getElementById('wallet-amount').value = '';
+  document.getElementById('wallet-note').value = '';
+  renderWallet();
+  showToast(`${_walletType === 'expense' ? '支出' : '收入'} ¥${amount.toFixed(2)} 已记录`, 'success');
+}
+
+function deleteTransaction(id) {
+  const wallet = Store.get('wallet', { transactions: [] });
+  const txn = (wallet.transactions || []).find(t => t.id === id);
+  if (!txn) return;
+  // Reverse balance
+  if (txn.type === 'expense') wallet.balance += txn.amount;
+  else wallet.balance -= txn.amount;
+  wallet.transactions = (wallet.transactions || []).filter(t => t.id !== id);
+  Store.set('wallet', wallet);
+  renderWallet();
+  showToast('已删除该记录', 'info');
+}
+
+function clearWalletHistory() {
+  if (!confirm('确定清空所有交易记录？余额将重置为0。')) return;
+  Store.set('wallet', { balance: 0, initialSet: false, transactions: [] });
+  renderWallet();
+  showToast('已清空所有记录', 'info');
+}
+
+function openSetBalanceModal() {
+  const wallet = Store.get('wallet', { balance: 0 });
+  const input = prompt(wallet.initialSet ? '调整当前余额（直接设置为该数值）' : '设置你的初始余额（你现在有多少钱？）', wallet.balance || '');
+  if (input === null) return;
+  const val = parseFloat(input);
+  if (isNaN(val)) { showToast('请输入有效数字', 'warning'); return; }
+  wallet.balance = val;
+  wallet.initialSet = true;
+  Store.set('wallet', wallet);
+  renderWallet();
+  showToast('余额已设置为 ¥' + val.toFixed(2), 'success');
+}
+
+// === Settings Functions ===
+function renderSettings() {
+  // Sync status
+  const syncStatus = document.getElementById('settings-sync-status');
+  if (syncStatus) {
+    syncStatus.textContent = SyncManager.isConfigured() ? '已连接' : '未配置';
+    syncStatus.style.color = SyncManager.isConfigured() ? 'var(--neon-green)' : 'var(--text-dim)';
+  }
+
+  // Daily templates
+  renderSettingsDailyTemplates();
+
+  // Habits
+  renderSettingsHabits();
+
+  // Level info
+  renderSettingsLevel();
+}
+
+function renderSettingsDailyTemplates() {
+  const templates = Store.get('dailyTemplates', []);
+  const container = document.getElementById('settings-daily-templates');
+  if (!container) return;
+  container.innerHTML = templates.map(t => `
+    <div class="card" style="display:flex;align-items:center;gap:10px;padding:10px;">
+      <input type="checkbox" ${t.enabled?'checked':''} onchange="toggleDailyTemplate('${t.id}')" style="width:auto;">
+      <span style="flex:1;font-size:0.85rem;">${t.title}</span>
+      <span style="font-size:0.7rem;color:var(--text-dim);">+${t.xp}XP</span>
+      <button class="btn btn-sm btn-danger" onclick="deleteDailyTemplate('${t.id}')" style="padding:2px 6px;font-size:0.65rem;">✕</button>
+    </div>
+  `).join('') || '<div style="color:var(--text-dim);font-size:0.8rem;">暂无模板</div>';
+}
+
+function toggleDailyTemplate(id) {
+  const templates = Store.get('dailyTemplates', []);
+  const t = templates.find(x => x.id === id);
+  if (t) { t.enabled = !t.enabled; Store.set('dailyTemplates', templates); }
+  refreshDailyTasks();
+}
+
+function deleteDailyTemplate(id) {
+  const templates = Store.get('dailyTemplates', []).filter(t => t.id !== id);
+  Store.set('dailyTemplates', templates);
+  renderSettingsDailyTemplates();
+}
+
+function addDailyTemplate() {
+  const title = prompt('输入每日任务名称：');
+  if (!title || !title.trim()) return;
+  const templates = Store.get('dailyTemplates', []);
+  templates.push({ id: 'd_' + Date.now(), title: title.trim(), xp: 50, coins: 30, enabled: true });
+  Store.set('dailyTemplates', templates);
+  renderSettingsDailyTemplates();
+}
+
+function renderSettingsHabits() {
+  const habits = Store.get('habits', { templates: [] });
+  const container = document.getElementById('settings-habits');
+  if (!container) return;
+  container.innerHTML = habits.templates.map(h => `
+    <div class="card" style="display:flex;align-items:center;gap:10px;padding:10px;">
+      <input type="checkbox" ${h.enabled?'checked':''} onchange="toggleHabitTemplate('${h.id}')" style="width:auto;">
+      <span style="font-size:1.1rem;">${h.icon}</span>
+      <span style="flex:1;font-size:0.85rem;">${h.name}</span>
+      <button class="btn btn-sm btn-danger" onclick="deleteHabitTemplate('${h.id}')" style="padding:2px 6px;font-size:0.65rem;">✕</button>
+    </div>
+  `).join('') || '<div style="color:var(--text-dim);font-size:0.8rem;">暂无习惯</div>';
+}
+
+function toggleHabitTemplate(id) {
+  const habits = Store.get('habits', { templates: [], logs: {} });
+  const t = habits.templates.find(x => x.id === id);
+  if (t) { t.enabled = !t.enabled; Store.set('habits', habits); }
+}
+
+function deleteHabitTemplate(id) {
+  const habits = Store.get('habits', { templates: [], logs: {} });
+  habits.templates = habits.templates.filter(t => t.id !== id);
+  Store.set('habits', habits);
+  renderSettingsHabits();
+}
+
+function addHabit() {
+  const name = prompt('输入习惯名称：');
+  if (!name || !name.trim()) return;
+  const icon = prompt('输入一个 emoji 图标：', '✅') || '✅';
+  const habits = Store.get('habits', { templates: [], logs: {} });
+  habits.templates.push({ id: 'h_' + Date.now(), name: name.trim(), icon: icon.trim(), enabled: true });
+  Store.set('habits', habits);
+  renderSettingsHabits();
+}
+
+function renderSettingsLevel() {
+  const profile = Store.get('profile', {});
+  const info = getLevelInfo(profile.xp || 0);
+  const el = document.getElementById('settings-level-info');
+  if (!el) return;
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="level-badge" style="width:48px;height:48px;font-size:1.2rem;">Lv.${info.level}</div>
+      <div style="flex:1;">
+        <div style="color:var(--neon-magenta);font-size:0.85rem;font-family:var(--font-mono);">${info.title}</div>
+        <div class="progress-bar" style="margin-top:6px;"><div class="progress-fill" style="width:${info.progress}%"></div></div>
+        <div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px;">EXP ${info.current} / ${info.needed}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;">
+      <div style="text-align:center;"><div style="font-family:var(--font-mono);color:var(--neon-cyan);">${profile.coins||0}</div><div style="font-size:0.65rem;color:var(--text-dim);">积分</div></div>
+      <div style="text-align:center;"><div style="font-family:var(--font-mono);color:var(--neon-orange);">${profile.streak||0}</div><div style="font-size:0.65rem;color:var(--text-dim);">连续天数</div></div>
+      <div style="text-align:center;"><div style="font-family:var(--font-mono);color:var(--neon-green);">${profile.totalCompleted||0}</div><div style="font-size:0.65rem;color:var(--text-dim);">完成任务</div></div>
+    </div>
+  `;
+}
+
+// === Data Export/Import ===
+function exportData() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('nexus_')) {
+      try { data[key] = JSON.parse(localStorage.getItem(key)); }
+      catch { data[key] = localStorage.getItem(key); }
+    }
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `nexus-core-backup-${TODAY()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('数据已导出', 'success');
+}
+
+function importDataPrompt() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (!confirm('导入将覆盖当前所有数据，确定继续？')) return;
+        Object.entries(data).forEach(([key, value]) => {
+          if (key.startsWith('nexus_')) {
+            localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+          }
+        });
+        showToast('数据已导入，刷新页面生效', 'success');
+        setTimeout(() => location.reload(), 1000);
+      } catch (e) {
+        showToast('导入失败：文件格式错误', 'warning');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// === Navigation ===
+document.getElementById('nav').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-item');
+  if (!btn) return;
+
+  document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const panelId = 'panel-' + btn.dataset.panel;
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById(panelId);
+  if (target) target.classList.add('active');
+
+  renderAll();
+});
+
+// === Filter/Sort listeners ===
+document.getElementById('task-filter')?.addEventListener('change', renderTasks);
+document.getElementById('task-sort')?.addEventListener('change', renderTasks);
+
+// === Close modal on overlay click ===
+document.getElementById('task-modal')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeTaskModal();
+});
+
+// === Particle Background ===
+function initParticles() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  const maxParticles = 60;
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  class Particle {
+    constructor() {
+      this.reset();
+      this.y = Math.random() * canvas.height;
+    }
+    reset() {
+      this.x = Math.random() * canvas.width;
+      this.y = -10;
+      this.size = Math.random() * 2 + 1;
+      this.speed = Math.random() * 0.5 + 0.2;
+      this.opacity = Math.random() * 0.5 + 0.1;
+      this.hue = Math.random() < 0.5 ? 190 : 300; // cyan or magenta
+    }
+    update() {
+      this.y += this.speed;
+      this.opacity -= 0.001;
+      if (this.y > canvas.height + 10 || this.opacity <= 0) {
+        this.reset();
+      }
+    }
+    draw() {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${this.hue}, 100%, 60%, ${this.opacity})`;
+      ctx.fill();
+    }
+  }
+
+  for (let i = 0; i < maxParticles; i++) {
+    particles.push(new Particle());
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => { p.update(); p.draw(); });
+
+    // Occasional data line
+    if (Math.random() < 0.02) {
+      const y = Math.random() * canvas.height;
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.03)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+
+    requestAnimationFrame(animate);
+  }
+  animate();
+}
+
+// === Plans ===
+const BURN_PLAN = {
+  dailyTemplates: [
+    { title: '散步/慢走 30-40分钟', xp: 60, coins: 40 },
+    { title: '快走 20-40分钟', xp: 80, coins: 50 },
+    { title: '温和拉伸 10-15分钟', xp: 40, coins: 25 },
+    { title: '居家力量训练 20-25分钟', xp: 100, coins: 60 },
+    { title: '腹式呼吸 10分钟', xp: 30, coins: 20 },
+    { title: '睡前拉伸 10分钟', xp: 40, coins: 25 }
+  ],
+  habits: [
+    { name: '喝水2000ml以上', icon: '💧' },
+    { name: '少油少盐', icon: '🥗' },
+    { name: '主食减半/晚餐不吃主食', icon: '🍚' },
+    { name: '戒奶茶/含糖饮料', icon: '🚫' },
+    { name: '23:00前睡足7.5小时', icon: '😴' },
+    { name: '每日步数8000+', icon: '👟' }
+  ]
+};
+
+const MAKEUP_PLAN = {
+  dailyTemplates: [
+    { title: '练习基础化妆 20-30分钟', xp: 50, coins: 30 },
+    { title: '底妆+眉毛+口红流程练习', xp: 60, coins: 40 },
+    { title: '完整妆容走一遍（腮红/眼影/睫毛）', xp: 80, coins: 50 },
+    { title: '化妆工具清洗', xp: 30, coins: 20 }
+  ],
+  habits: [
+    { name: '睡前彻底卸妆', icon: '🧴' },
+    { name: '护肤后再睡', icon: '✨' },
+    { name: '23:00前睡足7.5小时', icon: '😴' },
+    { name: '喝水1500ml以上', icon: '💧' },
+    { name: '饮食清淡少糖', icon: '🥗' }
+  ]
+};
+
+function switchPlan(plan) {
+  document.querySelectorAll('.plan-section').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.plan-nav-btn').forEach(el => el.classList.remove('active'));
+  const target = document.getElementById('plan-' + plan);
+  if (target) target.classList.add('active');
+  const btn = document.querySelector('.plan-nav-btn[onclick="switchPlan(\'' + plan + '\')"]');
+  if (btn) btn.classList.add('active');
+}
+
+function renderPlan() {
+  const planPanel = document.getElementById('panel-plan');
+  if (!planPanel) return;
+  // Static content is already in HTML; this function is a hook for future dynamic features.
+}
+
+function applyPlan(planName, planData) {
+  if (!confirm(`确定应用${planName}？\n\n这会把打卡项写入「每日模板」和「习惯管理」。`)) return;
+
+  const templates = Store.get('dailyTemplates', []);
+  let addedTpl = 0;
+  planData.dailyTemplates.forEach(item => {
+    const exists = templates.some(t => t.title === item.title);
+    if (!exists) {
+      templates.push({
+        id: 'd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+        title: item.title,
+        xp: item.xp,
+        coins: item.coins,
+        enabled: true
+      });
+      addedTpl++;
+    }
+  });
+  Store.set('dailyTemplates', templates);
+
+  const habits = Store.get('habits', { templates: [], logs: {} });
+  let addedHabit = 0;
+  planData.habits.forEach(item => {
+    const exists = habits.templates.some(h => h.name === item.name);
+    if (!exists) {
+      habits.templates.push({
+        id: 'h_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+        name: item.name,
+        icon: item.icon,
+        enabled: true
+      });
+      addedHabit++;
+    }
+  });
+  Store.set('habits', habits);
+
+  refreshDailyTasks();
+  renderAll();
+
+  showToast(`已应用${planName}：新增 ${addedTpl} 个每日任务，${addedHabit} 个习惯`, 'success');
+}
+
+function applyBurnPlan() {
+  applyPlan('燃脂规划', BURN_PLAN);
+}
+
+function applyMakeupPlan() {
+  applyPlan('化妆规划', MAKEUP_PLAN);
+}
+
+// === Initialize ===
+document.addEventListener('DOMContentLoaded', async () => {
+  loadTheme();
+  SyncManager.init();
+  initData();
+  initParticles();
+  renderAll();
+  updateDashboard();
+
+  // Auto-pull from cloud if configured
+  if (SyncManager.isConfigured()) {
+    const result = await SyncManager.pull();
+    if (result.pulled) {
+      renderAll();
+      updateDashboard();
+      showToast('已从云端同步数据', 'success');
+    }
+  }
+});
+
+// Auto-refresh daily at midnight
+setInterval(() => {
+  const now = new Date();
+  if (now.getHours() === 0 && now.getMinutes() === 0) {
+    refreshDailyTasks();
+    refreshBountiesCheck();
+    updateStreak();
+    renderAll();
+  }
+}, 60000);
+
+console.log('%c NEXUS CORE v1.0 %c 任务核心系统已就绪 ',
+  'background:#0a0a0f;color:#00f0ff;font-size:16px;padding:8px;',
+  'background:#0a0a0f;color:#e0e0e8;font-size:12px;padding:8px;');
+</script>
+
+</body>
+</html>
