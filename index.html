@@ -722,6 +722,40 @@ label {
 }
 .plan-section { display: none; }
 .plan-section.active { display: block; }
+.plan-entry-card {
+  background: linear-gradient(135deg, rgba(0,240,255,0.06), rgba(255,0,200,0.06));
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 14px;
+  margin: 18px 0 14px;
+}
+.plan-entry-title {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+.plan-entry-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.plan-entry-input {
+  background: var(--bg-input, #15151d);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  font-family: var(--font-ui);
+}
+.plan-entry-input::placeholder { color: var(--text-dim); }
+.plan-entry-hint {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  margin-top: 8px;
+  line-height: 1.5;
+}
 .plan-phase {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
@@ -1076,6 +1110,26 @@ label {
       </div>
     </div>
 
+    <!-- 手动录入我的任务 -->
+    <div class="plan-entry-card">
+      <div class="plan-entry-title">✍️ 手动录入我的燃脂任务</div>
+      <div class="plan-entry-row">
+        <select id="plan-burn-cat" class="plan-entry-input" style="width:88px;">
+          <option value="🏃 运动">🏃 运动</option>
+          <option value="🧘 拉伸">🧘 拉伸</option>
+          <option value="💧 饮水">💧 饮水</option>
+          <option value="🥗 饮食">🥗 饮食</option>
+          <option value="😴 睡眠">😴 睡眠</option>
+          <option value="">（无）</option>
+        </select>
+        <input id="plan-burn-title" class="plan-entry-input" type="text" placeholder="例如：快走40分钟" style="flex:1;min-width:140px;">
+        <input id="plan-burn-xp" class="plan-entry-input" type="number" value="60" title="积分奖励" style="width:52px;">
+        <input id="plan-burn-coins" class="plan-entry-input" type="number" value="40" title="金币奖励" style="width:52px;">
+        <button class="btn btn-primary btn-sm" onclick="addPlanTask('burn')" style="padding:4px 12px;">＋ 录入</button>
+      </div>
+      <div class="plan-entry-hint">录入后会出现在「每日模板」和每日打卡里，分类图标会拼到标题前；可在设置页编辑或删除。</div>
+    </div>
+
     <div style="text-align:center;padding:12px 0 20px;">
       <button class="btn btn-primary" onclick="switchTab('settings'); setTimeout(()=>document.getElementById('plan-apply-section').scrollIntoView({behavior:'smooth'}),100);">⚙ 应用燃脂规划到每日打卡</button>
     </div>
@@ -1155,6 +1209,26 @@ label {
         <li>这15天饮食清淡、多喝水、睡好觉，皮肤状态会越来越好，上妆会更服帖自然。</li>
         <li>先去把第一梯队买了吧：防晒 + 气垫 + 眉笔 + 口红，够你练好几天的了。</li>
       </ul>
+    </div>
+
+    <!-- 手动录入我的任务 -->
+    <div class="plan-entry-card">
+      <div class="plan-entry-title">✍️ 手动录入我的化妆任务</div>
+      <div class="plan-entry-row">
+        <select id="plan-makeup-cat" class="plan-entry-input" style="width:92px;">
+          <option value="💄 化妆练习">💄 化妆练习</option>
+          <option value="🧼 卸妆">🧼 卸妆</option>
+          <option value="🧴 护肤">🧴 护肤</option>
+          <option value="🌙 早睡">🌙 早睡</option>
+          <option value="🥗 清淡饮食">🥗 清淡饮食</option>
+          <option value="">（无）</option>
+        </select>
+        <input id="plan-makeup-title" class="plan-entry-input" type="text" placeholder="例如：练底妆+眉毛" style="flex:1;min-width:140px;">
+        <input id="plan-makeup-xp" class="plan-entry-input" type="number" value="60" title="积分奖励" style="width:52px;">
+        <input id="plan-makeup-coins" class="plan-entry-input" type="number" value="40" title="金币奖励" style="width:52px;">
+        <button class="btn btn-primary btn-sm" style="background:var(--neon-magenta);border-color:var(--neon-magenta);padding:4px 12px;" onclick="addPlanTask('makeup')">＋ 录入</button>
+      </div>
+      <div class="plan-entry-hint">录入后会出现在「每日模板」和每日打卡里，分类图标会拼到标题前；可在设置页编辑或删除。</div>
     </div>
 
     <div style="text-align:center;padding:12px 0 20px;">
@@ -4227,6 +4301,33 @@ function applyBurnPlan() {
 
 function applyMakeupPlan() {
   applyPlan('化妆规划', MAKEUP_PLAN);
+}
+
+function addPlanTask(plan) {
+  const catSel = document.getElementById(`plan-${plan}-cat`);
+  const catLabel = catSel ? catSel.value : '';
+  const titleEl = document.getElementById(`plan-${plan}-title`);
+  const title = titleEl.value.trim();
+  if (!title) { showToast('请输入任务标题', 'warning'); return; }
+  const xp = parseInt(document.getElementById(`plan-${plan}-xp`).value) || 50;
+  const coins = parseInt(document.getElementById(`plan-${plan}-coins`).value) || 30;
+  const fullTitle = catLabel ? `${catLabel} ${title}` : title;
+
+  const templates = Store.get('dailyTemplates', []);
+  templates.push({
+    id: 'd' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+    title: fullTitle,
+    xp,
+    coins,
+    enabled: true
+  });
+  Store.set('dailyTemplates', templates);
+
+  titleEl.value = '';
+  renderDailyTemplates();
+  refreshDailyTasks();
+  renderAll();
+  showToast('已录入到每日打卡：' + fullTitle, 'success');
 }
 
 // === Initialize ===
