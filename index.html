@@ -899,12 +899,12 @@ label {
 
   <!-- Bottom Tab Bar -->
   <nav class="bottom-tab-bar" id="nav">
-    <button class="tab-item active" data-panel="daily"><span class="tab-icon">📋</span><span class="tab-label">每日</span></button>
+    <button class="tab-item active" data-panel="daily"><span class="tab-icon">📋</span><span class="tab-label">今日</span></button>
     <button class="tab-item" data-panel="tasks"><span class="tab-icon">⚡</span><span class="tab-label">任务</span></button>
-    <button class="tab-item" data-panel="data"><span class="tab-icon">📊</span><span class="tab-label">数据</span></button>
     <button class="tab-item" data-panel="courses"><span class="tab-icon">📚</span><span class="tab-label">课表</span></button>
-    <button class="tab-item" data-panel="shop"><span class="tab-icon">🎁</span><span class="tab-label">商店</span></button>
-    <button class="tab-item" data-panel="settings"><span class="tab-icon">⚙️</span><span class="tab-label">设置</span></button>
+    <button class="tab-item" data-panel="data"><span class="tab-icon">📊</span><span class="tab-label">数据</span></button>
+    <button class="tab-item" data-panel="plan"><span class="tab-icon">🎯</span><span class="tab-label">规划</span></button>
+    <button class="tab-item" data-panel="settings"><span class="tab-icon">⚙️</span><span class="tab-label">我的</span></button>
   </nav>
 
   <!-- Panel: Daily Hub (首页) -->
@@ -1279,62 +1279,6 @@ label {
     <div id="course-week-view" style="display:none;"></div>
   </div>
 
-  <!-- Panel: Dashboard (保留但隐藏) -->
-  <div class="panel" id="panel-dashboard">
-    <!-- Level Display -->
-    <div class="level-display" id="level-display">
-      <div class="level-badge" id="level-num">Lv.1</div>
-      <div class="level-info">
-        <div class="level-title" id="level-title">数据残片</div>
-        <div class="progress-bar" style="margin-top: 8px;">
-          <div class="progress-fill" id="xp-bar" style="width: 0%"></div>
-        </div>
-        <div class="level-xp" id="xp-text">EXP 0 / 100</div>
-      </div>
-    </div>
-
-    <!-- Stats Row -->
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-value" id="stat-streak">0</div>
-        <div class="stat-label">连续打卡天数</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="stat-coins">0</div>
-        <div class="stat-label">积分余额</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="stat-total">0</div>
-        <div class="stat-label">累计完成任务</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="stat-today">0</div>
-        <div class="stat-label">今日完成</div>
-      </div>
-    </div>
-
-    <!-- Daily Tasks -->
-    <div class="section-header">
-      <span class="section-title">◆ 每日任务</span>
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span class="section-count" id="daily-count">剩余 0/0</span>
-        <button class="btn btn-sm" onclick="openDailyModal()" style="padding: 2px 8px; font-size: 0.7rem;">⚙ 管理</button>
-      </div>
-    </div>
-    <div id="daily-tasks-list"></div>
-
-    <!-- Main Quest -->
-    <div class="section-header" style="margin-top: 20px;">
-      <span class="section-title">◆ 主线任务</span>
-    </div>
-    <div id="main-quests-list"></div>
-
-    <!-- Urgent Tasks -->
-    <div class="section-header" style="margin-top: 20px;">
-      <span class="section-title">◆ 临近截止</span>
-    </div>
-    <div id="urgent-tasks-list"></div>
-  </div>
 
   <!-- Panel: Tasks -->
   <div class="panel" id="panel-tasks">
@@ -1358,46 +1302,7 @@ label {
     <div id="all-tasks-list"></div>
   </div>
 
-  <!-- Panel: Bounty Board -->
-  <div class="panel" id="panel-bounty">
-    <div class="section-header">
-      <span class="section-title">◆ 悬赏板</span>
-      <span class="section-count" style="color: var(--neon-orange);">双倍奖励 · 限时刷新</span>
-    </div>
-    <div id="bounty-list"></div>
-    <div style="text-align: center; margin-top: 12px;">
-      <button class="btn btn-primary" onclick="refreshBounties()">⟳ 刷新悬赏（每日3次）</button>
-      <span id="bounty-refresh-count" style="font-size: 0.7rem; color: var(--text-dim); margin-left: 8px;">剩余刷新: 3</span>
-    </div>
-  </div>
 
-  <!-- Panel: Pomodoro -->
-  <div class="panel" id="panel-pomodoro">
-    <div style="text-align: center; margin-bottom: 16px;">
-      <label style="text-align: left;">关联任务</label>
-      <select id="pomodoro-task-select">
-        <option value="">-- 选择要专注的任务 --</option>
-      </select>
-    </div>
-    <div class="pomodoro-display" id="pomodoro-time">25:00</div>
-    <div class="pomodoro-status" id="pomodoro-status">准备就绪</div>
-    <div class="progress-bar" style="max-width: 300px; margin: 12px auto;">
-      <div class="progress-fill" id="pomodoro-progress" style="width: 100%;"></div>
-    </div>
-    <div class="pomodoro-controls">
-      <button class="btn btn-primary" id="pomodoro-start" onclick="startPomodoro()">▶ 开始专注</button>
-      <button class="btn" onclick="pausePomodoro()">⏸ 暂停</button>
-      <button class="btn" onclick="resetPomodoro()">↺ 重置</button>
-    </div>
-    <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: center;">
-      <button class="btn btn-sm" onclick="setPomodoroPreset(25)">25分钟</button>
-      <button class="btn btn-sm" onclick="setPomodoroPreset(45)">45分钟</button>
-      <button class="btn btn-sm" onclick="setPomodoroPreset(5)">5分钟休息</button>
-    </div>
-    <div style="text-align: center; margin-top: 12px; font-size: 0.7rem; color: var(--text-dim);">
-      今日专注: <span id="pomodoro-today-count" style="color: var(--neon-cyan);">0</span> 个番茄
-    </div>
-  </div>
 
   <!-- Panel: Shop -->
   <div class="panel" id="panel-shop">
@@ -1414,14 +1319,6 @@ label {
     </div>
   </div>
 
-  <!-- Panel: Achievements -->
-  <div class="panel" id="panel-achievements">
-    <div class="section-header">
-      <span class="section-title">◆ 成就殿堂</span>
-      <span class="section-count" id="achievement-progress">已解锁 0/15</span>
-    </div>
-    <div class="grid-3" id="achievements-grid"></div>
-  </div>
 
   <!-- Panel: Stats -->
   <!-- Panel: Data (Stats + Wallet + Review) -->
@@ -1568,6 +1465,18 @@ label {
         <div style="flex:1;">
           <div style="font-size:0.9rem;color:var(--text-primary);">云同步</div>
           <div style="font-size:0.7rem;color:var(--text-dim);margin-top:2px;" id="settings-sync-status">未配置</div>
+        </div>
+        <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
+      </div>
+    </div>
+
+    <!-- 奖励商店 -->
+    <div class="card" style="cursor:pointer;padding:14px;" onclick="showPanel('panel-shop')">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:1.3rem;">🎁</span>
+        <div style="flex:1;">
+          <div style="font-size:0.9rem;color:var(--text-primary);">奖励商店</div>
+          <div style="font-size:0.7rem;color:var(--text-dim);margin-top:2px;" id="settings-shop-balance">用积分兑换奖励</div>
         </div>
         <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
       </div>
@@ -2081,12 +1990,8 @@ function initData() {
       { id: 'd5', title: '整理桌面/房间', xp: 30, coins: 20, enabled: true }
     ]);
     Store.set('dailyTasks', []); // { id, templateId, title, xp, coins, done, date }
-    Store.set('achievements', generateAchievements());
     Store.set('shopItems', generateShopItems());
     Store.set('shopHistory', []);
-    Store.set('bounties', []);
-    Store.set('bountyRefreshes', 3);
-    Store.set('bountyDate', '');
     Store.set('completionLog', {}); // { 'YYYY-MM-DD': count }
     Store.set('wallet', { balance: 0, initialSet: false, transactions: [] });
     Store.set('dailyLog', {}); // { "YYYY-MM-DD": { meals: [{type,name,kcal}], totalKcal } }
@@ -2106,8 +2011,6 @@ function initData() {
   }
   // Ensure daily tasks are refreshed
   refreshDailyTasks();
-  // Ensure bounties are refreshed
-  refreshBountiesCheck();
   // Check streak
   updateStreak();
 }
@@ -2552,9 +2455,7 @@ function completeTask(id) {
   profile.totalCompleted = (profile.totalCompleted || 0) + 1;
   Store.set('profile', profile);
 
-  showToast(`✓ 任务完成！+${task.xp}XP +${task.coins}💰`, 'success');
-  checkAchievements();
-  renderAll();
+  showToast(`✓ 任务完成！+${task.xp}XP +${task.coins}💰`, 'success');  renderAll();
 }
 
 function completeDailyTask(taskId) {
@@ -2577,9 +2478,7 @@ function completeDailyTask(taskId) {
   profile.totalCompleted = (profile.totalCompleted || 0) + 1;
   Store.set('profile', profile);
 
-  showToast(`✓ 每日任务完成！+${dt.xp}XP +${dt.coins}💰`, 'success');
-  checkAchievements();
-  renderAll();
+  showToast(`✓ 每日任务完成！+${dt.xp}XP +${dt.coins}💰`, 'success');  renderAll();
 }
 
 // === Daily Tasks System ===
@@ -2625,86 +2524,15 @@ function updateStreak() {
 }
 
 // === Bounty System ===
-const BOUNTY_POOL = [
-  { title: '清理电脑桌面文件', xp: 40, coins: 25 },
-  { title: '做10分钟拉伸运动', xp: 50, coins: 30 },
-  { title: '喝8杯水（今日记录）', xp: 30, coins: 20 },
-  { title: '给家人/朋友发一条消息', xp: 20, coins: 15 },
-  { title: '整理手机相册（删10张）', xp: 35, coins: 20 },
-  { title: '学一个快捷键/小技巧', xp: 45, coins: 25 },
-  { title: '写50字今日总结', xp: 40, coins: 25 },
-  { title: '整理书桌/工位5分钟', xp: 30, coins: 20 },
-  { title: '听一首新歌并记录感受', xp: 25, coins: 15 },
-  { title: '做5分钟冥想/深呼吸', xp: 35, coins: 20 },
-  { title: '复习10个已学单词', xp: 50, coins: 30 },
-  { title: '整理浏览器书签', xp: 25, coins: 15 },
-  { title: '站起来活动5分钟', xp: 20, coins: 10 },
-  { title: '读一篇技术/学习文章', xp: 60, coins: 35 },
-  { title: '删除一个不用的APP', xp: 20, coins: 10 },
-];
 
-function refreshBountiesCheck() {
-  const today = new Date().toISOString().split('T')[0];
-  const bountyDate = Store.get('bountyDate', '');
-  if (bountyDate !== today) {
-    Store.set('bountyRefreshes', 3);
-    Store.set('bountyDate', today);
-    generateBounties();
-  }
-}
 
-function generateBounties() {
-  const pool = [...BOUNTY_POOL];
-  // Shuffle and pick 3
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-  const bounties = pool.slice(0, 3).map(b => ({
-    id: 'b_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-    title: b.title,
-    xp: b.xp * 2, // Double rewards
-    coins: b.coins * 2,
-    claimed: false
-  }));
-  Store.set('bounties', bounties);
-}
 
-function refreshBounties() {
-  const refreshes = Store.get('bountyRefreshes', 0);
-  if (refreshes <= 0) {
-    showToast('今日刷新次数已用完', 'warning');
-    return;
-  }
-  Store.set('bountyRefreshes', refreshes - 1);
-  generateBounties();
-  showToast('悬赏板已刷新！', 'info');
-  renderBounties();
-}
 
-function claimBounty(id) {
-  const bounties = Store.get('bounties', []);
-  const bounty = bounties.find(b => b.id === id);
-  if (!bounty || bounty.claimed) return;
 
-  bounty.claimed = true;
-  Store.set('bounties', bounties);
-  addXP(bounty.xp);
-  addCoins(bounty.coins);
 
-  const today = new Date().toISOString().split('T')[0];
-  const log = Store.get('completionLog', {});
-  log[today] = (log[today] || 0) + 1;
-  Store.set('completionLog', log);
 
-  const profile = Store.get('profile');
-  profile.totalCompleted = (profile.totalCompleted || 0) + 1;
-  Store.set('profile', profile);
 
-  showToast(`⚡ 悬赏完成！双倍奖励 +${bounty.xp}XP +${bounty.coins}💰`, 'success');
-  checkAchievements();
-  renderAll();
-}
+
 
 // === Shop System ===
 function generateShopItems() {
@@ -2748,190 +2576,22 @@ function redeemItem(itemId) {
 }
 
 // === Achievement System ===
-function generateAchievements() {
-  return [
-    { id: 'a1', name: '初次觉醒', desc: '完成第一个任务', icon: '🌟', unlocked: false, hidden: false },
-    { id: 'a2', name: '连击x3', desc: '连续打卡3天', icon: '🔥', unlocked: false, hidden: false },
-    { id: 'a3', name: '连击x7', desc: '连续打卡7天', icon: '💫', unlocked: false, hidden: false },
-    { id: 'a4', name: '连击x30', desc: '连续打卡30天', icon: '👑', unlocked: false, hidden: false },
-    { id: 'a5', name: '百夫长', desc: '累计完成100个任务', icon: '💯', unlocked: false, hidden: false },
-    { id: 'a6', name: '佣兵新人', desc: '达到等级5', icon: '⚔️', unlocked: false, hidden: false },
-    { id: 'a7', name: '网络行者', desc: '达到等级10', icon: '🌐', unlocked: false, hidden: false },
-    { id: 'a8', name: '赛博武士', desc: '达到等级15', icon: '⚡', unlocked: false, hidden: false },
-    { id: 'a9', name: '积分富豪', desc: '累计获得1000积分', icon: '💰', unlocked: false, hidden: false },
-    { id: 'a10', name: '商店常客', desc: '兑换5次奖励', icon: '🛒', unlocked: false, hidden: false },
-    { id: 'a11', name: '番茄大师', desc: '完成10个番茄钟', icon: '🍅', unlocked: false, hidden: false },
-    { id: 'a12', name: '悬赏猎人', desc: '完成5个悬赏任务', icon: '🎯', unlocked: false, hidden: false },
-    { id: 'a13', name: '任务收割者', desc: '一天内完成5个任务', icon: '💀', unlocked: false, hidden: true },
-    { id: 'a14', name: '主线推进者', desc: '完成3个主线任务', icon: '🏆', unlocked: false, hidden: false },
-    { id: 'a15', name: '终极骇客', desc: '达到等级20', icon: '🔮', unlocked: false, hidden: false },
-  ];
-}
 
-function checkAchievements() {
-  const achievements = Store.get('achievements', []);
-  const profile = Store.get('profile');
-  const tasks = getTasks();
-  const shopHistory = Store.get('shopHistory', []);
-  const bounties = Store.get('bounties', []);
-  let updated = false;
 
-  const checks = {
-    a1: () => profile.totalCompleted >= 1,
-    a2: () => profile.streak >= 3,
-    a3: () => profile.streak >= 7,
-    a4: () => profile.streak >= 30,
-    a5: () => profile.totalCompleted >= 100,
-    a6: () => profile.level >= 5,
-    a7: () => profile.level >= 10,
-    a8: () => profile.level >= 15,
-    a9: () => {
-      // Total coins earned (estimate from completed tasks)
-      const completed = tasks.filter(t => t.status === 'completed');
-      const totalCoins = completed.reduce((s, t) => s + t.coins, 0);
-      return totalCoins >= 1000;
-    },
-    a10: () => shopHistory.length >= 5,
-    a11: () => {
-      const totalPomodoros = parseInt(localStorage.getItem('nexus_totalPomodoros') || '0');
-      return totalPomodoros >= 10;
-    },
-    a12: () => bounties.filter(b => b.claimed).length >= 5,
-    a13: () => {
-      const today = new Date().toISOString().split('T')[0];
-      const log = Store.get('completionLog', {});
-      return (log[today] || 0) >= 5;
-    },
-    a14: () => tasks.filter(t => t.type === 'main' && t.status === 'completed').length >= 3,
-    a15: () => profile.level >= 20,
-  };
 
-  for (const ach of achievements) {
-    if (!ach.unlocked && checks[ach.id] && checks[ach.id]()) {
-      ach.unlocked = true;
-      updated = true;
-      showToast(`🏆 成就解锁：${ach.name} - ${ach.desc}`, 'success');
-    }
-  }
-
-  if (updated) Store.set('achievements', achievements);
-}
 
 // === Pomodoro System ===
-let pomodoroState = {
-  minutes: 25, seconds: 0, totalSeconds: 25 * 60,
-  running: false, paused: false, intervalId: null,
-  taskId: ''
-};
 
-function setPomodoroPreset(min) {
-  pausePomodoro();
-  pomodoroState.minutes = min;
-  pomodoroState.seconds = 0;
-  pomodoroState.totalSeconds = min * 60;
-  updatePomodoroDisplay();
-}
 
-function updatePomodoroDisplay() {
-  const m = String(pomodoroState.minutes).padStart(2, '0');
-  const s = String(pomodoroState.seconds).padStart(2, '0');
-  document.getElementById('pomodoro-time').textContent = `${m}:${s}`;
-  const progress = ((pomodoroState.minutes * 60 + pomodoroState.seconds) / pomodoroState.totalSeconds) * 100;
-  document.getElementById('pomodoro-progress').style.width = progress + '%';
-}
 
-function startPomodoro() {
-  if (pomodoroState.running && !pomodoroState.paused) return;
 
-  const taskId = document.getElementById('pomodoro-task-select').value;
-  pomodoroState.taskId = taskId;
 
-  if (pomodoroState.paused) {
-    pomodoroState.paused = false;
-    document.getElementById('pomodoro-status').textContent = '专注中...';
-  } else {
-    document.getElementById('pomodoro-status').textContent = '专注中...';
-  }
 
-  pomodoroState.running = true;
-  document.getElementById('pomodoro-start').textContent = '⏳ 专注中...';
 
-  pomodoroState.intervalId = setInterval(() => {
-    if (pomodoroState.seconds === 0) {
-      if (pomodoroState.minutes === 0) {
-        // Pomodoro complete
-        clearInterval(pomodoroState.intervalId);
-        pomodoroState.running = false;
-        document.getElementById('pomodoro-status').textContent = '完成！';
-        document.getElementById('pomodoro-start').textContent = '▶ 开始专注';
-        showToast('🍅 番茄钟完成！', 'success');
 
-        // Update count
-        const profile = Store.get('profile');
-        const today = new Date().toISOString().split('T')[0];
-        if (profile.pomodoroDate !== today) {
-          profile.pomodoroToday = 0;
-          profile.pomodoroDate = today;
-        }
-        profile.pomodoroToday = (profile.pomodoroToday || 0) + 1;
-        Store.set('profile', profile);
 
-        // Track total pomodoros
-        const total = parseInt(localStorage.getItem('nexus_totalPomodoros') || '0');
-        localStorage.setItem('nexus_totalPomodoros', total + 1);
 
-        document.getElementById('pomodoro-today-count').textContent = profile.pomodoroToday;
 
-        // Advance task progress if linked
-        if (taskId) {
-          const tasks = getTasks();
-          const task = tasks.find(t => t.id === taskId);
-          if (task && task.status === 'active') {
-            task.progress = Math.min(100, (task.progress || 0) + 10);
-            if (task.progress >= 100) {
-              completeTask(taskId);
-            } else {
-              saveTasks(tasks);
-              showToast(`任务进度 +10% (当前 ${task.progress}%)`, 'info');
-            }
-          }
-        }
-
-        checkAchievements();
-        resetPomodoro();
-        renderAll();
-        return;
-      }
-      pomodoroState.minutes--;
-      pomodoroState.seconds = 59;
-    } else {
-      pomodoroState.seconds--;
-    }
-    updatePomodoroDisplay();
-  }, 1000);
-}
-
-function pausePomodoro() {
-  if (!pomodoroState.running) return;
-  pomodoroState.paused = true;
-  pomodoroState.running = false;
-  clearInterval(pomodoroState.intervalId);
-  document.getElementById('pomodoro-status').textContent = '已暂停';
-  document.getElementById('pomodoro-start').textContent = '▶ 继续';
-}
-
-function resetPomodoro() {
-  clearInterval(pomodoroState.intervalId);
-  pomodoroState.running = false;
-  pomodoroState.paused = false;
-  pomodoroState.minutes = 25;
-  pomodoroState.seconds = 0;
-  pomodoroState.totalSeconds = 25 * 60;
-  pomodoroState.taskId = '';
-  document.getElementById('pomodoro-status').textContent = '准备就绪';
-  document.getElementById('pomodoro-start').textContent = '▶ 开始专注';
-  updatePomodoroDisplay();
-}
 
 // === Task Modal ===
 function openTaskModal(editId = null) {
@@ -3006,106 +2666,21 @@ function saveTask() {
 
 // === Render Functions ===
 function renderAll() {
-  renderDailyHub();
-  renderDashboard();
-  renderTasks();
-  renderBounties();
-  renderShop();
-  renderAchievements();
-  renderStats();
+  renderDailyHub();  renderTasks();  renderShop();  renderStats();
   renderWallet();
   renderInvestJournal();
   renderHistory();
   renderSettings();
   renderPlan();
   renderCourses();
-  renderScheduleModeButtons();
-  updatePomodoroTaskSelect();
-}
+  renderScheduleModeButtons();}
 
+// 等级/积分展示现统一由 renderSettings() 渲染到「我的」面板（原 dashboard 面板已移除）
 function updateDashboard() {
-  const profile = Store.get('profile');
-  const info = getLevelInfo(profile.xp);
-
-  document.getElementById('level-num').textContent = 'Lv.' + info.level;
-  document.getElementById('level-title').textContent = info.title;
-  document.getElementById('xp-bar').style.width = info.progress + '%';
-  document.getElementById('xp-text').textContent = `EXP ${info.current} / ${info.needed}`;
-  document.getElementById('stat-streak').textContent = profile.streak || 0;
-  document.getElementById('stat-coins').textContent = profile.coins || 0;
-  document.getElementById('stat-total').textContent = profile.totalCompleted || 0;
-
-  const today = new Date().toISOString().split('T')[0];
-  const log = Store.get('completionLog', {});
-  document.getElementById('stat-today').textContent = log[today] || 0;
+  renderSettings();
 }
 
-function renderDashboard() {
-  updateDashboard();
 
-  // Daily tasks
-  const dailyTasks = Store.get('dailyTasks', []);
-  const doneCount = dailyTasks.filter(t => t.done).length;
-  document.getElementById('daily-count').textContent = `剩余 ${dailyTasks.length - doneCount}/${dailyTasks.length}`;
-
-  const dailyList = document.getElementById('daily-tasks-list');
-  dailyList.innerHTML = dailyTasks.map(t => `
-    <div class="task-item ${t.done ? 'completed' : ''}" onclick="${t.done ? '' : `completeDailyTask('${t.id}')`}">
-      <div class="task-check ${t.done ? 'checked' : ''}">${t.done ? '✓' : ''}</div>
-      <div class="task-info">
-        <div class="task-title">${t.title}</div>
-      </div>
-      <div class="task-reward">+${t.xp}XP +${t.coins}💰</div>
-    </div>
-  `).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无每日任务</div>';
-
-  // Main quests
-  const tasks = getTasks();
-  const mainQuests = tasks.filter(t => t.type === 'main' && t.status === 'active');
-  const mainList = document.getElementById('main-quests-list');
-  mainList.innerHTML = mainQuests.map(t => `
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">⚡ ${t.title}</span>
-        <span class="badge badge-${getPriorityColor(t.priority)}">${getPriorityLabel(t.priority)}</span>
-      </div>
-      <div class="progress-bar">
-        <div class="progress-fill" style="width: ${t.progress || 0}%"></div>
-      </div>
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <span class="card-subtitle">进度 ${t.progress || 0}%</span>
-        <div style="display: flex; gap: 4px;">
-          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); completeTask('${t.id}')">完成</button>
-          <button class="btn btn-sm" onclick="event.stopPropagation(); openTaskModal('${t.id}')">编辑</button>
-        </div>
-      </div>
-    </div>
-  `).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无主线任务，去任务中心添加吧！</div>';
-
-  // Urgent tasks
-  const now = new Date();
-  const urgentTasks = tasks.filter(t => {
-    if (t.status !== 'active' || t.type !== 'timed' || !t.deadline) return false;
-    const deadline = new Date(t.deadline);
-    const diff = (deadline - now) / (1000 * 60 * 60 * 24);
-    return diff <= 3 && diff >= 0;
-  });
-  const urgentList = document.getElementById('urgent-tasks-list');
-  urgentList.innerHTML = urgentTasks.map(t => {
-    const deadline = new Date(t.deadline);
-    const diff = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
-    return `
-      <div class="task-item" onclick="completeTask('${t.id}')">
-        <div class="task-check"></div>
-        <div class="task-info">
-          <div class="task-title">⏰ ${t.title}</div>
-          <div class="task-meta">剩余 ${diff} 天</div>
-        </div>
-        <div class="task-reward">+${t.xp}XP</div>
-      </div>
-    `;
-  }).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无临近截止任务</div>';
-}
 
 function renderTasks() {
   const tasks = getTasks();
@@ -3158,26 +2733,7 @@ function renderTasks() {
   `).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无任务，点击右上角"新增任务"开始吧！</div>';
 }
 
-function renderBounties() {
-  const bounties = Store.get('bounties', []);
-  const list = document.getElementById('bounty-list');
-  list.innerHTML = bounties.map(b => `
-    <div class="bounty-item">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <div style="font-weight: bold; margin-bottom: 4px;">${b.title}</div>
-          <div class="bounty-reward">💰 +${b.coins}积分 &nbsp; ⚡ +${b.xp}XP</div>
-        </div>
-        ${b.claimed
-          ? '<span class="badge badge-green">已完成</span>'
-          : `<button class="btn btn-primary btn-sm" onclick="claimBounty('${b.id}')">领取悬赏</button>`
-        }
-      </div>
-    </div>
-  `).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">悬赏板为空，点击刷新获取悬赏！</div>';
 
-  document.getElementById('bounty-refresh-count').textContent = `剩余刷新: ${Store.get('bountyRefreshes', 0)}`;
-}
 
 function renderShop() {
   const profile = Store.get('profile');
@@ -3205,26 +2761,7 @@ function renderShop() {
     : '暂无兑换记录';
 }
 
-function renderAchievements() {
-  const achievements = Store.get('achievements', []);
-  const unlocked = achievements.filter(a => a.unlocked).length;
-  document.getElementById('achievement-progress').textContent = `已解锁 ${unlocked}/${achievements.length}`;
 
-  const grid = document.getElementById('achievements-grid');
-  grid.innerHTML = achievements.map(a => {
-    if (a.hidden && !a.unlocked) {
-      return `<div class="achievement-card locked"><div class="achievement-icon">❓</div><div class="achievement-name">???</div><div class="achievement-desc">隐藏成就</div></div>`;
-    }
-    return `
-      <div class="achievement-card ${a.unlocked ? 'unlocked' : 'locked'}">
-        <div class="achievement-icon">${a.icon}</div>
-        <div class="achievement-name">${a.name}</div>
-        <div class="achievement-desc">${a.desc}</div>
-        ${a.unlocked ? '<span class="badge badge-yellow" style="margin-top: 4px;">已解锁</span>' : '<span class="badge" style="margin-top: 4px;">未解锁</span>'}
-      </div>
-    `;
-  }).join('');
-}
 
 function renderStats() {
   const log = Store.get('completionLog', {});
@@ -3373,23 +2910,7 @@ function drawTypeChart() {
   });
 }
 
-function updatePomodoroTaskSelect() {
-  const select = document.getElementById('pomodoro-task-select');
-  if (!select) return;
-  const tasks = getTasks().filter(t => t.status === 'active');
-  select.innerHTML = '<option value="">-- 选择要专注的任务 --</option>' +
-    tasks.map(t => `<option value="${t.id}">${t.title} (${t.progress || 0}%)</option>`).join('');
 
-  const profile = Store.get('profile');
-  const today = new Date().toISOString().split('T')[0];
-  if (profile.pomodoroDate !== today) {
-    profile.pomodoroToday = 0;
-    profile.pomodoroDate = today;
-    Store.set('profile', profile);
-  }
-  const el = document.getElementById('pomodoro-today-count');
-  if (el) el.textContent = profile.pomodoroToday || 0;
-}
 
 // === Helper Functions ===
 function getTypeLabel(type) {
@@ -4664,7 +4185,6 @@ setInterval(() => {
   const now = new Date();
   if (now.getHours() === 0 && now.getMinutes() === 0) {
     refreshDailyTasks();
-    refreshBountiesCheck();
     updateStreak();
     renderAll();
   }
