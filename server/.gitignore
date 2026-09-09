@@ -1,0 +1,5 @@
+node_modules/
+journal.db
+journal.db-wal
+journal.db-shm
+.env

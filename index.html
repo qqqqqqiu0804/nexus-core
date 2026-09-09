@@ -697,158 +697,6 @@ label {
   color: var(--neon-green);
 }
 
-/* === Plan Panel === */
-.plan-nav {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-  overflow-x: auto;
-}
-.plan-nav-btn {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  border-radius: 20px;
-  padding: 6px 14px;
-  font-size: 0.8rem;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s ease;
-}
-.plan-nav-btn.active {
-  background: rgba(0,240,255,0.12);
-  border-color: var(--neon-cyan);
-  color: var(--neon-cyan);
-}
-.plan-section { display: none; }
-.plan-section.active { display: block; }
-.plan-entry-card {
-  background: linear-gradient(135deg, rgba(0,240,255,0.06), rgba(255,0,200,0.06));
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  padding: 14px;
-  margin: 18px 0 14px;
-}
-.plan-entry-title {
-  font-size: 0.85rem;
-  color: var(--text-primary);
-  margin-bottom: 10px;
-}
-.plan-entry-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.plan-entry-input {
-  background: var(--bg-input, #15151d);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  color: var(--text-primary);
-  padding: 6px 8px;
-  font-size: 0.8rem;
-  font-family: var(--font-ui);
-}
-.plan-entry-input::placeholder { color: var(--text-dim); }
-.plan-entry-hint {
-  font-size: 0.68rem;
-  color: var(--text-dim);
-  margin-top: 8px;
-  line-height: 1.5;
-}
-.plan-phase {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 14px;
-}
-.plan-phase-title {
-  font-family: var(--font-mono);
-  font-size: 0.95rem;
-  color: var(--neon-cyan);
-  margin-bottom: 6px;
-  letter-spacing: 1px;
-}
-.plan-phase-sub {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin-bottom: 12px;
-}
-.plan-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.plan-list li {
-  position: relative;
-  padding-left: 16px;
-  font-size: 0.85rem;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-  line-height: 1.5;
-}
-.plan-list li::before {
-  content: '◆';
-  position: absolute;
-  left: 0;
-  color: var(--neon-magenta);
-  font-size: 0.6rem;
-  top: 2px;
-}
-.plan-note {
-  background: rgba(0,240,255,0.05);
-  border: 1px solid rgba(0,240,255,0.15);
-  border-radius: 6px;
-  padding: 12px;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  margin-top: 12px;
-}
-.plan-diet-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.8rem;
-  margin-top: 8px;
-}
-.plan-diet-table th,
-.plan-diet-table td {
-  border: 1px solid var(--border-subtle);
-  padding: 8px;
-  text-align: left;
-}
-.plan-diet-table th {
-  background: var(--bg-deep);
-  color: var(--neon-cyan);
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 1px;
-}
-.plan-diet-table td {
-  color: var(--text-secondary);
-}
-.plan-goal-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 10px;
-  margin-top: 12px;
-}
-.plan-goal-card {
-  background: var(--bg-deep);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  padding: 12px;
-  text-align: center;
-}
-.plan-goal-card .icon {
-  font-size: 1.4rem;
-  margin-bottom: 4px;
-}
-.plan-goal-card .label {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
 
 /* === Course Schedule === */
 .course-view-toggle { display:flex; gap:6px; }
@@ -883,10 +731,6 @@ label {
     <div class="header-title">N E X U S &nbsp; C O R E</div>
     <div class="header-subtitle">// 任务核心系统 v1.0</div>
     <div style="display:flex;gap:8px;position:absolute;top:24px;right:0;">
-      <button class="sync-btn" onclick="switchTab('plan')" title="燃脂规划">
-        <span>🎯</span>
-        <span>规划</span>
-      </button>
       <button class="sync-btn" id="theme-toggle" onclick="toggleTheme()" title="切换主题">
         <span id="theme-icon">☀️</span>
       </button>
@@ -903,7 +747,6 @@ label {
     <button class="tab-item" data-panel="tasks"><span class="tab-icon">⚡</span><span class="tab-label">任务</span></button>
     <button class="tab-item" data-panel="courses"><span class="tab-icon">📚</span><span class="tab-label">课表</span></button>
     <button class="tab-item" data-panel="data"><span class="tab-icon">📊</span><span class="tab-label">数据</span></button>
-    <button class="tab-item" data-panel="plan"><span class="tab-icon">🎯</span><span class="tab-label">规划</span></button>
     <button class="tab-item" data-panel="settings"><span class="tab-icon">⚙️</span><span class="tab-label">我的</span></button>
   </nav>
 
@@ -1049,229 +892,6 @@ label {
 
   </div>
 
-  <!-- Panel: Plan (规划集合) -->
-  <div class="panel" id="panel-plan">
-    <div class="daily-date-header" style="margin-bottom:12px;">
-      <div>
-        <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:2px;">PLAN HUB</div>
-        <div style="font-size:1.4rem;font-weight:bold;color:var(--neon-cyan);margin:4px 0;">我的规划</div>
-      </div>
-      <div class="daily-streak-badge" style="background:rgba(0,240,255,0.1);border-color:rgba(0,240,255,0.3);color:var(--neon-cyan);">🎯 进行中</div>
-    </div>
-
-    <div class="plan-nav">
-      <button class="plan-nav-btn active" onclick="switchPlan('fatburn')">🔥 14天燃脂</button>
-      <button class="plan-nav-btn" onclick="switchPlan('makeup')">💄 15天化妆入门</button>
-    </div>
-
-    <!-- Plan: Fat Burn -->
-    <div class="plan-section active" id="plan-fatburn">
-    <div style="margin-bottom:16px;">
-      <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:2px;">14-DAY HOME FAT BURN PLAN</div>
-      <div style="font-size:1.2rem;font-weight:bold;color:var(--neon-cyan);margin:4px 0;">14天居家燃脂规划</div>
-      <div style="font-size:0.8rem;color:var(--text-dim);">8月22日 — 9月5日 · 目标：紧致精神见偶像</div>
-    </div>
-
-    <div class="plan-note" style="margin-bottom:16px;">
-      <strong style="color:var(--neon-cyan);">先交代两个重要情况：</strong><br>
-      1. 经期 8月20-24日，前两天不做剧烈运动，以舒缓活动为主。<br>
-      2. 日常步数偏低（约3400步/天），这14天除了运动还要多走动。
-    </div>
-
-    <div class="plan-phase">
-      <div class="plan-phase-title">第一阶段 · 8月22日-24日</div>
-      <div class="plan-phase-sub">经期适应期 · 目标：让身体动起来，但不过度刺激 · 每天约60-90分钟</div>
-      <ul class="plan-list">
-        <li>散步/慢走 30-40分钟（晚饭后出门，微微出汗即可）</li>
-        <li>温和拉伸 15分钟（重点拉伸腿部和腰背）</li>
-        <li>腹式呼吸 10分钟（睡前做，帮助放松）</li>
-      </ul>
-    </div>
-
-    <div class="plan-phase">
-      <div class="plan-phase-title">第二阶段 · 8月25日-29日</div>
-      <div class="plan-phase-sub">正式燃脂期第1周 · 目标：建立运动习惯，开始真正燃脂 · 每天约90-120分钟</div>
-      <ul class="plan-list">
-        <li><strong>早上（7:30-8:00）</strong>：快走20分钟 + 拉伸10分钟</li>
-        <li><strong>晚上（18:30-20:00）</strong>：快走30分钟 + 居家力量训练20分钟</li>
-        <li>力量训练内容：深蹲10个×3组、臀桥15个×3组、跪姿俯卧撑8个×3组、平板支撑20秒×3组、卷腹12个×3组</li>
-        <li>睡前拉伸 10分钟</li>
-      </ul>
-    </div>
-
-    <div class="plan-phase">
-      <div class="plan-phase-title">第三阶段 · 8月30日-9月5日上午</div>
-      <div class="plan-phase-sub">燃脂期第2周 · 目标：加量加强度，最大化燃脂 · 每天约2小时</div>
-      <ul class="plan-list">
-        <li><strong>早上（7:30-8:00）</strong>：快走25分钟（速度比上周稍快）+ 拉伸5分钟</li>
-        <li><strong>晚上（18:30-20:30）</strong>：快走40分钟（可尝试快走3分钟+慢走2分钟交替）+ 居家力量训练25分钟</li>
-        <li>力量训练进阶：深蹲12个×3组、臀桥18个×3组、跪姿俯卧撑10个×3组、平板支撑30秒×3组、卷腹15个×3组</li>
-        <li>拉伸 10分钟</li>
-      </ul>
-    </div>
-
-    <div class="plan-phase">
-      <div class="plan-phase-title">饮食部分 · 14天全程执行</div>
-      <div class="plan-phase-sub">少油少盐、主食减半、戒奶茶</div>
-      <table class="plan-diet-table">
-        <tr><th>餐次</th><th>内容</th><th>要点</th></tr>
-        <tr><td>早餐</td><td>肠粉（少油）+ 水煮蛋1个</td><td>或无糖豆浆 + 全麦面包</td></tr>
-        <tr><td>午餐</td><td>湖南菜（少油少盐）+ 米饭减半</td><td>肉正常吃，蔬菜多吃</td></tr>
-        <tr><td>晚餐</td><td>主食减半或不吃主食</td><td>清淡为主，睡前3小时不进食</td></tr>
-        <tr><td>零食</td><td>水果或原味坚果一小把</td><td>饼干、奶茶、含糖饮料戒掉</td></tr>
-        <tr><td>饮水</td><td>每天2000ml以上</td><td>帮助代谢和消浮肿</td></tr>
-      </table>
-    </div>
-
-    <div class="plan-phase">
-      <div class="plan-phase-title">关键提醒</div>
-      <ul class="plan-list">
-        <li><strong>经期（8月20-24日）：</strong>不做剧烈运动，以散步和拉伸为主。</li>
-        <li><strong>小腿疼：</strong>全程不安排跑步，快走时小腿酸就放慢速度、多拉伸。</li>
-        <li><strong>睡眠：</strong>尽量23:00前睡，7.5小时以上。睡眠不足会脸浮肿。</li>
-        <li><strong>每天步数：</strong>除了运动，上班时多走动，午休散步10分钟，目标每天8000步以上。</li>
-      </ul>
-    </div>
-
-    <div class="plan-phase">
-      <div class="plan-phase-title">9月5日早上 · 你能期待什么</div>
-      <div class="plan-goal-grid">
-        <div class="plan-goal-card"><div class="icon">⚖️</div><div class="label">体重减2-3kg</div></div>
-        <div class="plan-goal-card"><div class="icon">✨</div><div class="label">脸浮肿消退，轮廓清晰</div></div>
-        <div class="plan-goal-card"><div class="icon">📏</div><div class="label">腰围细2-3cm</div></div>
-        <div class="plan-goal-card"><div class="icon">🔋</div><div class="label">整个人更精神有活力</div></div>
-      </div>
-      <div class="plan-note">
-        9月6号见偶像那天，你会以一个更紧致、更有精神的状态出现。别人看的是你的整体状态，不是体重秤上的数字。
-      </div>
-    </div>
-
-    <!-- 手动录入我的任务 -->
-    <div class="plan-entry-card">
-      <div class="plan-entry-title">✍️ 手动录入我的燃脂任务</div>
-      <div class="plan-entry-row">
-        <select id="plan-burn-cat" class="plan-entry-input" style="width:88px;">
-          <option value="🏃 运动">🏃 运动</option>
-          <option value="🧘 拉伸">🧘 拉伸</option>
-          <option value="💧 饮水">💧 饮水</option>
-          <option value="🥗 饮食">🥗 饮食</option>
-          <option value="😴 睡眠">😴 睡眠</option>
-          <option value="">（无）</option>
-        </select>
-        <input id="plan-burn-title" class="plan-entry-input" type="text" placeholder="例如：快走40分钟" style="flex:1;min-width:140px;">
-        <input id="plan-burn-xp" class="plan-entry-input" type="number" value="60" title="积分奖励" style="width:52px;">
-        <input id="plan-burn-coins" class="plan-entry-input" type="number" value="40" title="金币奖励" style="width:52px;">
-        <button class="btn btn-primary btn-sm" onclick="addPlanTask('burn')" style="padding:4px 12px;">＋ 录入</button>
-      </div>
-      <div class="plan-entry-hint">录入后会出现在「每日模板」和每日打卡里，分类图标会拼到标题前；可在设置页编辑或删除。</div>
-    </div>
-
-    <div style="text-align:center;padding:12px 0 20px;">
-      <button class="btn btn-primary" onclick="switchTab('settings'); setTimeout(()=>document.getElementById('plan-apply-section').scrollIntoView({behavior:'smooth'}),100);">⚙ 应用燃脂规划到每日打卡</button>
-    </div>
-    </div>
-
-    <!-- Plan: Makeup -->
-    <div class="plan-section" id="plan-makeup">
-    <div style="margin-bottom:16px;">
-      <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:2px;">15-DAY MAKEUP STARTER PLAN</div>
-      <div style="font-size:1.2rem;font-weight:bold;color:var(--neon-magenta);margin:4px 0;">新手化妆 15 天入门规划</div>
-      <div style="font-size:0.8rem;color:var(--text-dim);">8月22日 — 9月6日 · 目标：9月6日从容出门见偶像</div>
-    </div>
-
-    <div class="plan-note" style="margin-bottom:16px;">
-      皮肤底子好（光滑细腻、肤色均匀），其实不需要太多东西就能画出好看的自然妆。控制在预算内，够用就好。
-    </div>
-
-    <div class="plan-phase">
-      <div class="plan-phase-title">第一梯队 · 必须买（约150-250元）</div>
-      <div class="plan-phase-sub">先买这四样，练熟基础妆</div>
-      <table class="plan-diet-table">
-        <tr><th>品类</th><th>推荐选择</th><th>预算</th></tr>
-        <tr><td>防晒霜</td><td>日常通勤 SPF30+ 即可</td><td>30-60元</td></tr>
-        <tr><td>气垫/粉底液</td><td>选轻薄款，色号选和脖子肤色接近的</td><td>50-100元</td></tr>
-        <tr><td>口红</td><td>豆沙色或奶茶色，日常百搭</td><td>30-60元</td></tr>
-        <tr><td>眉笔</td><td>选灰色或棕色，比发色浅一号</td><td>10-20元</td></tr>
-      </table>
-    </div>
-
-    <div class="plan-phase">
-      <div class="plan-phase-title">第二梯队 · 锦上添花（约100-150元）</div>
-      <div class="plan-phase-sub">第一梯队练熟后再买</div>
-      <table class="plan-diet-table">
-        <tr><th>品类</th><th>推荐选择</th><th>预算</th></tr>
-        <tr><td>散粉</td><td>定妆用，控油防脱妆</td><td>30-50元</td></tr>
-        <tr><td>腮红</td><td>杏色或粉色，少量提气色</td><td>20-40元</td></tr>
-        <tr><td>眼影盘</td><td>大地色系小盘（3-4色就够）</td><td>30-60元</td></tr>
-        <tr><td>睫毛膏</td><td>纤长款，不容易苍蝇腿</td><td>20-40元</td></tr>
-      </table>
-    </div>
-
-    <div class="plan-phase">
-      <div class="plan-phase-title">第三梯队 · 可以后面再补</div>
-      <div class="plan-phase-sub">进阶之后再考虑</div>
-      <ul class="plan-list">
-        <li>眼线笔（新手容易画不好，先用眼影代替）</li>
-        <li>遮瑕膏（你皮肤底子好，暂时不需要）</li>
-        <li>高光修容（进阶再学）</li>
-      </ul>
-    </div>
-
-    <div class="plan-phase">
-      <div class="plan-phase-title">购买建议</div>
-      <ul class="plan-list">
-        <li><strong>不要一次买齐所有东西</strong>——先买第一梯队，练熟了再补第二梯队。</li>
-        <li><strong>平价品牌完全够用</strong>——新手不需要买大牌，国货平价品牌（如橘朵、完美日记、花西子等）性价比很高。</li>
-        <li><strong>色号选择</strong>：粉底色号不确定的话，去实体店试最稳妥；网购选“自然色”通常不会出错。</li>
-        <li><strong>口红选日常色</strong>：豆沙色、奶茶色、肉桂色，见偶像那天既提气色又不会太夸张。</li>
-      </ul>
-    </div>
-
-    <div class="plan-phase">
-      <div class="plan-phase-title">时间安排 · 8月22日-9月6日</div>
-      <div class="plan-phase-sub">今天到9月6日还有15天，时间完全够</div>
-      <ul class="plan-list">
-        <li><strong>本周（8月22-29日）</strong>：买齐第一梯队，每天晚上运动后花20-30分钟练基础化妆（底妆+眉毛+口红）。</li>
-        <li><strong>下周（8月30日-9月5日）</strong>：练熟了之后加腮红、眼影、睫毛膏，把整套流程走一遍。</li>
-        <li><strong>9月5日晚</strong>：完整化一次妆，看看效果，调整细节。</li>
-        <li><strong>9月6日当天</strong>：按练好的流程来，从容出门。</li>
-      </ul>
-    </div>
-
-    <div class="plan-phase">
-      <div class="plan-phase-title">一个提醒</div>
-      <ul class="plan-list">
-        <li>你现在减脂计划里运动后出汗多，<strong>化妆练习最好在洗漱后、睡前进行，不要带妆运动</strong>。</li>
-        <li>这15天饮食清淡、多喝水、睡好觉，皮肤状态会越来越好，上妆会更服帖自然。</li>
-        <li>先去把第一梯队买了吧：防晒 + 气垫 + 眉笔 + 口红，够你练好几天的了。</li>
-      </ul>
-    </div>
-
-    <!-- 手动录入我的任务 -->
-    <div class="plan-entry-card">
-      <div class="plan-entry-title">✍️ 手动录入我的化妆任务</div>
-      <div class="plan-entry-row">
-        <select id="plan-makeup-cat" class="plan-entry-input" style="width:92px;">
-          <option value="💄 化妆练习">💄 化妆练习</option>
-          <option value="🧼 卸妆">🧼 卸妆</option>
-          <option value="🧴 护肤">🧴 护肤</option>
-          <option value="🌙 早睡">🌙 早睡</option>
-          <option value="🥗 清淡饮食">🥗 清淡饮食</option>
-          <option value="">（无）</option>
-        </select>
-        <input id="plan-makeup-title" class="plan-entry-input" type="text" placeholder="例如：练底妆+眉毛" style="flex:1;min-width:140px;">
-        <input id="plan-makeup-xp" class="plan-entry-input" type="number" value="60" title="积分奖励" style="width:52px;">
-        <input id="plan-makeup-coins" class="plan-entry-input" type="number" value="40" title="金币奖励" style="width:52px;">
-        <button class="btn btn-primary btn-sm" style="background:var(--neon-magenta);border-color:var(--neon-magenta);padding:4px 12px;" onclick="addPlanTask('makeup')">＋ 录入</button>
-      </div>
-      <div class="plan-entry-hint">录入后会出现在「每日模板」和每日打卡里，分类图标会拼到标题前；可在设置页编辑或删除。</div>
-    </div>
-
-    <div style="text-align:center;padding:12px 0 20px;">
-      <button class="btn btn-primary" style="background:var(--neon-magenta);border-color:var(--neon-magenta);" onclick="switchTab('settings'); setTimeout(()=>document.getElementById('plan-apply-section').scrollIntoView({behavior:'smooth'}),100);">⚙ 应用化妆规划到每日打卡</button>
-    </div>
-    </div>
-  </div>
 
   <!-- Panel: Courses (课表集成) -->
   <div class="panel" id="panel-courses">
@@ -1454,6 +1074,19 @@ label {
       <span id="history-entry-count" style="font-size:0.7rem;color:var(--text-dim);"></span>
     </div>
     <div id="history-entries-list"></div>
+
+    <!-- 日记回顾 -->
+    <div class="section-header" style="margin-top:20px;">
+      <span class="section-title">◆ 日记回顾</span>
+      <span id="journal-arch-stats" style="font-size:0.7rem;color:var(--text-dim);"></span>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
+      <button class="btn btn-sm" onclick="journalMonthShift(-1)">‹</button>
+      <span id="journal-arch-month" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--neon-cyan);"></span>
+      <button class="btn btn-sm" onclick="journalMonthShift(1)">›</button>
+      <input type="text" id="journal-arch-search" placeholder="搜索全部日记..." style="flex:1;min-width:120px;" oninput="renderJournalArchive()">
+    </div>
+    <div id="journal-archive-list"></div>
   </div>
 
   <!-- Panel: Settings -->
@@ -1473,39 +1106,6 @@ label {
       </div>
     </div>
 
-    <!-- 应用规划 -->
-    <div id="plan-apply-section" style="margin-top:16px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-        <span style="font-size:1rem;">⚙</span>
-        <span style="font-size:0.85rem;color:var(--text-primary);">规划应用</span>
-      </div>
-      <div class="card" style="padding:12px; margin-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <span style="font-size:1rem;">🔥</span>
-          <span style="font-size:0.85rem;color:var(--text-primary);">14 天居家燃脂规划</span>
-        </div>
-        <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">
-          将运动打卡、饮食控制、睡眠、饮水等条目写入「每日模板」和「习惯管理」。
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" onclick="applyBurnPlan()" style="padding:4px 12px;">✅ 应用燃脂规划</button>
-          <button class="btn btn-sm" onclick="switchTab('plan'); switchPlan('fatburn')" style="padding:4px 12px;">📖 查看</button>
-        </div>
-      </div>
-      <div class="card" style="padding:12px;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <span style="font-size:1rem;">💄</span>
-          <span style="font-size:0.85rem;color:var(--text-primary);">新手化妆 15 天入门规划</span>
-        </div>
-        <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">
-          将化妆练习、卸妆、护肤、早睡等条目写入「每日模板」和「习惯管理」。
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" onclick="applyMakeupPlan()" style="padding:4px 12px; background:var(--neon-magenta); border-color:var(--neon-magenta);">✅ 应用化妆规划</button>
-          <button class="btn btn-sm" onclick="switchTab('plan'); switchPlan('makeup')" style="padding:4px 12px;">📖 查看</button>
-        </div>
-      </div>
-    </div>
 
     <!-- 课表数据 -->
     <div style="margin-top:16px;">
@@ -1523,6 +1123,33 @@ label {
           </div>
         </div>
       </div>
+
+    <!-- 日记后端 -->
+    <div style="margin-top:16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="font-size:1rem;">📓</span>
+        <span style="font-size:0.85rem;color:var(--text-primary);">日记后端</span>
+        <span id="journal-api-status" style="font-size:0.65rem;color:var(--text-dim);"></span>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div class="form-group" style="margin-bottom:8px;">
+          <label style="font-size:0.7rem;">API 地址（留空 = 仅本机存储）</label>
+          <input type="text" id="cfg-journal-api" placeholder="http://localhost:3000" style="width:100%;">
+        </div>
+        <div class="form-group" style="margin-bottom:8px;">
+          <label style="font-size:0.7rem;">Token</label>
+          <input type="password" id="cfg-journal-token" placeholder="AUTH_TOKEN" style="width:100%;">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="saveJournalApiCfg()">保存并测试连接</button>
+          <button class="btn btn-sm" onclick="importJournalToServer()">导入本机旧日记</button>
+        </div>
+        <div style="font-size:0.65rem;color:var(--text-dim);margin-top:8px;line-height:1.5;">
+          启动方式见 server/README.md（npm install → 设 AUTH_TOKEN → npm start）。
+          配置后今日记自动同步后端 SQLite；不配置也照常能用（仅本机）。
+        </div>
+      </div>
+    </div>
 
     <!-- 作息季节 -->
     <div style="margin-top:16px;">
@@ -2014,6 +1641,15 @@ function renderDailyHub() {
   const journalEl = document.getElementById('daily-journal');
   if (journalEl && journal[today] !== undefined) journalEl.value = journal[today];
   else if (journalEl) journalEl.value = '';
+  // 配置了后端时，以服务端内容为准（仅在用户尚未输入新内容时覆盖）
+  if (journalApiOn() && journalEl) {
+    const cached = journal[today] || '';
+    const { base } = journalApiCfg();
+    fetch(`${base}/api/entries/${today}`, { headers: journalHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(e => { if (e && typeof e.content === 'string' && journalEl.value === cached) journalEl.value = e.content; })
+      .catch(() => {});
+  }
 }
 
 // --- Time Allocation ---
@@ -2249,6 +1885,134 @@ function saveJournal() {
   const val = document.getElementById('daily-journal').value;
   journal[TODAY()] = val;
   Store.set('journal', journal);
+  scheduleJournalSync(TODAY(), val); // 配置了后端则 1s 防抖后同步
+}
+
+// === 日记后端（server/ 目录，Express + SQLite）===
+function journalApiCfg() {
+  return { base: (Store.get('journalApiBase', '') || '').replace(/\/+$/, ''), token: Store.get('journalApiToken', '') };
+}
+function journalApiOn() {
+  const c = journalApiCfg();
+  return !!(c.base && c.token);
+}
+function journalHeaders() {
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + journalApiCfg().token };
+}
+// 防抖同步：输入停顿 1 秒后 PUT 到后端；localStorage 始终同步写（离线兜底）
+let _journalSyncTimer = null;
+function scheduleJournalSync(date, content) {
+  if (!journalApiOn()) return;
+  clearTimeout(_journalSyncTimer);
+  _journalSyncTimer = setTimeout(() => pushJournalEntry(date, content), 1000);
+}
+async function pushJournalEntry(date, content) {
+  try {
+    const { base } = journalApiCfg();
+    const r = await fetch(`${base}/api/entries/${date}`, { method: 'PUT', headers: journalHeaders(), body: JSON.stringify({ content }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+  } catch (e) { showToast('日记同步后端失败：' + e.message, 'error'); }
+}
+async function fetchAllEntries() {
+  const { base } = journalApiCfg();
+  const r = await fetch(`${base}/api/entries`, { headers: journalHeaders() });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+function saveJournalApiCfg() {
+  const base = document.getElementById('cfg-journal-api').value.trim();
+  const token = document.getElementById('cfg-journal-token').value.trim();
+  Store.set('journalApiBase', base);
+  Store.set('journalApiToken', token);
+  const status = document.getElementById('journal-api-status');
+  if (!base || !token) {
+    if (status) status.textContent = '未启用（仅本机存储）';
+    showToast('已保存：日记仅存本机', 'info');
+    renderJournalArchive();
+    return;
+  }
+  if (status) status.textContent = '测试连接中...';
+  fetchAllEntries().then(() => {
+    if (status) status.textContent = '已连接 ✓';
+    showToast('日记后端连接成功', 'success');
+    renderJournalArchive();
+  }).catch(e => {
+    if (status) status.textContent = '连接失败：' + e.message;
+    showToast('连接失败，请检查服务是否启动 / token 是否正确', 'error');
+  });
+}
+async function importJournalToServer() {
+  if (!journalApiOn()) { showToast('请先配置并保存日记后端', 'warning'); return; }
+  const j = Store.get('journal', {});
+  const entries = Object.entries(j)
+    .map(([date, v]) => ({ date, content: typeof v === 'string' ? v : (v && v.text) || '' }))
+    .filter(e => e.content.trim());
+  if (!entries.length) { showToast('本机没有可导入的日记', 'info'); return; }
+  try {
+    const { base } = journalApiCfg();
+    const r = await fetch(`${base}/api/entries/import`, { method: 'POST', headers: journalHeaders(), body: JSON.stringify({ entries }) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const res = await r.json();
+    showToast(`导入完成：${res.imported} 篇入后端，${res.skipped} 篇跳过`, 'success');
+    renderJournalArchive();
+  } catch (e) { showToast('导入失败：' + e.message, 'error'); }
+}
+
+// === 日记回顾（数据面板）===
+let _journalMonth = null; // 'YYYY-MM'，null = 当前月
+function journalMonthShift(d) {
+  const now = _journalMonth ? new Date(parseInt(_journalMonth.slice(0,4)), parseInt(_journalMonth.slice(5,7))-1 + d, 1) : (() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth()+d, 1); })();
+  _journalMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}`;
+  renderJournalArchive();
+}
+async function renderJournalArchive() {
+  const listEl = document.getElementById('journal-archive-list');
+  if (!listEl) return;
+  let entries;
+  if (journalApiOn()) {
+    try { entries = await fetchAllEntries(); }
+    catch (e) { listEl.innerHTML = `<div style="color:var(--text-dim);font-size:0.8rem;padding:8px;">后端连接失败（${e.message}），显示本机数据</div>`;
+      entries = localJournalEntries(); }
+  } else {
+    entries = localJournalEntries();
+  }
+  entries = entries.filter(e => e.content && e.content.trim());
+
+  const q = (document.getElementById('journal-arch-search')?.value || '').trim().toLowerCase();
+  const monthEl = document.getElementById('journal-arch-month');
+  const statsEl = document.getElementById('journal-arch-stats');
+  const totalChars = entries.reduce((s, e) => s + e.content.length, 0);
+  if (statsEl) statsEl.textContent = `${entries.length} 篇 · 共 ${totalChars} 字`;
+  if (monthEl && !_journalMonth) { const n = new Date(); _journalMonth = `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; }
+
+  let show = entries;
+  if (q) {
+    show = entries.filter(e => e.content.toLowerCase().includes(q) || e.date.includes(q));
+  } else {
+    show = entries.filter(e => e.date.startsWith(_journalMonth));
+  }
+  if (monthEl) monthEl.textContent = q ? `搜索"${q}"` : _journalMonth;
+  renderJournalArchiveList(listEl, show);
+}
+function localJournalEntries() {
+  const j = Store.get('journal', {});
+  return Object.entries(j).map(([date, v]) => ({ date, content: typeof v === 'string' ? v : (v && v.text) || '' }));
+}
+function renderJournalArchiveList(el, entries) {
+  if (!entries.length) { el.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:8px;">这个月还没有日记，去「今日」写一篇吧</div>'; return; }
+  el.innerHTML = entries.map(e => {
+    const [y, m, d] = e.date.split('-');
+    const preview = e.content.length > 40 ? e.content.slice(0, 40) + '…' : e.content;
+    return `
+    <details class="card" style="padding:10px;margin-bottom:8px;">
+      <summary style="cursor:pointer;list-style:none;display:flex;gap:8px;align-items:baseline;">
+        <span style="font-family:var(--font-mono);color:var(--neon-cyan);font-size:0.8rem;white-space:nowrap;">${m}-${d}</span>
+        <span style="flex:1;font-size:0.78rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${preview}</span>
+        <span style="font-size:0.65rem;color:var(--text-dim);white-space:nowrap;">${e.content.length}字</span>
+      </summary>
+      <div style="white-space:pre-wrap;font-size:0.8rem;color:var(--text-primary);line-height:1.7;padding:10px 2px 2px;border-top:1px solid var(--border-subtle);margin-top:8px;">${e.content}</div>
+    </details>`;
+  }).join('');
 }
 
 // --- Tab Switch Helper ---
@@ -2625,8 +2389,8 @@ function renderAll() {
   renderInvestJournal();
   renderHistory();
   renderSettings();
-  renderPlan();
   renderCourses();
+  renderJournalArchive();
   renderScheduleModeButtons();}
 
 // 等级/积分展示现统一由 renderSettings() 渲染到「我的」面板（原 dashboard 面板已移除）
@@ -3482,6 +3246,16 @@ function renderSettings() {
     syncStatus.style.color = SyncManager.isConfigured() ? 'var(--neon-green)' : 'var(--text-dim)';
   }
 
+  // 日记后端配置回填
+  const apiInput = document.getElementById('cfg-journal-api');
+  const tokenInput = document.getElementById('cfg-journal-token');
+  if (apiInput && document.activeElement !== apiInput) apiInput.value = Store.get('journalApiBase', '');
+  if (tokenInput && document.activeElement !== tokenInput) tokenInput.value = Store.get('journalApiToken', '');
+  const jStatus = document.getElementById('journal-api-status');
+  if (jStatus && !jStatus.textContent.includes('✓') && !jStatus.textContent.includes('失败')) {
+    jStatus.textContent = journalApiOn() ? '已启用' : '未启用（仅本机存储）';
+  }
+
   // Daily templates
   renderSettingsDailyTemplates();
 
@@ -3726,133 +3500,6 @@ function initParticles() {
   animate();
 }
 
-// === Plans ===
-const BURN_PLAN = {
-  dailyTemplates: [
-    { title: '散步/慢走 30-40分钟', xp: 60, coins: 40 },
-    { title: '快走 20-40分钟', xp: 80, coins: 50 },
-    { title: '温和拉伸 10-15分钟', xp: 40, coins: 25 },
-    { title: '居家力量训练 20-25分钟', xp: 100, coins: 60 },
-    { title: '腹式呼吸 10分钟', xp: 30, coins: 20 },
-    { title: '睡前拉伸 10分钟', xp: 40, coins: 25 }
-  ],
-  habits: [
-    { name: '喝水2000ml以上', icon: '💧' },
-    { name: '少油少盐', icon: '🥗' },
-    { name: '主食减半/晚餐不吃主食', icon: '🍚' },
-    { name: '戒奶茶/含糖饮料', icon: '🚫' },
-    { name: '23:00前睡足7.5小时', icon: '😴' },
-    { name: '每日步数8000+', icon: '👟' }
-  ]
-};
-
-const MAKEUP_PLAN = {
-  dailyTemplates: [
-    { title: '练习基础化妆 20-30分钟', xp: 50, coins: 30 },
-    { title: '底妆+眉毛+口红流程练习', xp: 60, coins: 40 },
-    { title: '完整妆容走一遍（腮红/眼影/睫毛）', xp: 80, coins: 50 },
-    { title: '化妆工具清洗', xp: 30, coins: 20 }
-  ],
-  habits: [
-    { name: '睡前彻底卸妆', icon: '🧴' },
-    { name: '护肤后再睡', icon: '✨' },
-    { name: '23:00前睡足7.5小时', icon: '😴' },
-    { name: '喝水1500ml以上', icon: '💧' },
-    { name: '饮食清淡少糖', icon: '🥗' }
-  ]
-};
-
-function switchPlan(plan) {
-  document.querySelectorAll('.plan-section').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.plan-nav-btn').forEach(el => el.classList.remove('active'));
-  const target = document.getElementById('plan-' + plan);
-  if (target) target.classList.add('active');
-  const btn = document.querySelector('.plan-nav-btn[onclick="switchPlan(\'' + plan + '\')"]');
-  if (btn) btn.classList.add('active');
-}
-
-function renderPlan() {
-  const planPanel = document.getElementById('panel-plan');
-  if (!planPanel) return;
-  // Static content is already in HTML; this function is a hook for future dynamic features.
-}
-
-function applyPlan(planName, planData) {
-  if (!confirm(`确定应用${planName}？\n\n这会把打卡项写入「每日模板」和「习惯管理」。`)) return;
-
-  const templates = Store.get('dailyTemplates', []);
-  let addedTpl = 0;
-  planData.dailyTemplates.forEach(item => {
-    const exists = templates.some(t => t.title === item.title);
-    if (!exists) {
-      templates.push({
-        id: 'd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-        title: item.title,
-        xp: item.xp,
-        coins: item.coins,
-        enabled: true
-      });
-      addedTpl++;
-    }
-  });
-  Store.set('dailyTemplates', templates);
-
-  const habits = Store.get('habits', { templates: [], logs: {} });
-  let addedHabit = 0;
-  planData.habits.forEach(item => {
-    const exists = habits.templates.some(h => h.name === item.name);
-    if (!exists) {
-      habits.templates.push({
-        id: 'h_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-        name: item.name,
-        icon: item.icon,
-        enabled: true
-      });
-      addedHabit++;
-    }
-  });
-  Store.set('habits', habits);
-
-  refreshDailyTasks();
-  renderAll();
-
-  showToast(`已应用${planName}：新增 ${addedTpl} 个每日任务，${addedHabit} 个习惯`, 'success');
-}
-
-function applyBurnPlan() {
-  applyPlan('燃脂规划', BURN_PLAN);
-}
-
-function applyMakeupPlan() {
-  applyPlan('化妆规划', MAKEUP_PLAN);
-}
-
-function addPlanTask(plan) {
-  const catSel = document.getElementById(`plan-${plan}-cat`);
-  const catLabel = catSel ? catSel.value : '';
-  const titleEl = document.getElementById(`plan-${plan}-title`);
-  const title = titleEl.value.trim();
-  if (!title) { showToast('请输入任务标题', 'warning'); return; }
-  const xp = parseInt(document.getElementById(`plan-${plan}-xp`).value) || 50;
-  const coins = parseInt(document.getElementById(`plan-${plan}-coins`).value) || 30;
-  const fullTitle = catLabel ? `${catLabel} ${title}` : title;
-
-  const templates = Store.get('dailyTemplates', []);
-  templates.push({
-    id: 'd' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-    title: fullTitle,
-    xp,
-    coins,
-    enabled: true
-  });
-  Store.set('dailyTemplates', templates);
-
-  titleEl.value = '';
-  renderSettingsDailyTemplates();
-  refreshDailyTasks();
-  renderAll();
-  showToast('已录入到每日打卡：' + fullTitle, 'success');
-}
 
 // === Course Schedule (教务课表集成) ===
 const TERM_START = '2026-09-07'; // 2026-2027-1 第一周周一
