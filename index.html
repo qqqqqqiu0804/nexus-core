@@ -924,6 +924,15 @@ label {
     <!-- ⓪ Next Class Banner -->
     <div class="daily-next-class" id="daily-next-class" style="display:none;"></div>
 
+    <!-- ⓪.5 Today's Courses (linked from timetable) -->
+    <div class="daily-section" id="daily-courses-section" style="display:none;">
+      <div class="section-header">
+        <span class="section-title">◆ 今日课程</span>
+        <button class="btn btn-sm" onclick="switchTab('courses')">课表 →</button>
+      </div>
+      <div id="daily-courses-list"></div>
+    </div>
+
     <!-- ② Time Allocation -->
     <div class="daily-section">
       <div class="section-header">
@@ -1603,6 +1612,25 @@ label {
       <label>截止日期（限时任务）</label>
       <input type="date" id="task-deadline">
     </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>关联课程（课表）</label>
+        <select id="task-course"><option value="">不关联</option></select>
+      </div>
+      <div class="form-group">
+        <label>周期重复</label>
+        <select id="task-recurrence">
+          <option value="none">不重复</option>
+          <option value="daily">每天</option>
+          <option value="weekly">每周</option>
+          <option value="monthly">每月</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>子任务（每行一个，可选）</label>
+      <textarea id="task-subtasks" placeholder="例如：&#10;看书第1-20页&#10;做课后习题" style="min-height:60px;"></textarea>
+    </div>
     <div class="form-group">
       <label>备注</label>
       <textarea id="task-note" placeholder="任务详情..."></textarea>
@@ -1959,6 +1987,9 @@ function renderDailyHub() {
 
   // ⓪ Next Class Banner
   renderNextClassBanner();
+
+  // ⓪.5 Today's Courses
+  renderTodayCourses();
 
   // ② Time Allocation
   renderTimeAlloc();
@@ -2333,6 +2364,9 @@ function addTask(taskData) {
     coins: parseInt(taskData.coins) || 30,
     deadline: taskData.deadline || '',
     note: taskData.note || '',
+    course: taskData.course || '',
+    recurrence: taskData.recurrence || 'none',
+    subtasks: taskData.subtasks || [],
     progress: 0,
     status: 'active', // active, completed, failed
     createdAt: new Date().toISOString(),
@@ -2382,7 +2416,24 @@ function completeTask(id) {
   profile.totalCompleted = (profile.totalCompleted || 0) + 1;
   Store.set('profile', profile);
 
-  showToast(`✓ 任务完成！+${task.xp}XP +${task.coins}💰`, 'success');  renderAll();
+  // 周期重复任务：完成后自动生成下一期（子任务进度清零）
+  let recurringMsg = '';
+  if (task.recurrence && task.recurrence !== 'none') {
+    tasks.push({
+      ...task,
+      id: generateId(),
+      status: 'active',
+      progress: 0,
+      subtasks: (task.subtasks || []).map(s => ({ title: s.title, done: false })),
+      deadline: nextDeadline(task.deadline, task.recurrence),
+      createdAt: new Date().toISOString(),
+      completedAt: null
+    });
+    saveTasks(tasks);
+    recurringMsg = '，下一期已生成 🔁';
+  }
+
+  showToast(`✓ 任务完成！+${task.xp}XP +${task.coins}💰${recurringMsg}`, 'success');  renderAll();
 }
 
 function completeDailyTask(taskId) {
@@ -2498,6 +2549,9 @@ function openTaskModal(editId = null) {
       document.getElementById('task-coins').value = task.coins;
       document.getElementById('task-deadline').value = task.deadline;
       document.getElementById('task-note').value = task.note || '';
+      populateTaskCourseSelect(task.course || '');
+      document.getElementById('task-recurrence').value = task.recurrence || 'none';
+      document.getElementById('task-subtasks').value = (task.subtasks || []).map(s => s.title).join('\n');
     }
   } else {
     document.getElementById('modal-title').textContent = '// 新增任务';
@@ -2508,6 +2562,9 @@ function openTaskModal(editId = null) {
     document.getElementById('task-coins').value = '30';
     document.getElementById('task-deadline').value = '';
     document.getElementById('task-note').value = '';
+    populateTaskCourseSelect('');
+    document.getElementById('task-recurrence').value = 'none';
+    document.getElementById('task-subtasks').value = '';
   }
 
   // Show/hide deadline based on type
@@ -2526,6 +2583,14 @@ function toggleDeadline() {
 
 function saveTask() {
   const editId = document.getElementById('task-edit-id').value;
+  const subLines = document.getElementById('task-subtasks').value.split('\n').map(s => s.trim()).filter(Boolean);
+  let subtasks;
+  if (editId) {
+    const old = (getTasks().find(t => t.id === editId)?.subtasks) || [];
+    subtasks = subLines.map(title => ({ title, done: old.find(o => o.title === title)?.done || false }));
+  } else {
+    subtasks = subLines.map(title => ({ title, done: false }));
+  }
   const data = {
     title: document.getElementById('task-name').value.trim(),
     type: document.getElementById('task-type').value,
@@ -2533,7 +2598,10 @@ function saveTask() {
     xp: document.getElementById('task-xp').value,
     coins: document.getElementById('task-coins').value,
     deadline: document.getElementById('task-deadline').value,
-    note: document.getElementById('task-note').value.trim()
+    note: document.getElementById('task-note').value.trim(),
+    course: document.getElementById('task-course').value,
+    recurrence: document.getElementById('task-recurrence').value,
+    subtasks
   };
 
   if (!data.title) { showToast('请输入任务名称', 'warning'); return; }
@@ -2598,7 +2666,31 @@ function renderTasks() {
   });
 
   const list = document.getElementById('all-tasks-list');
-  list.innerHTML = filtered.map(t => `
+  list.innerHTML = filtered.map(t => {
+    const st = t.subtasks || [];
+    const stDone = st.filter(s => s.done).length;
+    const expanded = _expandedSubtasks.has(t.id);
+    let progressHtml = '';
+    if (st.length) {
+      const pct = Math.round(stDone / st.length * 100);
+      progressHtml = `
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;" onclick="event.stopPropagation(); toggleSubtaskView('${t.id}')">
+          <div style="flex:1;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:var(--neon-cyan);border-radius:2px;"></div>
+          </div>
+          <span style="font-size:0.65rem;color:var(--text-dim);white-space:nowrap;">☑ ${stDone}/${st.length} ${expanded ? '▲' : '▼'}</span>
+        </div>
+        ${expanded ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px;" onclick="event.stopPropagation();">
+          ${st.map((s, i) => `
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.75rem;color:${s.done ? 'var(--text-dim)' : 'var(--text-secondary)'};cursor:pointer;">
+              <input type="checkbox" ${s.done ? 'checked' : ''} onchange="toggleSubtask('${t.id}', ${i})" style="width:auto;" onclick="event.stopPropagation();">
+              <span style="${s.done ? 'text-decoration:line-through;' : ''}">${s.title}</span>
+            </label>`).join('')}
+        </div>` : ''}`;
+    } else if (t.status === 'active') {
+      progressHtml = `<span>进度 ${t.progress || 0}%</span>`;
+    }
+    return `
     <div class="task-item ${t.status === 'completed' ? 'completed' : ''}" onclick="${t.status === 'completed' ? '' : `completeTask('${t.id}')`}">
       <div class="task-check ${t.status === 'completed' ? 'checked' : ''}">${t.status === 'completed' ? '✓' : ''}</div>
       <div class="task-info">
@@ -2606,8 +2698,10 @@ function renderTasks() {
         <div class="task-meta">
           <span class="badge badge-${getTypeColor(t.type)}">${getTypeLabel(t.type)}</span>
           <span class="badge badge-${getPriorityColor(t.priority)}">${getPriorityLabel(t.priority)}</span>
+          ${t.course ? `<span class="badge" style="background:rgba(0,240,255,0.12);border:1px solid rgba(0,240,255,0.4);color:var(--neon-cyan);">📚 ${t.course}</span>` : ''}
+          ${t.recurrence && t.recurrence !== 'none' ? `<span class="badge" style="background:rgba(255,200,0,0.1);border:1px solid rgba(255,200,0,0.35);color:var(--neon-yellow);">🔁 ${{daily:'每天',weekly:'每周',monthly:'每月'}[t.recurrence] || ''}</span>` : ''}
           ${t.deadline ? `<span>📅 ${t.deadline}</span>` : ''}
-          ${t.status === 'active' ? `<span>进度 ${t.progress || 0}%</span>` : ''}
+          ${progressHtml}
         </div>
       </div>
       <div class="task-reward">+${t.xp}XP +${t.coins}💰</div>
@@ -2615,8 +2709,46 @@ function renderTasks() {
         <button class="btn btn-sm" onclick="event.stopPropagation(); openTaskModal('${t.id}')">编辑</button>
         <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteTask('${t.id}'); renderAll();">删除</button>
       </div>
-    </div>
-  `).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无任务，点击右上角"新增任务"开始吧！</div>';
+    </div>`;
+  }).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无任务，点击右上角"新增任务"开始吧！</div>';
+}
+
+// 子任务展开状态（内存级，不持久化）
+const _expandedSubtasks = new Set();
+function toggleSubtaskView(id) {
+  _expandedSubtasks.has(id) ? _expandedSubtasks.delete(id) : _expandedSubtasks.add(id);
+  renderTasks();
+}
+function toggleSubtask(taskId, idx) {
+  const tasks = getTasks();
+  const t = tasks.find(x => x.id === taskId);
+  if (!t || !t.subtasks || !t.subtasks[idx]) return;
+  t.subtasks[idx].done = !t.subtasks[idx].done;
+  const done = t.subtasks.filter(s => s.done).length;
+  t.progress = Math.round(done / t.subtasks.length * 100);
+  saveTasks(tasks);
+  renderTasks();
+  // 子任务全部完成时提示（不自动完成任务）
+  if (done === t.subtasks.length && t.status === 'active') showToast('子任务全部完成，可以勾掉整个任务了！', 'info');
+}
+
+// 任务弹窗：填充「关联课程」下拉（课程名去重）
+function populateTaskCourseSelect(selected) {
+  const sel = document.getElementById('task-course');
+  if (!sel) return;
+  const names = [...new Set(getCourses().map(c => c.name))];
+  sel.innerHTML = '<option value="">不关联</option>' + names.map(n => `<option value="${n}" ${n === selected ? 'selected' : ''}>${n}</option>`).join('');
+}
+
+// 周期任务：计算下一次截止日期
+function nextDeadline(deadline, recurrence) {
+  if (!deadline) return '';
+  const d = new Date(deadline);
+  if (isNaN(d)) return '';
+  if (recurrence === 'daily') d.setDate(d.getDate() + 1);
+  else if (recurrence === 'weekly') d.setDate(d.getDate() + 7);
+  else if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1);
+  return d.toISOString().split('T')[0];
 }
 
 
@@ -3918,6 +4050,38 @@ function renderNextClassBanner() {
     : `正在上课：${next.name} @ ${next.location}`;
   el.innerHTML = `📚 ${txt}`;
   el.style.display = '';
+}
+
+// 今日面板：今日课程时间轴（只读，复用课表数据与样式）
+function renderTodayCourses() {
+  const section = document.getElementById('daily-courses-section');
+  const list = document.getElementById('daily-courses-list');
+  if (!section || !list) return;
+  const week = getCurrentWeek();
+  const todayName = DAY_NAMES[new Date().getDay()];
+  const courses = getCourses().filter(c => c.day === todayName && courseMatches(c, week)).sort((a, b) => a.section - b.section);
+  if (!courses.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  const now = new Date();
+  list.innerHTML = courses.map(c => {
+    const t = getCurrentSchedule()[c.section];
+    const [h, m] = t.start.split(':').map(Number);
+    const startDt = new Date(); startDt.setHours(h, m, 0, 0);
+    const [eh, em] = t.end.split(':').map(Number);
+    const endDt = new Date(); endDt.setHours(eh, em, 0, 0);
+    let status;
+    if (now < startDt) status = `<span class="course-countdown">${Math.round((startDt - now) / 60000)} 分钟后</span>`;
+    else if (now <= endDt) status = `<span class="course-countdown" style="color:var(--neon-orange)">上课中</span>`;
+    else status = `<span class="course-countdown" style="color:var(--text-dim)">已结束</span>`;
+    return `<div class="course-card">
+      <div class="course-time">${t.start}<br>${t.end}</div>
+      <div class="course-body">
+        <div class="course-name">${c.name}</div>
+        <div class="course-meta">📍 ${c.location || '地点待定'} · 第${SEC_CN[c.section - 1]}大节</div>
+      </div>
+      ${status}
+    </div>`;
+  }).join('');
 }
 
 function importCourses() {
