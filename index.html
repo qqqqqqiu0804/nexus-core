@@ -1268,6 +1268,7 @@ label {
       <div>
         <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:2px;">COURSE SCHEDULE</div>
         <div style="font-size:1.4rem;font-weight:bold;color:var(--neon-cyan);margin:4px 0;" id="course-week-label">第 1 周</div>
+        <div style="font-size:0.8rem;color:var(--neon-orange);margin-top:2px;" id="course-season-label"></div>
       </div>
       <div class="course-view-toggle">
         <button class="course-view-btn active" data-view="day" onclick="switchCourseView('day')">📅 日</button>
@@ -1618,7 +1619,25 @@ label {
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-primary btn-sm" onclick="importCourses()" style="padding:4px 12px;">📥 导入/更新课表</button>
-          <button class="btn btn-sm" onclick="switchTab('courses')" style="padding:4px 12px;">📖 查看课表</button>
+            <button class="btn btn-sm" onclick="switchTab('courses')" style="padding:4px 12px;">📖 查看课表</button>
+          </div>
+        </div>
+      </div>
+
+    <!-- 作息季节 -->
+    <div style="margin-top:16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="font-size:1rem;">🕐</span>
+        <span style="font-size:0.85rem;color:var(--text-primary);">作息季节</span>
+      </div>
+      <div class="card" style="padding:12px;">
+        <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:10px;line-height:1.5;">
+          默认按日期自动套用（5–9月夏季，其余春秋冬季）。可手动锁定某套作息以预览课表时间。
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;" id="schedule-mode-group">
+          <button class="btn btn-sm" data-mode="auto" onclick="setScheduleOverride('auto')" style="padding:4px 12px;">🌗 自动</button>
+          <button class="btn btn-sm" data-mode="summer" onclick="setScheduleOverride('summer')" style="padding:4px 12px;">🌤 夏季</button>
+          <button class="btn btn-sm" data-mode="standard" onclick="setScheduleOverride('standard')" style="padding:4px 12px;">🍂 秋季冬季</button>
         </div>
       </div>
     </div>
@@ -3000,6 +3019,7 @@ function renderAll() {
   renderSettings();
   renderPlan();
   renderCourses();
+  renderScheduleModeButtons();
   updatePomodoroTaskSelect();
 }
 
@@ -4394,14 +4414,60 @@ function addPlanTask(plan) {
 
 // === Course Schedule (教务课表集成) ===
 const TERM_START = '2026-09-07'; // 2026-2027-1 第一周周一
-const SECTION_TIME = {
-  1: { start:'08:10', end:'09:50' },
-  2: { start:'10:10', end:'11:50' },
-  3: { start:'14:45', end:'16:25' },
-  4: { start:'16:40', end:'18:20' },
-  5: { start:'19:30', end:'21:10' },
-  6: { start:'21:20', end:'22:05' }
+
+// === 季节作息（统一数据源）===
+// 湖南科技学院官方作息仅两套时间表（来源 huse.edu.cn/mkszyxy/info/1034/1399.htm）：
+//   夏季：5/1–9/30
+//   春秋冬季：1/1–4/30 与 10/1–12/31（学校合并为一张表，秋季直接套用）
+// 大节 = 两节课连排（每节45分钟），与教务系统"节次"字段一一对应。
+// 所有展示/切换逻辑统一走 getCurrentSchedule()，不再散落引用单张表。
+const SCHEDULES = {
+  summer: {
+    key: 'summer',
+    label: '夏季作息',
+    range: '5月1日—9月30日',
+    1: { start:'08:10', end:'09:50' },
+    2: { start:'10:10', end:'11:50' },
+    3: { start:'14:45', end:'16:25' },
+    4: { start:'16:40', end:'18:20' },
+    5: { start:'19:30', end:'21:10' },
+    6: { start:'21:20', end:'22:05' }
+  },
+  standard: { // 春秋冬季（含秋季）
+    key: 'standard',
+    label: '春秋冬季作息',
+    range: '10月1日—次年4月30日',
+    1: { start:'08:20', end:'10:00' },
+    2: { start:'10:20', end:'12:00' },
+    3: { start:'14:30', end:'16:10' },
+    4: { start:'16:25', end:'18:05' },
+    5: { start:'19:10', end:'20:50' },
+    6: { start:'21:00', end:'21:45' }
+  }
 };
+
+// 按日期推算适用哪套作息：5–9月=夏季，其余=春秋冬季
+function scheduleKeyForDate(d = new Date()) {
+  const m = d.getMonth() + 1; // 1–12
+  return (m >= 5 && m <= 9) ? 'summer' : 'standard';
+}
+
+// 当前生效作息（设置页可手动覆盖，用于预览/测试）
+function getCurrentSchedule() {
+  const override = Store.get('scheduleOverride', null); // 'summer' | 'standard' | null
+  return SCHEDULES[override] || SCHEDULES[scheduleKeyForDate()];
+}
+
+// 季节展示名：秋季(10–12月)套用春秋冬季表，但单独标注
+function seasonDisplayName(d = new Date(), key = scheduleKeyForDate(d)) {
+  if (key === 'summer') return '夏季作息';
+  return (d.getMonth() + 1) >= 10 ? '秋季作息' : '冬季作息';
+}
+
+// 季节图标
+function seasonIcon(key = scheduleKeyForDate()) {
+  return key === 'summer' ? '🌤' : '🍂';
+}
 const DAY_NAMES = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
 const SEC_CN = ['一','二','三','四','五','六'];
 
@@ -4457,6 +4523,11 @@ function renderCourses() {
   const week = getCurrentWeek();
   const wl = document.getElementById('course-week-label');
   if (wl) wl.textContent = `第 ${week} 周 · ${getWeekRange(week)}`;
+  const sl = document.getElementById('course-season-label');
+  if (sl) {
+    const key = Store.get('scheduleOverride', null) || scheduleKeyForDate();
+    sl.textContent = `${seasonIcon(key)} ${seasonDisplayName(new Date(), key)} · ${SCHEDULES[key].range}`;
+  }
   document.querySelectorAll('.course-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === _courseView));
   const dayEl = document.getElementById('course-day-view');
   const weekEl = document.getElementById('course-week-view');
@@ -4476,7 +4547,7 @@ function renderCourseDay(week) {
   if (!list.length) { el.innerHTML = `<div class="course-empty">今天（${todayName}）第 ${week} 周无课 🎉</div>`; return; }
   const now = new Date();
   el.innerHTML = list.map(c => {
-    const t = SECTION_TIME[c.section];
+    const t = getCurrentSchedule()[c.section];
     const [h, m] = t.start.split(':').map(Number);
     const startDt = new Date(); startDt.setHours(h, m, 0, 0);
     const [eh, em] = t.end.split(':').map(Number);
@@ -4503,7 +4574,8 @@ function renderCourseWeek(week) {
   let html = '<div class="week-grid"><div class="week-corner"></div>';
   days.forEach(d => html += `<div class="week-head">${d.replace('星期', '周')}</div>`);
   for (let s = 1; s <= 6; s++) {
-    html += `<div class="week-sec">第${SEC_CN[s - 1]}大节<br><span class="week-sec-time">${SECTION_TIME[s].start}-${SECTION_TIME[s].end}</span></div>`;
+    const st = getCurrentSchedule();
+    html += `<div class="week-sec">第${SEC_CN[s - 1]}大节<br><span class="week-sec-time">${st[s].start}-${st[s].end}</span></div>`;
     days.forEach(d => {
       const cs = getCourses().filter(c => c.day === d && c.section === s && courseMatches(c, week));
       const inner = cs.map(c => `<div class="week-cell-course" title="${c.name} @ ${c.location}">${c.name}<br><span class="week-cell-loc">${c.location || ''}</span></div>`).join('');
@@ -4523,16 +4595,16 @@ function renderNextClassBanner() {
   const now = new Date();
   let next = null;
   for (const c of list) {
-    const [eh, em] = SECTION_TIME[c.section].end.split(':').map(Number);
+    const [eh, em] = getCurrentSchedule()[c.section].end.split(':').map(Number);
     const endDt = new Date(); endDt.setHours(eh, em, 0, 0);
     if (now < endDt) { next = c; break; }
   }
   if (!next) { el.style.display = 'none'; return; }
-  const [h, m] = SECTION_TIME[next.section].start.split(':').map(Number);
+  const [h, m] = getCurrentSchedule()[next.section].start.split(':').map(Number);
   const startDt = new Date(); startDt.setHours(h, m, 0, 0);
   const diff = Math.round((startDt - now) / 60000);
   const txt = diff > 0
-    ? `下一节：${next.name} · ${SECTION_TIME[next.section].start} @ ${next.location}（${diff} 分钟后）`
+    ? `下一节：${next.name} · ${getCurrentSchedule()[next.section].start} @ ${next.location}（${diff} 分钟后）`
     : `正在上课：${next.name} @ ${next.location}`;
   el.innerHTML = `📚 ${txt}`;
   el.style.display = '';
@@ -4548,6 +4620,23 @@ function importCourses() {
     renderCourses(); renderNextClassBanner();
     showToast('课表已更新，共 ' + arr.length + ' 条', 'success');
   } catch (e) { showToast('JSON 解析失败，请检查格式', 'error'); }
+}
+
+// 设置作息季节：'auto' 跟随日期，'summer'/'standard' 手动锁定
+function setScheduleOverride(mode) {
+  if (mode === 'auto') Store.set('scheduleOverride', null);
+  else Store.set('scheduleOverride', mode); // 'summer' | 'standard'
+  renderScheduleModeButtons();
+  renderCourses(); renderNextClassBanner();
+  const key = Store.get('scheduleOverride', null) || scheduleKeyForDate();
+  showToast('作息已切换：' + seasonDisplayName(new Date(), key), 'success');
+}
+
+function renderScheduleModeButtons() {
+  const cur = Store.get('scheduleOverride', null) || 'auto';
+  document.querySelectorAll('#schedule-mode-group .btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === cur);
+  });
 }
 
 // === Initialize ===
