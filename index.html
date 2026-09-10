@@ -957,6 +957,24 @@ button:focus-visible { box-shadow: var(--ring); }
       <input type="text" id="journal-arch-search" placeholder="搜索全部日记..." style="flex:1;min-width:120px;" oninput="renderJournalArchive()">
     </div>
     <div id="journal-archive-list"></div>
+
+    <!-- AI 周报（本地 Ollama，经后端 SSE 代理） -->
+    <div class="section-header" style="margin-top:20px;">
+      <span class="section-title">◆ AI 周报</span>
+      <span id="ai-week-status" style="font-size:0.7rem;color:var(--text-dim);"></span>
+    </div>
+    <div class="card" style="padding:12px;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="btn btn-sm" onclick="aiWeekShift(-1)">‹</button>
+        <span id="ai-week-label" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--accent);"></span>
+        <button class="btn btn-sm" onclick="aiWeekShift(1)">›</button>
+        <span style="flex:1;"></span>
+        <input type="text" id="ai-model" placeholder="模型名，如 qwen2.5:7b" style="width:170px;font-size:0.75rem;" onchange="saveAiModel()">
+        <button class="btn btn-primary btn-sm" id="ai-gen-btn" onclick="generateWeeklyReport()">✦ 生成周报</button>
+      </div>
+      <div id="ai-week-output" style="display:none;white-space:pre-wrap;font-size:0.8rem;line-height:1.8;color:var(--text-primary);background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:14px;max-height:420px;overflow-y:auto;"></div>
+    </div>
+    <div id="ai-reports-list"></div>
   </div>
 
   <!-- Panel: Settings -->
@@ -1882,6 +1900,170 @@ function renderJournalArchiveList(el, entries) {
   }).join('');
 }
 
+// === AI 周报（本地 Ollama，经后端 SSE 代理）===
+// 学点：fetch 的 resp.body 是 ReadableStream，SSE 以「data: {...}\n\n」分帧，
+// 边读边解帧、边往页面上追加 token——打字机效果不需要任何库。
+let _aiWeekOffset = 0;
+let _aiGenerating = false;
+
+function mondayOf(d) { const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); return x; }
+function aiWeekRange(offset) {
+  const m = mondayOf(new Date());
+  m.setDate(m.getDate() + offset * 7);
+  const e = new Date(m); e.setDate(e.getDate() + 6);
+  return { start: m.toISOString().split('T')[0], end: e.toISOString().split('T')[0] };
+}
+function aiWeekShift(d) { _aiWeekOffset += d; renderAiWeek(); }
+function saveAiModel() {
+  Store.set('aiModel', document.getElementById('ai-model').value.trim());
+  showToast('模型已保存', 'info');
+}
+
+function renderAiWeek() {
+  const range = aiWeekRange(_aiWeekOffset);
+  const labelEl = document.getElementById('ai-week-label');
+  if (labelEl) labelEl.textContent = `${range.start} ~ ${range.end}`;
+  const modelEl = document.getElementById('ai-model');
+  if (modelEl && document.activeElement !== modelEl) modelEl.value = Store.get('aiModel', '');
+  renderAiReports();
+}
+
+// 收集一周数据（全部来自 localStorage：前端是数据真相源，后端只当 AI 网关）
+function collectWeekData(range) {
+  const dates = [];
+  const d = new Date(range.start + 'T00:00:00');
+  const end = new Date(range.end + 'T00:00:00');
+  while (d <= end) { dates.push(d.toISOString().split('T')[0]); d.setDate(d.getDate() + 1); }
+
+  const dailyLog = Store.get('dailyLog', {});
+  const journal = Store.get('journal', {});
+  const sleep = Store.get('sleep', {});
+  const habits = Store.get('habits', { templates: [], logs: {} });
+  const habitTotal = (habits.templates || []).filter(t => t.enabled).length;
+  const WD = ['日','一','二','三','四','五','六'];
+
+  const days = dates.map(date => {
+    const log = dailyLog[date] || {};
+    const txns = (Store.get('wallet', { transactions: [] }).transactions || []).filter(t => (t.date || '').slice(0, 10) === date);
+    const expense = txns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    const incomeTx = txns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+    const logs = (habits.logs || {})[date] || {};
+    const sl = sleep[date] || {};
+    let diary = journal[date] || '';
+    if (typeof diary !== 'string') diary = diary.text || '';
+    if (diary.length > 1200) diary = diary.slice(0, 1200) + '…(截断)';
+    return {
+      date, weekday: '周' + WD[new Date(date + 'T00:00:00').getDay()],
+      tasksDone: (Store.get('completionLog', {})[date]) || 0,
+      expense: Math.round(expense * 10) / 10, income: Math.round(incomeTx * 10) / 10,
+      sleep: sl.bed ? `${sl.bed}-${sl.wake || '?'}` : '',
+      habits: habitTotal ? `${Object.values(logs).filter(v => v).length}/${habitTotal}` : '',
+      diary
+    };
+  });
+
+  const tasks = getTasks().filter(t => t.status === 'completed' && (t.completedAt || '').slice(0, 10) >= range.start && (t.completedAt || '').slice(0, 10) <= range.end);
+  const cat = {};
+  (Store.get('wallet', { transactions: [] }).transactions || []).forEach(t => {
+    if (t.type === 'expense' && (t.date || '').slice(0, 10) >= range.start && (t.date || '').slice(0, 10) <= range.end) {
+      cat[t.category || '其他'] = Math.round(((cat[t.category || '其他'] || 0) + t.amount) * 10) / 10;
+    }
+  });
+  const incomeTotal = days.reduce((s, x) => s + x.income, 0);
+  const expenseTotal = days.reduce((s, x) => s + x.expense, 0);
+  return { range: `${range.start} ~ ${range.end}`, days, completedTasks: tasks.map(t => t.title).slice(0, 40), expenseByCategory: cat, incomeTotal: Math.round(incomeTotal * 10) / 10, expenseTotal: Math.round(expenseTotal * 10) / 10 };
+}
+
+async function generateWeeklyReport() {
+  if (_aiGenerating) { showToast('正在生成中，稍等', 'info'); return; }
+  if (!journalApiOn()) { showToast('AI 周报需要本地后端：先在「我的」配置并启动 server', 'warning'); return; }
+  const model = Store.get('aiModel', '') || 'qwen2.5:7b';
+  const range = aiWeekRange(_aiWeekOffset);
+  const data = collectWeekData(range);
+  const user = `以下是我（一名学生）${data.range} 一周的真实数据，请生成一份周报，包含四部分，用 emoji 小标题（纯文本，不要 markdown 表格）：
+📊 完成情况（量化+点评）
+💰 收支观察（分类花销是否合理）
+📔 日记亮点（引用 1-2 句原文）
+💡 下周建议（2-3 条，具体可执行，不要空话）
+
+数据（JSON）：
+${JSON.stringify(data)}`;
+
+  _aiGenerating = true;
+  const btn = document.getElementById('ai-gen-btn');
+  const status = document.getElementById('ai-week-status');
+  const out = document.getElementById('ai-week-output');
+  btn.disabled = true;
+  status.textContent = '收集数据 → 请求 Ollama…';
+  out.style.display = 'block';
+  out.textContent = '';
+
+  try {
+    const { base } = journalApiCfg();
+    const resp = await fetch(`${base}/api/ai/weekly`, {
+      method: 'POST', headers: journalHeaders(),
+      body: JSON.stringify({ model, user, system: '你是学生的个人周报助手。语言简洁具体，不说空话套话，引用数据要忠实于输入。' })
+    });
+    if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status);
+
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '', content = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const frame = buf.slice(0, idx).trim(); buf = buf.slice(idx + 2);
+        if (!frame.startsWith('data:')) continue;
+        try {
+          const { event, data: payload } = JSON.parse(frame.slice(5).trim());
+          if (event === 'token') { content += payload; out.textContent = content; out.scrollTop = out.scrollHeight; status.textContent = `生成中… ${content.length} 字`; }
+          else if (event === 'error') { status.textContent = '出错'; out.textContent += (out.textContent ? '\n\n' : '') + '⚠ ' + payload; showToast('生成失败：' + payload, 'error'); }
+        } catch { /* 忽略残帧 */ }
+      }
+    }
+    if (content.trim()) {
+      const reports = Store.get('aiReports', []);
+      reports.unshift({ id: 'r' + Date.now(), range: data.range, model, createdAt: new Date().toLocaleString('zh-CN'), content });
+      Store.set('aiReports', reports.slice(0, 30));
+      status.textContent = '已保存 ✓';
+      showToast('周报已生成并保存', 'success');
+      renderAiReports();
+    } else if (status.textContent !== '出错') {
+      status.textContent = '未产生内容';
+    }
+  } catch (e) {
+    status.textContent = '失败';
+    out.textContent = '⚠ ' + e.message;
+    showToast('生成失败：' + e.message, 'error');
+  } finally {
+    _aiGenerating = false;
+    btn.disabled = false;
+  }
+}
+
+function renderAiReports() {
+  const list = document.getElementById('ai-reports-list');
+  if (!list) return;
+  const reports = Store.get('aiReports', []);
+  if (!reports.length) return;
+  list.innerHTML = `<div style="font-size:0.7rem;color:var(--text-dim);margin:10px 0 6px;">往期周报（存于本机）</div>` + reports.map(r => `
+    <details class="card" style="padding:10px;margin-bottom:8px;">
+      <summary style="cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center;">
+        <span style="font-family:var(--font-mono);color:var(--accent);font-size:0.75rem;white-space:nowrap;">${r.range}</span>
+        <span style="flex:1;font-size:0.72rem;color:var(--text-dim);">${r.model} · ${r.createdAt}</span>
+        <button class="btn btn-sm btn-danger" onclick="event.preventDefault();deleteAiReport('${r.id}')" style="padding:1px 8px;font-size:0.65rem;">✕</button>
+      </summary>
+      <div style="white-space:pre-wrap;font-size:0.8rem;color:var(--text-primary);line-height:1.7;padding:10px 2px 2px;border-top:1px solid var(--border-subtle);margin-top:8px;">${r.content}</div>
+    </details>`).join('');
+}
+function deleteAiReport(id) {
+  Store.set('aiReports', Store.get('aiReports', []).filter(r => r.id !== id));
+  renderAiReports();
+}
+
 // --- Tab Switch Helper ---
 function switchTab(panel) {
   document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
@@ -2216,6 +2398,7 @@ function renderAll() {
   renderSettings();
   renderCourses();
   renderJournalArchive();
+  renderAiWeek();
   renderScheduleModeButtons();}
 
 // 等级/积分展示现统一由 renderSettings() 渲染到「我的」面板（原 dashboard 面板已移除）

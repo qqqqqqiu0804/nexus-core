@@ -121,9 +121,78 @@ app.post('/api/entries/import', wrap(req => {
   return { ok: true, imported: valid.length, skipped: list.length - valid.length };
 }));
 
+// POST /api/ai/weekly —— AI 周报（流式）。
+// 学点：SSE（Server-Sent Events）。前端 fetch 拿到的不是一次性 JSON，
+// 而是 ReadableStream——后端从 Ollama 的 JSON-lines 流里逐个抠出 token，
+// 以 `data: {...}\n\n` 的格式边收边转发，前端打字机效果就是这么来的。
+// Ollama 是本地进程，浏览器直连会被 CORS 拦，所以由后端代理（后端没有同源限制）。
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+
+app.post('/api/ai/weekly', async (req, res) => {
+  const { model = 'qwen2.5:7b', system, user } = req.body || {};
+  if (!user) { res.status(400).json({ error: '缺少 user 提示词' }); return; }
+
+  // SSE 响应头：text/event-stream 是协议约定，no-cache 禁止中间层缓冲
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': CORS_ORIGIN
+  });
+  const send = (event, data) => res.write(`data: ${JSON.stringify({ event, data })}\n\n`);
+
+  let ollamaRes;
+  try {
+    ollamaRes = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        stream: true,
+        messages: [
+          { role: 'system', content: system || '你是学生的个人周报助手，用简洁的中文输出。' },
+          { role: 'user', content: user }
+        ]
+      })
+    });
+    if (!ollamaRes.ok) {
+      const errText = await ollamaRes.text().catch(() => '');
+      send('error', `Ollama 返回 ${ollamaRes.status}：${errText.slice(0, 200)}（模型名是否正确？）`);
+      return res.end();
+    }
+  } catch (e) {
+    send('error', `连不上 Ollama（${OLLAMA_URL}）：${e.message}。确认已运行 ollama serve。`);
+    return res.end();
+  }
+
+  // Ollama 的流是「每行一个 JSON」；逐行解析，只转发新增的文字
+  const decoder = new TextDecoder();
+  let buf = '';
+  try {
+    for await (const chunk of ollamaRes.body) {
+      buf += decoder.decode(chunk, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, idx).trim();
+        buf = buf.slice(idx + 1);
+        if (!line) continue;
+        try {
+          const j = JSON.parse(line);
+          if (j.message?.content) send('token', j.message.content);
+          if (j.done) send('done', { total_duration: j.total_duration });
+        } catch { /* 忽略不完整行 */ }
+      }
+    }
+  } catch (e) {
+    send('error', `流中断：${e.message}`);
+  }
+  res.end();
+});
+
 app.listen(PORT, () => {
   console.log(`[nexus-core server] 已启动 → http://localhost:${PORT}`);
   console.log(`  日记 API: http://localhost:${PORT}/api/entries`);
+  console.log(`  AI 周报:  POST ${PORT === 80 ? '' : ':' + PORT}/api/ai/weekly (SSE) → Ollama ${OLLAMA_URL}`);
   console.log(`  CORS 放行: ${CORS_ORIGIN}`);
   console.log(`  数据库: ${path.join(__dirname, 'journal.db')}`);
 });
