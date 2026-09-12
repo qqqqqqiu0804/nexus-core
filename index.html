@@ -586,8 +586,22 @@ button:focus-visible { box-shadow: var(--ring); }
 
 /* === Course Schedule === */
 .course-view-toggle { display:flex; gap:6px; }
-.course-view-btn { background:var(--bg-card); border:1px solid rgba(255,255,255,0.1); color:var(--text-secondary); padding:6px 14px; border-radius:6px; font-size:0.8rem; cursor:pointer; transition:.2s; }
+.course-view-btn { background:var(--bg-card); border:1px solid var(--border-subtle); color:var(--text-secondary); padding:6px 14px; border-radius:6px; font-size:0.8rem; cursor:pointer; transition:.2s; }
 .course-view-btn.active { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+/* 预告视图：明天 + 下周 */
+.forecast-block { margin-bottom: 22px; }
+.forecast-title { display:flex; align-items:baseline; gap:8px; margin-bottom:10px; }
+.forecast-title .ft-main { font-size:0.95rem; font-weight:600; color:var(--text-primary); }
+.forecast-title .ft-sub { font-size:0.72rem; color:var(--text-dim); font-family:var(--font-mono); }
+.forecast-day { margin-bottom:14px; }
+.forecast-day-head { display:flex; align-items:center; gap:8px; font-size:0.78rem; color:var(--text-secondary); margin-bottom:6px; }
+.forecast-day-head .fd-tag { font-family:var(--font-mono); color:var(--accent); }
+.forecast-day-head .fd-none { color:var(--text-dim); font-size:0.72rem; }
+.forecast-row { display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--border-subtle); border-left:2px solid var(--accent); border-radius:var(--radius-sm); padding:8px 12px; margin-bottom:6px; font-size:0.8rem; }
+.forecast-row .fr-time { font-family:var(--font-mono); font-size:0.72rem; color:var(--accent); white-space:nowrap; }
+.forecast-row .fr-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.forecast-row .fr-loc { font-size:0.7rem; color:var(--text-dim); white-space:nowrap; }
+.forecast-off { font-size:0.72rem; color:var(--text-dim); padding:8px 0; }
 .course-card { display:flex; gap:12px; align-items:center; background:var(--bg-card); border-left:3px solid var(--accent); border-radius:8px; padding:12px; margin-bottom:10px; }
 .course-time { font-family:var(--font-mono); font-size:0.8rem; color:var(--accent); text-align:center; min-width:48px; line-height:1.3; }
 .course-body { flex:1; min-width:0; }
@@ -658,6 +672,9 @@ button:focus-visible { box-shadow: var(--ring); }
       </div>
       <div id="daily-courses-list"></div>
     </div>
+
+    <!-- ⓪.6 明日预告（一行摘要，点击进课表预告视图看下周） -->
+    <div id="daily-tomorrow-hint" class="card" style="display:none;padding:10px 14px;margin-bottom:12px;cursor:pointer;font-size:0.8rem;" onclick="switchTab('courses');switchCourseView('forecast')"></div>
 
     <!-- ② Time Allocation -->
     <div class="daily-section">
@@ -787,10 +804,12 @@ button:focus-visible { box-shadow: var(--ring); }
       <div class="course-view-toggle">
         <button class="course-view-btn active" data-view="day" onclick="switchCourseView('day')">📅 日</button>
         <button class="course-view-btn" data-view="week" onclick="switchCourseView('week')">🗓 周</button>
+        <button class="course-view-btn" data-view="forecast" onclick="switchCourseView('forecast')">⏭ 预告</button>
       </div>
     </div>
     <div id="course-day-view"></div>
     <div id="course-week-view" style="display:none;"></div>
+    <div id="course-forecast-view" style="display:none;"></div>
   </div>
 
 
@@ -1495,6 +1514,9 @@ function renderDailyHub() {
 
   // ⓪.5 Today's Courses
   renderTodayCourses();
+
+  // ⓪.6 明日预告
+  renderDailyTomorrowHint();
 
   // ② Time Allocation
   renderTimeAlloc();
@@ -3512,11 +3534,15 @@ const DEFAULT_COURSES = [
 
 function getCourses() { return Store.get('courses', DEFAULT_COURSES); }
 
-function getCurrentWeek() {
+// 按任意日期算学期周次（明天/下周可能跨周，必须带日期参数）
+function weekForDate(date) {
+  const d = new Date(date);
+  const midnight = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const start = new Date(TERM_START + 'T00:00:00');
-  const days = Math.floor((new Date() - start) / 86400000);
+  const days = Math.floor((midnight - start) / 86400000);
   return Math.max(1, Math.floor(days / 7) + 1);
 }
+function getCurrentWeek() { return weekForDate(new Date()); }
 
 function getWeekRange(week) {
   const d = new Date(new Date(TERM_START + 'T00:00:00').getTime() + (week - 1) * 7 * 86400000);
@@ -3543,13 +3569,61 @@ function renderCourses() {
   document.querySelectorAll('.course-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === _courseView));
   const dayEl = document.getElementById('course-day-view');
   const weekEl = document.getElementById('course-week-view');
-  if (_courseView === 'day') {
-    dayEl.style.display = ''; weekEl.style.display = 'none';
-    renderCourseDay(week);
-  } else {
-    dayEl.style.display = 'none'; weekEl.style.display = '';
-    renderCourseWeek(week);
+  const fcEl = document.getElementById('course-forecast-view');
+  dayEl.style.display = _courseView === 'day' ? '' : 'none';
+  weekEl.style.display = _courseView === 'week' ? '' : 'none';
+  if (fcEl) fcEl.style.display = _courseView === 'forecast' ? '' : 'none';
+  if (_courseView === 'day') renderCourseDay(week);
+  else if (_courseView === 'week') renderCourseWeek(week);
+  else renderCourseForecast();
+}
+
+// 预告视图：明天 + 下周（跨周用 weekForDate 按日期算周次）
+function fmtMD(d) { return (d.getMonth() + 1) + '/' + d.getDate(); }
+function courseRow(c) {
+  const t = getCurrentSchedule()[c.section];
+  return `<div class="forecast-row">
+    <span class="fr-time">${t.start}-${t.end}</span>
+    <span class="fr-name">${c.name}</span>
+    <span class="fr-loc">${c.location || ''}</span>
+  </div>`;
+}
+function renderCourseForecast() {
+  const el = document.getElementById('course-forecast-view');
+  if (!el) return;
+  const courses = getCourses();
+
+  // ---- 明天 ----
+  const tm = new Date(); tm.setDate(tm.getDate() + 1);
+  const tWeek = weekForDate(tm);
+  const tName = DAY_NAMES[tm.getDay()];
+  const tList = courses.filter(c => c.day === tName && courseMatches(c, tWeek)).sort((a, b) => a.section - b.section);
+  let html = `<div class="forecast-block">
+    <div class="forecast-title"><span class="ft-main">明天</span><span class="ft-sub">${fmtMD(tm)} ${tName} · 第 ${tWeek} 周</span></div>
+    ${tList.length ? tList.map(courseRow).join('') : '<div class="forecast-off">明天没有课</div>'}
+  </div>`;
+
+  // ---- 下周（下周一为基准，7 天全列）----
+  const today = new Date();
+  const dow = (today.getDay() + 6) % 7; // 周一=0
+  const nextMon = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dow + 7);
+  const nWeek = weekForDate(nextMon);
+  html += `<div class="forecast-block">
+    <div class="forecast-title"><span class="ft-main">下周</span><span class="ft-sub">第 ${nWeek} 周 · ${fmtMD(nextMon)} ~ ${fmtMD(new Date(nextMon.getTime() + 6 * 86400000))}</span></div>`;
+  let total = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(nextMon.getTime() + i * 86400000);
+    const name = DAY_NAMES[d.getDay()];
+    const list = courses.filter(c => c.day === name && courseMatches(c, nWeek)).sort((a, b) => a.section - b.section);
+    total += list.length;
+    html += `<div class="forecast-day">
+      <div class="forecast-day-head"><span class="fd-tag">${fmtMD(d)} ${name}</span>${list.length ? '' : '<span class="fd-none">无课</span>'}</div>
+      ${list.map(courseRow).join('')}
+    </div>`;
   }
+  if (!total) html += '<div class="forecast-off">这一周暂无课程安排（可能已停课或进入假期）</div>';
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function renderCourseDay(week) {
@@ -3652,6 +3726,29 @@ function renderTodayCourses() {
       ${status}
     </div>`;
   }).join('');
+}
+
+// 今日面板的「明日预告」一行（点击进课表预告视图）
+function renderDailyTomorrowHint() {
+  const el = document.getElementById('daily-tomorrow-hint');
+  if (!el) return;
+  const tm = new Date(); tm.setDate(tm.getDate() + 1);
+  const week = weekForDate(tm);
+  const name = DAY_NAMES[tm.getDay()];
+  const list = getCourses().filter(c => c.day === name && courseMatches(c, week)).sort((a, b) => a.section - b.section);
+  const head = `<span style="font-family:var(--font-mono);color:var(--accent);">${fmtMD(tm)} ${name}</span>`;
+  if (!list.length) {
+    el.innerHTML = `<div style="display:flex;gap:8px;align-items:center;"><span style="color:var(--text-secondary);">明天</span>${head}<span style="color:var(--text-dim);">没有课</span></div>`;
+  } else {
+    const t = getCurrentSchedule()[list[0].section];
+    el.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <span style="color:var(--text-secondary);">明天</span>${head}
+      <span style="color:var(--text-primary);">${list.length} 节课</span>
+      <span style="color:var(--text-dim);">首节 ${t.start} ${list[0].name}</span>
+      <span style="color:var(--text-dim);margin-left:auto;white-space:nowrap;">查看下周 →</span>
+    </div>`;
+  }
+  el.style.display = '';
 }
 
 function importCourses() {
