@@ -889,7 +889,6 @@ button:focus-visible { box-shadow: var(--ring); }
           <option value="生活">生活</option>
           <option value="其他">其他</option>
         </select>
-        <input type="datetime-local" id="wallet-when" style="width: 190px;" title="可以选择过去的日期时间补记">
         <input type="text" id="wallet-note" placeholder="备注（可选）" style="flex: 1; min-width: 150px;">
         <button class="btn btn-primary" onclick="addTransaction()">记一笔</button>
       </div>
@@ -1094,13 +1093,6 @@ button:focus-visible { box-shadow: var(--ring); }
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:1rem;">📥</span>
           <span style="flex:1;font-size:0.85rem;">导入数据</span>
-          <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
-        </div>
-      </div>
-      <div class="card" style="cursor:pointer;padding:12px;margin-top:8px;" onclick="copyDataToClipboard()">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:1rem;">📋</span>
-          <span style="flex:1;font-size:0.85rem;">复制数据（手机推荐）</span>
           <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
         </div>
       </div>
@@ -1503,33 +1495,7 @@ function initData() {
 }
 
 // === Daily Hub Functions ===
-// ===== 本地时间工具 =====
-// 坑：toISOString() 返回的是 UTC。北京时间（UTC+8）在 0:00–7:59 之间，
-// 它的日期部分还是「昨天」——所有「今天」的判断都会错位一天。
-// 以下函数一律按本地时间计算；新写入的时间戳用 localStamp()（不带 Z = 按本地解析）。
-function localDate(d = new Date()) {
-  const x = new Date(d);
-  return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
-}
-function localHM(d = new Date()) {
-  const x = new Date(d);
-  return String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0');
-}
-function localStamp(d = new Date()) {
-  const x = new Date(d);
-  return localDate(x) + 'T' + String(x.getHours()).padStart(2, '0') + ':' + String(x.getMinutes()).padStart(2, '0') + ':' + String(x.getSeconds()).padStart(2, '0');
-}
-// 解析任意历史时间戳：纯日期按本地零点、无 Z 按本地、带 Z 按 UTC（兼容旧数据）
-function parseStamp(v) {
-  if (!v) return null;
-  const str = String(v);
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(str) ? new Date(str + 'T00:00:00') : new Date(str);
-  return isNaN(d.getTime()) ? null : d;
-}
-function dateOf(v) { const d = parseStamp(v); return d ? localDate(d) : ''; }
-function timeOf(v) { const d = parseStamp(v); return d ? localHM(d) : ''; }
-
-const TODAY = () => localDate();
+const TODAY = () => new Date().toISOString().split('T')[0];
 
 function renderDailyHub() {
   const today = TODAY();
@@ -1810,7 +1776,7 @@ function renderDailyExpense() {
   const today = TODAY();
   let exp = 0, inc = 0;
   (wallet.transactions || []).forEach(t => {
-    const d = dateOf(t.date);
+    const d = t.date ? t.date.slice(0,10) : '';
     if (d === today) {
       if (t.type === 'expense') exp += t.amount;
       else inc += t.amount;
@@ -1967,7 +1933,7 @@ function aiWeekRange(offset) {
   const m = mondayOf(new Date());
   m.setDate(m.getDate() + offset * 7);
   const e = new Date(m); e.setDate(e.getDate() + 6);
-  return { start: localDate(m), end: localDate(e) };
+  return { start: m.toISOString().split('T')[0], end: e.toISOString().split('T')[0] };
 }
 function aiWeekShift(d) { _aiWeekOffset += d; renderAiWeek(); }
 function saveAiModel() {
@@ -1989,7 +1955,7 @@ function collectWeekData(range) {
   const dates = [];
   const d = new Date(range.start + 'T00:00:00');
   const end = new Date(range.end + 'T00:00:00');
-  while (d <= end) { dates.push(localDate(d)); d.setDate(d.getDate() + 1); }
+  while (d <= end) { dates.push(d.toISOString().split('T')[0]); d.setDate(d.getDate() + 1); }
 
   const dailyLog = Store.get('dailyLog', {});
   const journal = Store.get('journal', {});
@@ -2000,7 +1966,7 @@ function collectWeekData(range) {
 
   const days = dates.map(date => {
     const log = dailyLog[date] || {};
-    const txns = (Store.get('wallet', { transactions: [] }).transactions || []).filter(t => dateOf(t.date) === date);
+    const txns = (Store.get('wallet', { transactions: [] }).transactions || []).filter(t => (t.date || '').slice(0, 10) === date);
     const expense = txns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     const incomeTx = txns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const logs = (habits.logs || {})[date] || {};
@@ -2021,8 +1987,7 @@ function collectWeekData(range) {
   const tasks = getTasks().filter(t => t.status === 'completed' && (t.completedAt || '').slice(0, 10) >= range.start && (t.completedAt || '').slice(0, 10) <= range.end);
   const cat = {};
   (Store.get('wallet', { transactions: [] }).transactions || []).forEach(t => {
-    const dd = dateOf(t.date);
-    if (t.type === 'expense' && dd >= range.start && dd <= range.end) {
+    if (t.type === 'expense' && (t.date || '').slice(0, 10) >= range.start && (t.date || '').slice(0, 10) <= range.end) {
       cat[t.category || '其他'] = Math.round(((cat[t.category || '其他'] || 0) + t.amount) * 10) / 10;
     }
   });
@@ -2240,7 +2205,7 @@ function addTask(taskData) {
     availableFrom: TODAY(),
     progress: 0,
     status: 'active', // active, completed, failed
-    createdAt: localStamp(),
+    createdAt: new Date().toISOString(),
     completedAt: null
   };
   tasks.push(task);
@@ -2268,7 +2233,7 @@ function completeTask(id) {
   if (!task || task.status === 'completed') return;
 
   task.status = 'completed';
-  task.completedAt = localStamp();
+  task.completedAt = new Date().toISOString();
   task.progress = 100;
   saveTasks(tasks);
 
@@ -2277,7 +2242,7 @@ function completeTask(id) {
   addCoins(task.coins);
 
   // Update completion log
-  const today = TODAY();
+  const today = new Date().toISOString().split('T')[0];
   const log = Store.get('completionLog', {});
   log[today] = (log[today] || 0) + 1;
   Store.set('completionLog', log);
@@ -2298,7 +2263,7 @@ function completeTask(id) {
       subtasks: (task.subtasks || []).map(s => ({ title: s.title, done: false })),
       deadline: nextDeadline(task.deadline, task.recurrence),
       availableFrom: nextOccurrenceDate(task.recurrence),
-      createdAt: localStamp(),
+      createdAt: new Date().toISOString(),
       completedAt: null
     });
     saveTasks(tasks);
@@ -2310,8 +2275,8 @@ function completeTask(id) {
 
 function updateStreak() {
   const profile = Store.get('profile');
-  const today = TODAY();
-  const yesterday = localDate(Date.now() - 86400000);
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
   if (profile.lastCheckin === today) return; // Already checked today
 
@@ -2575,7 +2540,7 @@ function nextOccurrenceDate(recurrence) {
   if (recurrence === 'daily') d.setDate(d.getDate() + 1);
   else if (recurrence === 'weekly') d.setDate(d.getDate() + 7);
   else if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1);
-  return localDate(d);
+  return d.toISOString().split('T')[0];
 }
 
 // 周期任务：计算下一次截止日期
@@ -2586,7 +2551,7 @@ function nextDeadline(deadline, recurrence) {
   if (recurrence === 'daily') d.setDate(d.getDate() + 1);
   else if (recurrence === 'weekly') d.setDate(d.getDate() + 7);
   else if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1);
-  return localDate(d);
+  return d.toISOString().split('T')[0];
 }
 
 
@@ -2604,7 +2569,7 @@ function renderStats() {
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(Date.now() - i * 86400000);
-    const key = localDate(d);
+    const key = d.toISOString().split('T')[0];
     const day = d.getDay();
     days.push({ label: `周${dayNames[day]}`, date: key, count: log[key] || 0 });
   }
@@ -2612,7 +2577,7 @@ function renderStats() {
   breakdown.innerHTML = days.map(d => {
     const maxH = Math.max(1, ...days.map(x => x.count));
     const h = d.count > 0 ? (d.count / maxH) * 100 : 4;
-    const isToday = d.date === TODAY();
+    const isToday = d.date === new Date().toISOString().split('T')[0];
     return `
       <div style="text-align: center; flex: 1;">
         <div style="font-size: 0.8rem; font-weight: bold; color: ${isToday ? 'var(--accent)' : 'var(--text-secondary)'};">${d.count}</div>
@@ -2673,7 +2638,7 @@ function drawWeeklyChart(days) {
     const barH = (d.count / maxVal) * 120;
     const y = h - 20 - barH;
 
-    const isToday = d.date === TODAY();
+    const isToday = d.date === new Date().toISOString().split('T')[0];
 
     // Bar
     const gradient = ctx.createLinearGradient(x, y, x, h - 20);
@@ -2922,8 +2887,6 @@ function setWalletType(type) {
 }
 
 function renderWallet() {
-  const whenEl = document.getElementById('wallet-when');
-  if (whenEl && !whenEl.value) whenEl.value = localStamp().slice(0, 16);
   const wallet = Store.get('wallet', { balance: 0, initialSet: false, transactions: [] });
   if (!wallet.transactions) wallet.transactions = [];
 
@@ -2941,11 +2904,11 @@ function renderWallet() {
 
   // Stats
   const now = new Date();
-  const todayStr = localDate(now);
+  const todayStr = now.toISOString().split('T')[0];
   const monthStr = todayStr.slice(0, 7);
   let todayExp = 0, todayInc = 0, monthExp = 0, monthInc = 0;
   wallet.transactions.forEach(t => {
-    const tDate = dateOf(t.date);
+    const tDate = t.date ? t.date.slice(0, 10) : '';
     if (t.type === 'expense') {
       if (tDate === todayStr) todayExp += t.amount;
       if (tDate.slice(0, 7) === monthStr) monthExp += t.amount;
@@ -3039,14 +3002,14 @@ function renderHistory() {
   Object.keys(completionLog).forEach(d => allDates.add(d));
   Object.keys(sleep).forEach(d => allDates.add(d));
   Object.keys(timeAlloc).forEach(d => allDates.add(d));
-  (wallet.transactions || []).forEach(t => { const dd = dateOf(t.date); if (dd) allDates.add(dd); });
+  (wallet.transactions || []).forEach(t => { if (t.date) allDates.add(t.date.slice(0,10)); });
 
   // Filter
   let dates = [...allDates].sort((a,b) => b.localeCompare(a));
 
   if (_historyFilter === 'calories') dates = dates.filter(d => dailyLog[d]?.meals?.length > 0);
   else if (_historyFilter === 'habits') dates = dates.filter(d => habits.logs[d] && Object.values(habits.logs[d]).some(v => v));
-  else if (_historyFilter === 'expense') dates = dates.filter(d => (wallet.transactions||[]).some(t => dateOf(t.date) === d && t.type === 'expense'));
+  else if (_historyFilter === 'expense') dates = dates.filter(d => (wallet.transactions||[]).some(t => t.date?.slice(0,10) === d && t.type === 'expense'));
   else if (_historyFilter === 'journal') dates = dates.filter(d => journal[d]?.trim());
 
   // Update header
@@ -3081,7 +3044,7 @@ function renderHistory() {
     const tasksDone = completionLog[date] || 0;
 
     // Expense
-    const dayExp = (wallet.transactions||[]).filter(t => dateOf(t.date) === date && t.type === 'expense').reduce((s,t) => s + t.amount, 0);
+    const dayExp = (wallet.transactions||[]).filter(t => t.date?.slice(0,10) === date && t.type === 'expense').reduce((s,t) => s + t.amount, 0);
 
     // Journal preview
     const journalText = journal[date] || '';
@@ -3156,7 +3119,7 @@ function showDayDetail(date) {
   }
 
   // Expense
-  const dayTxns = (wallet.transactions||[]).filter(t => dateOf(t.date) === date);
+  const dayTxns = (wallet.transactions||[]).filter(t => t.date?.slice(0,10) === date);
   if (dayTxns.length > 0) {
     const exp = dayTxns.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0);
     const inc = dayTxns.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
@@ -3193,17 +3156,17 @@ function renderWalletHistory() {
   const txns = wallet.transactions || [];
   const filter = document.getElementById('wallet-filter')?.value || 'all';
   const now = new Date();
-  const todayStr = localDate(now);
+  const todayStr = now.toISOString().split('T')[0];
   const weekAgo = new Date(Date.now() - 7 * 86400000);
   const monthStr = todayStr.slice(0, 7);
 
   let filtered = txns;
   if (filter === 'today') {
-    filtered = txns.filter(t => dateOf(t.date) === todayStr);
+    filtered = txns.filter(t => t.date && t.date.slice(0, 10) === todayStr);
   } else if (filter === 'week') {
     filtered = txns.filter(t => t.date && new Date(t.date) >= weekAgo);
   } else if (filter === 'month') {
-    filtered = txns.filter(t => dateOf(t.date).slice(0, 7) === monthStr);
+    filtered = txns.filter(t => t.date && t.date.slice(0, 7) === monthStr);
   }
 
   // Sort by date desc
@@ -3218,14 +3181,14 @@ function renderWalletHistory() {
   // Group by date
   const grouped = {};
   filtered.forEach(t => {
-    const day = dateOf(t.date) || '未知';
+    const day = t.date ? t.date.slice(0, 10) : '未知';
     if (!grouped[day]) grouped[day] = [];
     grouped[day].push(t);
   });
 
   const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
   list.innerHTML = Object.entries(grouped).map(([day, items]) => {
-    const d = parseStamp(day);
+    const d = new Date(day);
     const isToday = day === todayStr;
     const dayLabel = isToday ? '今天' : `周${dayNames[d.getDay()] || '?'}`;
     const dateLabel = `${d.getMonth() + 1}/${d.getDate()}`;
@@ -3247,7 +3210,7 @@ function renderWalletHistory() {
             </div>
             <div style="flex: 1; min-width: 0;">
               <div style="font-size: 0.85rem; color: var(--text-primary);">${t.category || '其他'}${t.note ? ' · ' + t.note : ''}</div>
-              <div style="font-size: 0.65rem; color: var(--text-dim); font-family: var(--font-mono);">${timeOf(t.date)}</div>
+              <div style="font-size: 0.65rem; color: var(--text-dim); font-family: var(--font-mono);">${t.date ? t.date.slice(11, 16) : ''}</div>
             </div>
             <div style="font-size: 0.9rem; font-weight: bold; color: ${t.type === 'expense' ? 'var(--expense)' : 'var(--success)'}; font-family: var(--font-mono);">
               ${t.type === 'expense' ? '-' : '+'}¥${t.amount.toFixed(2)}
@@ -3269,16 +3232,13 @@ function addTransaction() {
   const wallet = Store.get('wallet', { balance: 0, initialSet: false, transactions: [] });
   if (!wallet.transactions) wallet.transactions = [];
 
-  // 记账时间：默认当前本地时间，可选过去（补记）。存本地时间串（不带 Z = 按本地解析）
-  const whenEl = document.getElementById('wallet-when');
-  const whenVal = (whenEl && whenEl.value) ? whenEl.value : localStamp().slice(0, 16);
   const txn = {
     id: 'w' + Date.now(),
     type: _walletType,
     amount: amount,
     category: category,
     note: note,
-    date: whenVal.length === 16 ? whenVal + ':00' : whenVal
+    date: new Date().toISOString()
   };
 
   wallet.transactions.push(txn);
@@ -3291,7 +3251,6 @@ function addTransaction() {
   Store.set('wallet', wallet);
   document.getElementById('wallet-amount').value = '';
   document.getElementById('wallet-note').value = '';
-  if (whenEl) whenEl.value = localStamp().slice(0, 16);
   renderWallet();
   showToast(`${_walletType === 'expense' ? '支出' : '收入'} ¥${amount.toFixed(2)} 已记录`, 'success');
 }
@@ -3415,8 +3374,7 @@ function renderSettingsLevel() {
 }
 
 // === Data Export/Import ===
-// 备份文本（导出与复制共用）
-function buildBackupText() {
+function exportData() {
   const data = {};
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
@@ -3425,43 +3383,14 @@ function buildBackupText() {
       catch { data[key] = localStorage.getItem(key); }
     }
   }
-  return JSON.stringify(data, null, 2);
-}
-
-function exportData() {
-  // \uFEFF（BOM）不是美观问题：手机上的文本查看器/微信预览没有它常按 GBK 解码中文 → 乱码
-  const blob = new Blob(['\uFEFF' + buildBackupText()], { type: 'application/json;charset=utf-8' });
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = `nexus-core-backup-${TODAY()}.json`;
-  document.body.appendChild(a);
   a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  URL.revokeObjectURL(url);
   showToast('数据已导出', 'success');
-}
-
-// 手机首选：复制到剪贴板（微信/QQ 内置浏览器常拦截下载，复制粘贴最稳）
-async function copyDataToClipboard() {
-  const text = buildBackupText();
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
-    }
-    showToast(`已复制 ${(text.length / 1024).toFixed(0)}KB 到剪贴板，粘贴到备忘录即可`, 'success');
-  } catch (e) {
-    showToast('复制失败，请改用导出文件', 'warning');
-  }
 }
 
 function importDataPrompt() {
@@ -3474,9 +3403,7 @@ function importDataPrompt() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        // 去掉可能的 BOM（Windows 记事本/部分手机导出会带）
-        const text = String(ev.target.result).replace(/^\uFEFF/, '');
-        const data = JSON.parse(text);
+        const data = JSON.parse(ev.target.result);
         if (!confirm('导入将覆盖当前所有数据，确定继续？')) return;
         Object.entries(data).forEach(([key, value]) => {
           if (key.startsWith('nexus_')) {
@@ -3866,7 +3793,7 @@ function migrateDailyTemplatesToTasks() {
         id: generateId(), title: t.title, type: 'side', priority: 'medium',
         xp: t.xp || 50, coins: t.coins || 30, deadline: '', note: '', course: '',
         recurrence: 'daily', subtasks: [], progress: 0, status: 'active',
-        createdAt: localStamp(), completedAt: null, availableFrom: today
+        createdAt: new Date().toISOString(), completedAt: null, availableFrom: today
       });
     });
   }
