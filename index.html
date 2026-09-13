@@ -1229,14 +1229,16 @@ button:focus-visible { box-shadow: var(--ring); }
 
       <div style="background: color-mix(in srgb, var(--accent) 5%, transparent); padding: 10px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent); font-size: 0.7rem; color: var(--text-secondary); line-height: 1.6;">
         <strong style="color: var(--accent);">使用方法：</strong><br>
-        1. 在此设备配置完成后，复制上方 Bin ID<br>
-        2. 在另一台设备（手机/电脑）打开此页面<br>
-        3. 输入相同的 API Key 和 Bin ID 即可同步
+        <strong style="color:var(--warn);">⚠ 顺序很重要：</strong>第一次连接会把云端数据覆盖到本机（不是合并）。<br>
+        1. 在「数据最全的那台设备」上完成配置（它会创建云空间）<br>
+        2. 复制上方 Bin ID，到其他设备输入相同的 API Key 和 Bin ID<br>
+        3. 其他设备连接后，会以云端数据为准覆盖本机（系统会先自动备份，可一键还原）
       </div>
     </div>
 
     <div class="modal-actions" style="flex-wrap: wrap; gap: 8px;">
       <button class="btn btn-danger btn-sm" id="sync-disconnect-btn" onclick="disconnectSync()" style="display: none;">断开</button>
+      <button class="btn btn-sm" id="sync-restore-btn" onclick="restorePrePullBackup()" style="display: none;">↩ 还原备份</button>
       <div style="flex: 1;"></div>
       <button class="btn" onclick="closeSyncModal()">关闭</button>
       <button class="btn" id="sync-pull-btn" onclick="manualPull()" style="display: none;">↓ 下载</button>
@@ -1271,6 +1273,31 @@ const Store = {
   }
 };
 
+// 同步时需跳过的键：同步配置自身 + 拉取前的本机备份
+const SYNC_SKIP_KEYS = ['nexus_syncConfig', 'nexus_backup_before_pull'];
+
+// 本机现有几项数据（用于覆盖前警告）
+function countLocalDataKeys() {
+  let n = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(k)) n++;
+  }
+  return n;
+}
+
+// 还原「上次拉取前的本机数据」
+function restorePrePullBackup() {
+  const snap = JSON.parse(localStorage.getItem('nexus_backup_before_pull') || 'null');
+  if (!snap || !snap.data) { showToast('没有可还原的备份', 'warning'); return; }
+  const n = Object.keys(snap.data).length;
+  const when = new Date(snap.at).toLocaleString('zh-CN');
+  if (!confirm('把本机数据还原到「' + when + '」拉取前的状态（' + n + ' 项）？\n\n当前数据会被替换。还原后如需覆盖云端，请点「↑ 上传」。')) return;
+  Object.entries(snap.data).forEach(([k, v]) => localStorage.setItem(k, v));
+  showToast('已还原 ' + n + ' 项，即将刷新页面', 'success');
+  setTimeout(() => location.reload(), 600);
+}
+
 // === Cloud Sync Manager (JSONBin.io) ===
 const SyncManager = {
   config: { apiKey: '', binId: '', autoSync: true, lastSync: 0, lastLocalModify: 0 },
@@ -1300,7 +1327,7 @@ const SyncManager = {
     const data = {};
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith('nexus_') && key !== 'nexus_syncConfig') {
+      if (key && key.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(key)) {
         try { data[key] = JSON.parse(localStorage.getItem(key)); }
         catch { data[key] = localStorage.getItem(key); }
       }
@@ -1312,14 +1339,23 @@ const SyncManager = {
   importData(payload) {
     if (!payload || !payload.data) return;
     this._suppressAutoPush = true;
+    // 先给本机数据拍快照——覆盖是有去无回的，至少留一份后悔药
+    const snapshot = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(key)) snapshot[key] = localStorage.getItem(key);
+    }
+    if (Object.keys(snapshot).length) {
+      localStorage.setItem('nexus_backup_before_pull', JSON.stringify({ at: Date.now(), data: snapshot }));
+    }
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith('nexus_') && key !== 'nexus_syncConfig') keysToRemove.push(key);
+      if (key && key.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(key)) keysToRemove.push(key);
     }
     keysToRemove.forEach(k => localStorage.removeItem(k));
     for (const [key, value] of Object.entries(payload.data)) {
-      if (key.startsWith('nexus_')) {
+      if (key.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(key)) {
         localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
       }
     }
@@ -2753,6 +2789,7 @@ function openSyncModal() {
     document.getElementById('sync-push-btn').style.display = 'inline-block';
     document.getElementById('sync-disconnect-btn').style.display = 'inline-block';
     updateSyncModalStatus();
+    updateRestoreButton();
   } else {
     document.getElementById('sync-setup-section').style.display = 'block';
     document.getElementById('sync-connected-section').style.display = 'none';
@@ -2764,6 +2801,22 @@ function openSyncModal() {
     document.getElementById('sync-token').value = '';
     document.getElementById('sync-gist-id-input').value = '';
     document.getElementById('sync-auto').checked = true;
+    updateRestoreButton();
+  }
+}
+
+function updateRestoreButton() {
+  const btn = document.getElementById('sync-restore-btn');
+  if (!btn) return;
+  let snap = null;
+  try { snap = JSON.parse(localStorage.getItem('nexus_backup_before_pull') || 'null'); } catch {}
+  if (snap && snap.data) {
+    const d = new Date(snap.at);
+    const label = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    btn.textContent = '↩ 还原 ' + label + ' 备份';
+    btn.style.display = 'inline-block';
+  } else {
+    btn.style.display = 'none';
   }
 }
 
@@ -2782,7 +2835,12 @@ async function saveSyncSettings() {
   SyncManager._initialized = true;
 
   if (binId) {
-    // Connect to existing Bin
+    // Connect to existing Bin —— 这是「用云端覆盖本机」的操作，先讲清后果
+    const localItems = countLocalDataKeys();
+    if (localItems > 0) {
+      const okGo = confirm('⚠ 注意：连接后本机数据会被云端数据覆盖\n\n本机现有 ' + localItems + ' 项数据，将被云端内容整体替换（不是合并）。\n系统会先自动备份一份，可在同步设置里一键还原。\n\n确定继续连接吗？');
+      if (!okGo) { showToast('已取消连接，本机数据未变动', 'info'); return; }
+    }
     SyncManager.config.binId = binId;
     SyncManager.saveConfig();
     showToast('正在连接...', 'info');
@@ -2880,7 +2938,7 @@ function setWalletType(type) {
   // Swap categories for income
   const cat = document.getElementById('wallet-category');
   if (type === 'income') {
-    cat.innerHTML = '<option value="工资">工资</option><option value="兼职">兼职</option><option value="红包">红包</option><option value="理财">理财</option><option value="其他">其他</option>';
+    cat.innerHTML = '<option value="工资">工资</option><option value="兼职">兼职</option><option value="生活费">生活费</option><option value="理财">理财</option><option value="其他">其他</option>';
   } else {
     cat.innerHTML = '<option value="餐饮">餐饮</option><option value="交通">交通</option><option value="购物">购物</option><option value="娱乐">娱乐</option><option value="学习">学习</option><option value="生活">生活</option><option value="其他">其他</option>';
   }
