@@ -2,6 +2,8 @@
 
 Node/Express + SQLite 的单人日记服务。这是「真后端」学习路线的第一站。
 
+> **要部署到服务器（买机器 → 域名 → HTTPS → 备份）？看 [DEPLOY.md](./DEPLOY.md)** —— 那是照敲即可的作战手册。
+
 ## 启动（Windows）
 
 ```powershell
