@@ -28,7 +28,14 @@ if (!TOKEN) {
   process.exit(1);
 }
 // GitHub Pages 的页面是 HTTPS，调本机 HTTP API 属于跨域，需要后端明确放行
-const CORS_ORIGIN = process.env.CORS_ORIGIN || 'https://qqqqqqiu0804.github.io';
+// 允许的来源，逗号分隔可配多个：Pages 页面、服务器 IP、域名（HTTP/HTTPS）都算跨域来源
+const CORS_ORIGINS = (process.env.CORS_ORIGIN || 'https://qqqqqqiu0804.github.io')
+  .split(',').map(s => s.trim()).filter(Boolean);
+// SSE 端点要手动写响应头，这里挑出与请求匹配的来源
+function allowedOrigin(req) {
+  const o = req.headers.origin;
+  return (o && CORS_ORIGINS.includes(o)) ? o : CORS_ORIGINS[0];
+}
 
 // ===== 数据库 =====
 // 默认 journal.db 生成在 server/ 目录。备份 = 复制这个文件。
@@ -62,7 +69,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // ===== 应用 =====
 const app = express();
 app.use(express.json({ limit: '2mb' }));
-app.use(cors({ origin: CORS_ORIGIN })); // 只放行你的 Pages 域名；localhost:3000 同源访问不受影响
+app.use(cors({ origin: CORS_ORIGINS })); // 白名单内多个来源；同源访问不受影响
 // 只托管前端单文件——不把整个仓库目录（含 journal.db）暴露成静态资源
 app.get(['/', '/index.html'], (req, res) => res.sendFile(path.join(__dirname, '..', 'index.html')));
 
@@ -140,7 +147,7 @@ app.post('/api/ai/weekly', async (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': CORS_ORIGIN
+    'Access-Control-Allow-Origin': allowedOrigin(req)
   });
   const send = (event, data) => res.write(`data: ${JSON.stringify({ event, data })}\n\n`);
 
@@ -196,6 +203,6 @@ app.listen(PORT, () => {
   console.log(`[nexus-core server] 已启动 → http://localhost:${PORT}`);
   console.log(`  日记 API: http://localhost:${PORT}/api/entries`);
   console.log(`  AI 周报:  POST ${PORT === 80 ? '' : ':' + PORT}/api/ai/weekly (SSE) → Ollama ${OLLAMA_URL}`);
-  console.log(`  CORS 放行: ${CORS_ORIGIN}`);
+  console.log(`  CORS 放行: ${CORS_ORIGINS.join(' , ')}`);
   console.log(`  数据库: ${DB_PATH}`);
 });
