@@ -31,8 +31,11 @@ if (!TOKEN) {
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'https://qqqqqqiu0804.github.io';
 
 // ===== 数据库 =====
-// journal.db 会自动生成在 server/ 目录。备份 = 复制这个文件。
-const db = new DatabaseSync(path.join(__dirname, 'journal.db'));
+// 默认 journal.db 生成在 server/ 目录。备份 = 复制这个文件。
+// DB_PATH 环境变量可改路径——**跑测试时务必指向临时文件**，
+// 免得误删/误写真实数据（2026-09-14 有过一次教训）。
+const DB_PATH = path.resolve(process.env.DB_PATH || path.join(__dirname, 'journal.db'));
+const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA journal_mode = WAL;'); // 写入性能优化，断电也不丢已提交数据
 db.exec(`
   CREATE TABLE IF NOT EXISTS entries (
@@ -194,5 +197,5 @@ app.listen(PORT, () => {
   console.log(`  日记 API: http://localhost:${PORT}/api/entries`);
   console.log(`  AI 周报:  POST ${PORT === 80 ? '' : ':' + PORT}/api/ai/weekly (SSE) → Ollama ${OLLAMA_URL}`);
   console.log(`  CORS 放行: ${CORS_ORIGIN}`);
-  console.log(`  数据库: ${path.join(__dirname, 'journal.db')}`);
+  console.log(`  数据库: ${DB_PATH}`);
 });
