@@ -2010,6 +2010,16 @@ function initData() {
     Store.set('investJournal', {}); // { "YYYY-MM-DD": "投资思考文本" }
     Store.set('initialized', true);
   }
+  // profile 兜底：任何路径下缺 profile 都不能让启动流程崩掉。
+  // （实测：profile 为空时 updateStreak 抛错 → DOMContentLoaded 整体中断 →
+  //   折叠绑定 / KVSync.init / 状态回填全都没执行，表现成「功能集体消失」。）
+  // 此处位于启动保护块内，写入不记时间戳，因此不会覆盖服务器数据。
+  if (!Store.get('profile') || typeof Store.get('profile') !== 'object') {
+    Store.set('profile', {
+      level: 1, xp: 0, coins: 0, streak: 0, lastCheckin: '',
+      totalCompleted: 0, pomodoroToday: 0, pomodoroDate: ''
+    });
+  }
   // Check streak
   updateStreak();
 }
@@ -2772,6 +2782,7 @@ function completeTask(id) {
 
 function updateStreak() {
   const profile = Store.get('profile');
+  if (!profile || typeof profile !== 'object') return;   // 缺 profile 就跳过，别抛错（会连累整个启动流程）
   const today = TODAY();
   const yesterday = localDate(Date.now() - 86400000);
 
@@ -4191,21 +4202,30 @@ function migrateLegacyConfig() {
 document.addEventListener('DOMContentLoaded', async () => {
   // 启动阶段的所有写入都属「派生/默认值」，一律不算用户修改——
   // 否则新设备第一次打开，会用空默认值盖掉服务器上的真实数据（实测踩到过）。
-  _dataInitRunning = true;
-  try {
-    loadTheme();
-    migrateLegacyConfig();
-    initData();
-    migrateDailyTemplatesToTasks();
-    renderAll();
-    updateDashboard();
-  } finally {
-    _dataInitRunning = false;
-  }
-  KVSync.init();        // 内部会在短暂延迟后自动拉取一次
-  syncServerFields();
-  bindSectionToggles();
-  updateInspEntryCount(); // 今日面板区块折叠：标题行点击
+  //
+  // 每一步各自 try/catch：任一环节出错都不许拖垮后面的初始化。
+  // （实测踩到过：initData 因 profile 为空抛错 → 整个启动流程中断 →
+  //   折叠绑定 / KVSync.init / 状态回填全没执行，页面看起来「功能集体消失」。）
+  const boot = (name, fn) => {
+    _dataInitRunning = true;
+    try { fn(); } catch (e) { console.error('[启动] ' + name + ' 失败：', e); }
+    finally { _dataInitRunning = false; }
+  };
+  const safe = (name, fn) => {
+    try { fn(); } catch (e) { console.error('[启动] ' + name + ' 失败：', e); }
+  };
+
+  boot('主题', loadTheme);
+  boot('配置迁移', migrateLegacyConfig);
+  boot('默认数据', initData);
+  boot('模板迁移', migrateDailyTemplatesToTasks);
+  boot('渲染', renderAll);
+  boot('仪表盘', updateDashboard);
+
+  safe('同步初始化', () => KVSync.init());      // 内部会在短暂延迟后自动拉取一次
+  safe('服务器字段回填', syncServerFields);
+  safe('折叠点击绑定', bindSectionToggles);
+  safe('灵感入口计数', updateInspEntryCount);
 });
 
 // Auto-refresh daily at midnight
