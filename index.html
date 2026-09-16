@@ -681,6 +681,19 @@ button:focus-visible { box-shadow: var(--ring); }
 
   <!-- Panel: Daily Hub (首页) -->
   <div class="panel active" id="panel-daily">
+    <!-- 新容器引导（只在「本机没数据 + 没连服务器」时出现）-->
+    <div id="first-run-banner" class="card" style="display:none;padding:14px;margin-bottom:14px;border-color:var(--accent);">
+      <div style="font-size:0.85rem;color:var(--text-primary);margin-bottom:6px;">📱 这台设备上还没有数据</div>
+      <div style="font-size:0.72rem;color:var(--text-secondary);line-height:1.6;margin-bottom:10px;">
+        如果你是从主屏幕图标打开的，那是 iPhone 的正常行为——每个「应用」有自己的独立存储空间，
+        和 Safari 里的数据互不相通。这不代表数据丢了：填一次访问令牌，云端数据会全部拉回来。
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="gotoServerSetup()">去填访问令牌</button>
+        <button class="btn btn-sm" onclick="dismissFirstRun()">我知道了</button>
+      </div>
+    </div>
+
     <!-- ① Date Header -->
     <div class="daily-date-header" id="daily-date-header">
       <div class="daily-date-main">
@@ -967,19 +980,6 @@ button:focus-visible { box-shadow: var(--ring); }
         <input type="datetime-local" id="wallet-when" style="width: 190px;" title="可以选择过去的日期时间补记">
         <input type="text" id="wallet-note" placeholder="备注（可选）" style="flex: 1; min-width: 150px;">
         <button class="btn btn-primary" onclick="addTransaction()">记一笔</button>
-      </div>
-    </div>
-
-    <!-- Charts -->
-    <div class="grid-2" style="margin-top: 16px;">
-      <div class="chart-container">
-        <div class="section-title" style="margin-bottom: 12px;">◆ 近7日完成趋势</div>
-        <div id="weekly-breakdown" style="display: flex; align-items: flex-end; justify-content: space-between; gap: 4px; min-height: 80px; margin-bottom: 8px;"></div>
-        <canvas id="chart-weekly"></canvas>
-      </div>
-      <div class="chart-container">
-        <div class="section-title" style="margin-bottom: 12px;">◆ 任务类型分布</div>
-        <canvas id="chart-types"></canvas>
       </div>
     </div>
 
@@ -2565,6 +2565,7 @@ function saveServerCfg() {
     if (p.ok) showToast('同步完成：拉取 ' + p.pulled + ' 项，上传 ' + p.pushed + ' 项', 'success');
     await flushJournalPending();   // 顺手把没传上去的日记补掉
     syncServerFields();
+    updateFirstRunBanner();
   });
 }
 
@@ -2922,9 +2923,14 @@ function completeTask(id) {
   // 周期重复任务：完成后自动生成下一期（子任务进度清零）
   let recurringMsg = '';
   if (task.recurrence && task.recurrence !== 'none') {
-    tasks.push({
+    // seriesId 把「同一个周期任务的所有期」串起来（第一期的 id 就是这条链的编号）。
+    // 用途：生成下一期时顺手清掉这条链里更早的已完成实例 —— completionLog 已经记住
+    // 完成次数，旧实例留着只会让 tasks 每天膨胀（一天两条 → 一年七百条）。
+    const seriesId = task.seriesId || task.id;
+    const next = {
       ...task,
       id: generateId(),
+      seriesId: seriesId,
       status: 'active',
       progress: 0,
       subtasks: (task.subtasks || []).map(s => ({ title: s.title, done: false })),
@@ -2932,12 +2938,19 @@ function completeTask(id) {
       availableFrom: nextOccurrenceDate(task.recurrence),
       createdAt: localStamp(),
       completedAt: null
-    });
-    saveTasks(tasks);
-    recurringMsg = '，下一期已生成 🔁';
+    };
+    const cleaned = tasks.filter(t => !(
+      t.id !== task.id &&                              // 今天这条要留着，用户要看到「划掉」
+      (t.seriesId || t.id) === seriesId &&
+      t.status === 'completed' &&
+      String(t.completedAt || '').slice(0, 10) !== today
+    ));
+    cleaned.push(next);
+    saveTasks(cleaned);
+    recurringMsg = '，下一期已排到 ' + next.availableFrom;
   }
 
-  showToast(`✓ 任务完成！+${task.xp}XP +${task.coins}💰${recurringMsg}`, 'success');  renderAll();
+  showToast('✓ 任务完成' + recurringMsg, 'success');  renderAll();
 }
 
 function updateStreak() {
@@ -3075,7 +3088,7 @@ function saveTask() {
 
 // === Render Functions ===
 function renderAll() {
-  renderDailyHub();  renderTasks();  renderStats();
+  renderDailyHub();  renderTasks();
   renderWallet();
   renderInvestJournal();
   renderHistory();
@@ -3096,8 +3109,18 @@ function renderTasks() {
   const tasks = getTasks();
   const filter = document.getElementById('task-filter')?.value || 'all';
   const sort = document.getElementById('task-sort')?.value || 'newest';
+  const today = TODAY();
 
-  let filtered = [...tasks];
+  // 过滤掉「还没到日子的下一期」——周期任务一完成就会立刻生成下一期，
+  // 若照原样列出来，看起来就像任务没完成、而且能无限重复完成（实测反馈的 bug）。
+  // 另外：周期任务的已完成实例只在当天显示，否则每天积累一条，列表很快被刷屏。
+  let filtered = tasks.filter(t => {
+    if (t.availableFrom && t.availableFrom > today) return false;
+    if (t.status === 'completed' && t.recurrence && t.recurrence !== 'none') {
+      return String(t.completedAt || '').slice(0, 10) === today;
+    }
+    return true;
+  });
   if (filter !== 'all') filtered = filtered.filter(t => t.type === filter);
 
   // Sort
@@ -3220,41 +3243,6 @@ function nextDeadline(deadline, recurrence) {
 
 
 
-function renderStats() {
-  const log = Store.get('completionLog', {});
-  const profile = Store.get('profile');
-
-  // Weekly breakdown
-  const breakdown = document.getElementById('weekly-breakdown');
-  const days = [];
-  const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86400000);
-    const key = localDate(d);
-    const day = d.getDay();
-    days.push({ label: `周${dayNames[day]}`, date: key, count: log[key] || 0 });
-  }
-
-  breakdown.innerHTML = days.map(d => {
-    const maxH = Math.max(1, ...days.map(x => x.count));
-    const h = d.count > 0 ? (d.count / maxH) * 100 : 4;
-    const isToday = d.date === TODAY();
-    return `
-      <div style="text-align: center; flex: 1;">
-        <div style="font-size:0.8rem; font-weight: bold; color: ${isToday ? 'var(--accent)' : 'var(--text-secondary)'};">${d.count}</div>
-        <div style="height: ${Math.max(h, 4)}px; background: ${isToday ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 30%, transparent)'}; border-radius: 2px; margin: 4px 0; min-width: 20px; "></div>
-        <div style="font-size:0.68rem; color: var(--text-dim);">${d.label}</div>
-      </div>
-    `;
-  }).join('');
-
-  // Weekly chart (simple canvas)
-  drawWeeklyChart(days);
-
-  // Type distribution chart
-  drawTypeChart();
-}
-
 // canvas 无法解析 CSS 颜色函数，运行时把 token 解析成具体色值
 function cssColor(name, alpha = 1) {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -3266,120 +3254,6 @@ function cssColor(name, alpha = 1) {
   const r = parseInt(n.slice(0,2),16), g = parseInt(n.slice(2,4),16), b = parseInt(n.slice(4,6),16);
   return `rgba(${r},${g},${b},${alpha})`;
 }
-
-function drawWeeklyChart(days) {
-  const canvas = document.getElementById('chart-weekly');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const w = canvas.parentElement.clientWidth - 32;
-  const h = 160;
-  canvas.width = w;
-  canvas.height = h;
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-
-  ctx.clearRect(0, 0, w, h);
-
-  // Grid lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 4; i++) {
-    const y = 20 + i * 35;
-    ctx.beginPath();
-    ctx.moveTo(40, y);
-    ctx.lineTo(w - 20, y);
-    ctx.stroke();
-  }
-
-  const maxVal = Math.max(1, ...days.map(d => d.count));
-  const barW = (w - 80) / days.length - 8;
-
-  days.forEach((d, i) => {
-    const x = 50 + i * ((w - 80) / days.length);
-    const barH = (d.count / maxVal) * 120;
-    const y = h - 20 - barH;
-
-    const isToday = d.date === TODAY();
-
-    // Bar
-    const gradient = ctx.createLinearGradient(x, y, x, h - 20);
-    gradient.addColorStop(0, isToday ? cssColor('--accent') : cssColor('--accent', 0.55));
-    gradient.addColorStop(1, isToday ? cssColor('--accent', 0.25) : cssColor('--accent', 0.12));
-    ctx.fillStyle = gradient;
-    ctx.fillRect(x, y, barW, barH);
-
-    // Value
-    ctx.fillStyle = isToday ? cssColor('--accent') : cssColor('--text-secondary');
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(d.count, x + barW / 2, y - 6);
-
-    // Label
-    ctx.fillStyle = cssColor('--text-dim');
-    ctx.font = '9px monospace';
-    ctx.fillText(d.label, x + barW / 2, h - 4);
-  });
-}
-
-function drawTypeChart() {
-  const tasks = getTasks();
-  const completed = tasks.filter(t => t.status === 'completed');
-  const types = { main: 0, side: 0, timed: 0 };
-  completed.forEach(t => { if (types[t.type] !== undefined) types[t.type]++; });
-
-  const canvas = document.getElementById('chart-types');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const size = 150;
-  canvas.width = size;
-  canvas.height = size;
-  canvas.style.width = size + 'px';
-  canvas.style.height = size + 'px';
-
-  ctx.clearRect(0, 0, size, size);
-
-  const total = Object.values(types).reduce((a, b) => a + b, 0) || 1;
-  const colors = {
-    main: cssColor('--accent-2'), side: cssColor('--accent'), daily: cssColor('--success'), timed: cssColor('--warn')
-  };
-  const labels = {
-    main: '主线', side: '支线', daily: '每日', timed: '限时'
-  };
-
-  const cx = size / 2, cy = size / 2, r = 50;
-  let angle = -Math.PI / 2;
-
-  Object.entries(types).forEach(([key, val]) => {
-    if (val === 0) return;
-    const slice = (val / total) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, r, angle, angle + slice);
-    ctx.closePath();
-    ctx.fillStyle = colors[key];
-    ctx.globalAlpha = 0.7;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = '#0a0a0f';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    angle += slice;
-  });
-
-  // Legend
-  let lx = 10, ly = 110;
-  Object.entries(types).forEach(([key, val]) => {
-    ctx.fillStyle = colors[key];
-    ctx.fillRect(lx, ly, 10, 10);
-    ctx.fillStyle = cssColor('--text-secondary');
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText(`${labels[key]}: ${val}`, lx + 14, ly + 9);
-    ly += 16;
-  });
-}
-
-
 
 // === Helper Functions ===
 function getTypeLabel(type) {
@@ -4345,6 +4219,43 @@ function migrateDailyTemplatesToTasks() {
   Store.set('dailyMigrated', true); // 旧 dailyTemplates 数据留在 localStorage 作备份，不再读取
 }
 
+// === 新容器引导 ===
+// 场景：iOS 把「添加到主屏幕」的应用当成独立容器，localStorage 与 Safari 隔离，
+// 打开后看到空面板，很容易以为「数据全没了」。数据其实在服务器上，连一次就回来。
+// 这里只在「本机确实没有业务数据 + 也没配服务器」时提示，避免对着有数据的设备瞎弹。
+function deviceHasUserData() {
+  const t = Store.get('tasks', []);
+  if (Array.isArray(t) && t.length) return true;
+  const w = Store.get('wallet', {});
+  if ((w.transactions || []).length) return true;
+  if (Object.keys(Store.get('journal', {})).length) return true;
+  const ins = Store.get('inspirations', []);
+  if (Array.isArray(ins) && ins.length) return true;
+  if (Object.keys(Store.get('completionLog', {})).length) return true;
+  return false;
+}
+
+function updateFirstRunBanner() {
+  const el = document.getElementById('first-run-banner');
+  if (!el) return;
+  const show = !journalApiOn() && !deviceHasUserData() && !Store.get('firstRunDismissed');
+  el.style.display = show ? 'block' : 'none';
+}
+
+function dismissFirstRun() {
+  Store.set('firstRunDismissed', true);
+  updateFirstRunBanner();
+}
+
+function gotoServerSetup() {
+  switchTab('settings');
+  const card = document.getElementById('cfg-server-token');
+  if (card) {
+    card.scrollIntoView({ block: 'center' });
+    setTimeout(() => card.focus(), 300);
+  }
+}
+
 // === Initialize ===
 // 一次性迁移：旧的「日记后端」配置 → 统一的「服务器」配置（免得重填 token）
 function migrateLegacyConfig() {
@@ -4390,6 +4301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   safe('服务器字段回填', syncServerFields);
   safe('折叠点击绑定', bindSectionToggles);
   safe('灵感入口计数', updateInspEntryCount);
+  safe('新容器引导', updateFirstRunBanner);
 });
 
 // Auto-refresh daily at midnight
