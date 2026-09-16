@@ -228,24 +228,10 @@ label {
 .stat-label { font-size:0.72rem; color: var(--text-dim); margin-top: 4px; }
 
 /* === Level Display === */
-.level-display {
-  display: flex; align-items: center; gap: 12px;
-  padding: 16px; background: var(--bg-card);
-  border: 1px solid var(--border-subtle); border-radius: 6px;
-  margin-bottom: 20px;
-}
-.level-badge {
-  width: 56px; height: 56px; border-radius: 50%;
-  border: 2px solid var(--accent);
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-size:1.5rem; font-weight: 700;
-  color: var(--accent); flex-shrink: 0;
-}
-.level-info { flex: 1; }
-.level-title {
-  font-size:0.88rem; font-weight: 600;
-  color: var(--text-primary);
-}
+
+
+
+
 .level-xp { font-size:0.72rem; color: var(--text-dim); margin-top: 4px; }
 
 /* === Task List === */
@@ -276,7 +262,7 @@ label {
   font-size:0.72rem; color: var(--text-dim);
   display: flex; gap: 12px; margin-top: 2px;
 }
-.task-reward { font-size:0.72rem; color: var(--warn); flex-shrink: 0; }
+
 .task-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
 /* === Section Header === */
@@ -464,7 +450,7 @@ button:focus-visible { box-shadow: var(--ring); }
   .form-row { flex-direction: column; gap: 0; }
   .stats-row { grid-template-columns: repeat(2, 1fr); }
   .header-title { font-size:1.1rem; }
-  .level-display { flex-direction: column; text-align: center; }
+  
   .sync-btn { position: static; margin-top: 12px; }
   .app-container { padding: 12px 12px 76px; }
   .panel { padding:12px; min-height: auto; }
@@ -487,6 +473,41 @@ button:focus-visible { box-shadow: var(--ring); }
 .daily-section.collapsible.collapsed > .section-header .section-title::after { content: ' ▸'; }
 .daily-section.collapsible.collapsed > .section-header { opacity: .55; }
 .daily-section.collapsible.collapsed > *:not(.section-header) { display: none !important; }
+
+
+/* === 财务洞察（2026-09-16 新增）=== */
+.budget-bar { height:8px; border-radius:4px; background:var(--bg-hover); overflow:hidden; margin-top:8px; }
+.budget-fill { height:100%; border-radius:4px; background:var(--accent); transition:width .3s; }
+.budget-fill.warn { background:var(--warn); }
+.budget-fill.over { background:var(--danger); }
+.cat-row { margin-bottom:10px; }
+.cat-row:last-child { margin-bottom:0; }
+.cat-row-head { display:flex; justify-content:space-between; font-size:0.78rem; margin-bottom:4px; color:var(--text-secondary); }
+.cat-row-head .amt { font-family:var(--font-mono); color:var(--text-primary); }
+.cat-bar { height:6px; border-radius:3px; background:var(--bg-hover); overflow:hidden; }
+.cat-bar-fill { height:100%; border-radius:3px; background:var(--accent); }
+.quick-add { display:flex; gap:6px; flex-wrap:wrap; }
+.quick-cat { padding:8px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle); background:var(--bg-card); color:var(--text-secondary); font-size:0.78rem; cursor:pointer; min-height:40px; -webkit-tap-highlight-color:transparent; }
+.quick-cat.active { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+/* === 财务洞察 END === */
+
+
+/* === 灵感库（2026-09-16）=== */
+.insp-kind { flex:1; padding:8px 10px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle); background:var(--bg-card); color:var(--text-secondary); font-size:0.78rem; cursor:pointer; min-height:40px; }
+.insp-kind.active { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+.insp-card { background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius); padding:14px; margin-bottom:10px; }
+.insp-card-head { display:flex; align-items:flex-start; gap:8px; margin-bottom:6px; }
+.insp-card-title { font-size:0.88rem; color:var(--text-primary); flex:1; word-break:break-word; }
+.insp-card-time { font-size:0.65rem; color:var(--text-dim); font-family:var(--font-mono); white-space:nowrap; }
+.insp-card-body { font-size:0.8rem; color:var(--text-secondary); line-height:1.55; white-space:pre-wrap; word-break:break-word; }
+.insp-thumb { width:100%; max-height:220px; object-fit:cover; border-radius:var(--radius-sm); margin:8px 0; cursor:pointer; display:block; }
+.insp-tag { font-size:0.65rem; color:var(--accent); background:var(--accent-soft); padding:2px 8px; border-radius:10px; }
+.insp-tagbar-item { font-size:0.72rem; padding:5px 12px; border-radius:14px; border:1px solid var(--border-subtle); background:var(--bg-card); color:var(--text-secondary); cursor:pointer; min-height:32px; }
+.insp-tagbar-item.active { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+.insp-empty { color:var(--text-dim); font-size:0.78rem; text-align:center; padding:28px 10px; }
+.insp-viewer { position:fixed; top:0; left:0; right:0; bottom:0; z-index:300; background:var(--overlay); display:flex; align-items:center; justify-content:center; padding:16px; }
+.insp-viewer img { max-width:100%; max-height:100%; border-radius:var(--radius); }
+/* === 灵感库 END === */
 
 /* === Wallet === */
 .wallet-balance-card {
@@ -821,6 +842,17 @@ button:focus-visible { box-shadow: var(--ring); }
     <div id="course-day-view"></div>
     <div id="course-week-view" style="display:none;"></div>
     <div id="course-forecast-view" style="display:none;"></div>
+<!-- 课表数据 / 调课更新 -->
+    <details style="margin-top:16px;">
+      <summary style="cursor:pointer;font-size:0.72rem;color:var(--text-dim);padding:8px 0;list-style:none;user-select:none;">⚙ 课表数据 · 调课更新</summary>
+      <div class="card" style="padding:12px;margin-top:6px;">
+        <div style="font-size:0.72rem;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">
+          课表已嵌入本地（来自湖南科技学院教务系统，2026-2027-1 学期）。调课时点此覆盖更新。
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="importCourses()" style="padding:4px 12px;">📥 导入/更新课表</button>
+      </div>
+    </details>
+
   </div>
 
 
@@ -880,7 +912,38 @@ button:focus-visible { box-shadow: var(--ring); }
       </div>
     </div>
 
-    <!-- Add Transaction -->
+    <!-- 预算（未设置时自动隐藏）-->
+    <div id="budget-section" style="display:none;margin-bottom:16px;">
+      <div class="card" style="padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-size:0.88rem;color:var(--text-primary);">本月预算</span>
+          <button class="btn btn-sm" onclick="setBudget()" style="padding:2px 10px;font-size:0.72rem;">设置</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:0.78rem;">
+          <span id="budget-spent" style="color:var(--expense);">¥0</span>
+          <span id="budget-total" style="color:var(--text-dim);">/ ¥0</span>
+        </div>
+        <div class="budget-bar"><div class="budget-fill" id="budget-fill" style="width:0%;"></div></div>
+        <div id="budget-hint" style="font-size:0.68rem;color:var(--text-dim);margin-top:6px;"></div>
+      </div>
+    </div>
+
+    <!-- 快速记账：常用分类一键 -->
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span class="section-title">◆ 快速记账</span>
+        <span style="font-size:0.68rem;color:var(--text-dim);">点分类 → 输金额</span>
+      </div>
+      <div class="quick-add" id="quick-cats"></div>
+      <div id="quick-input-row" style="display:none;margin-top:8px;gap:8px;align-items:center;">
+        <span id="quick-cat-label" style="font-size:0.78rem;color:var(--accent);min-width:48px;"></span>
+        <input type="number" id="quick-amount" placeholder="金额" inputmode="decimal" step="0.01" min="0" style="flex:1;min-width:80px;">
+        <button class="btn btn-primary btn-sm" onclick="quickConfirm()">记下</button>
+        <button class="btn btn-sm" onclick="quickCancel()">取消</button>
+      </div>
+    </div>
+
+        <!-- Add Transaction -->
     <div class="section-header" style="margin-top: 16px;">
       <span class="section-title">◆ 记一笔</span>
     </div>
@@ -933,7 +996,31 @@ button:focus-visible { box-shadow: var(--ring); }
     </div>
     <div id="invest-history-list"></div>
 
-    <!-- Transaction History -->
+    <!-- 本月去向（分类占比）-->
+    <div style="margin-bottom:16px;">
+      <div class="section-header" style="margin-bottom:10px;">
+        <span class="section-title">◆ 本月去向</span>
+      </div>
+      <div class="card" style="padding:14px;">
+        <div id="cat-breakdown"></div>
+      </div>
+    </div>
+
+    <!-- 收支趋势 -->
+    <div style="margin-bottom:16px;">
+      <div class="section-header" style="margin-bottom:10px;">
+        <span class="section-title">◆ 近 6 个月趋势</span>
+        <div style="display:flex;gap:10px;font-size:0.68rem;">
+          <span style="color:var(--expense);">■ 支出</span>
+          <span style="color:var(--success);">■ 收入</span>
+        </div>
+      </div>
+      <div class="card" style="padding:14px 10px;">
+        <canvas id="trend-chart" style="width:100%;height:140px;display:block;"></canvas>
+      </div>
+    </div>
+
+        <!-- Transaction History -->
     <div class="section-header" style="margin-top: 16px;">
       <span class="section-title">◆ 交易记录</span>
       <div style="display: flex; gap: 8px; align-items: center;">
@@ -1011,50 +1098,46 @@ button:focus-visible { box-shadow: var(--ring); }
   <!-- Panel: Settings -->
   <div class="panel" id="panel-settings">
     <!-- 个人等级 -->
-    <div class="card" id="settings-level-info" style="margin-bottom:16px;"></div>
-
-    <!-- 课表数据 -->
-    <div style="margin-top:16px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-        <span style="font-size:1rem;">📚</span>
-        <span style="font-size:0.88rem;color:var(--text-primary);">课表数据</span>
-      </div>
-      <div class="card" style="padding:12px;">
-        <div style="font-size:0.72rem;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">
-          课表已嵌入本地（来自湖南科技学院教务系统，2026-2027-1 学期）。调课时点此覆盖更新。
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" onclick="importCourses()" style="padding:4px 12px;">📥 导入/更新课表</button>
-            <button class="btn btn-sm" onclick="switchTab('courses')" style="padding:4px 12px;">📖 查看课表</button>
-          </div>
-        </div>
-      </div>
-
     <!-- 服务器同步 -->
     <div style="margin-top:16px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:8px;">
         <span style="font-size:1rem;">☁️</span>
-        <span style="font-size:0.88rem;color:var(--text-primary);">服务器同步</span>
+        <span style="font-size:0.88rem;color:var(--text-primary);flex:1;">服务器同步</span>
         <span id="srv-dot" class="srv-dot"></span>
         <span id="srv-status-text" style="font-size:0.68rem;color:var(--text-dim);">未连接</span>
       </div>
-      <div class="card" style="padding:12px;">
-        <div class="form-group" style="margin-bottom:8px;">
-          <label style="font-size:0.72rem;">服务器地址（留空 = 当前网址）</label>
-          <input type="text" id="cfg-server-base" placeholder="留空即用当前网址" style="width:100%;">
+      <details style="margin-top:8px;">
+        <summary style="cursor:pointer;font-size:0.72rem;color:var(--text-dim);padding:6px 0;list-style:none;user-select:none;">⚙ 高级设置</summary>
+        <div class="card" style="padding:12px;margin-top:6px;">
+          <div class="form-group" style="margin-bottom:8px;">
+            <label style="font-size:0.72rem;">服务器地址（留空 = 当前网址）</label>
+            <input type="text" id="cfg-server-base" placeholder="留空即用当前网址" style="width:100%;">
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label style="font-size:0.72rem;">访问令牌</label>
+            <input type="password" id="cfg-server-token" placeholder="AUTH_TOKEN" style="width:100%;">
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="saveServerCfg()">保存并连接</button>
+            <button class="btn btn-sm" onclick="syncNow()">立即同步</button>
+            <button class="btn btn-sm" onclick="importJournalToServer()">导入本机旧日记</button>
+          </div>
+          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:8px;line-height:1.5;">
+            任务 / 记账 / 课表 / 习惯等全部数据自动同步到你的服务器，手机电脑保持一致。
+          </div>
         </div>
-        <div class="form-group" style="margin-bottom:8px;">
-          <label style="font-size:0.72rem;">访问令牌</label>
-          <input type="password" id="cfg-server-token" placeholder="AUTH_TOKEN" style="width:100%;">
+      </details>
+    </div>
+
+    <!-- 灵感库入口 -->
+    <div class="card" style="cursor:pointer;padding:14px;margin-bottom:16px;" onclick="openInspiration()">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:1.3rem;">💡</span>
+        <div style="flex:1;">
+          <div style="font-size:0.88rem;color:var(--text-primary);">灵感库</div>
+          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px;" id="insp-entry-count">记下想法和素材</div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" onclick="saveServerCfg()">保存并连接</button>
-          <button class="btn btn-sm" onclick="syncNow()">立即同步</button>
-          <button class="btn btn-sm" onclick="importJournalToServer()">导入本机旧日记</button>
-        </div>
-        <div style="font-size:0.68rem;color:var(--text-dim);margin-top:8px;line-height:1.5;">
-          任务 / 记账 / 课表 / 习惯等全部数据自动同步到你的服务器，手机电脑保持一致；日记另存服务器数据库，长期可检索。
-        </div>
+        <span style="color:var(--text-dim);font-size:0.78rem;">→</span>
       </div>
     </div>
 
@@ -1121,16 +1204,6 @@ button:focus-visible { box-shadow: var(--ring); }
         </select>
       </div>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>经验值奖励</label>
-        <input type="number" id="task-xp" value="50" min="10" max="500">
-      </div>
-      <div class="form-group">
-        <label>积分奖励</label>
-        <input type="number" id="task-coins" value="30" min="5" max="300">
-      </div>
-    </div>
     <div class="form-group" id="deadline-group">
       <label>截止日期（限时任务）</label>
       <input type="date" id="task-deadline">
@@ -1167,6 +1240,44 @@ button:focus-visible { box-shadow: var(--ring); }
 </div>
 
 <!-- Sync Modal -->
+<!-- 灵感库（全屏）-->
+<div id="insp-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:var(--bg-deep);overflow-y:auto;-webkit-overflow-scrolling:touch;">
+  <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
+    <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
+      <span style="font-size:1.1rem;">💡</span>
+      <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">灵感库</span>
+      <button class="btn btn-sm" onclick="inspToggleForm()">+ 新建</button>
+      <button class="btn btn-sm" onclick="closeInspiration()">✕</button>
+    </div>
+
+    <div id="insp-form" class="card" style="display:none;padding:14px;margin-bottom:14px;">
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <button class="insp-kind active" data-kind="thought" onclick="inspSetKind('thought')">💭 想法</button>
+        <button class="insp-kind" data-kind="material" onclick="inspSetKind('material')">🖼 素材</button>
+      </div>
+      <input id="insp-title" placeholder="标题（可选）" style="width:100%;margin-bottom:8px;">
+      <textarea id="insp-content" placeholder="写点什么…" style="width:100%;min-height:80px;margin-bottom:8px;"></textarea>
+      <div id="insp-material-fields" style="display:none;">
+        <label style="display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border:1px dashed var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:0.78rem;cursor:pointer;margin-bottom:8px;">
+          📷 拍照 / 选图
+          <input type="file" accept="image/*" capture="environment" onchange="inspPickImage(this)" style="display:none;">
+        </label>
+        <div id="insp-preview" style="margin-bottom:8px;"></div>
+        <input id="insp-link" placeholder="原链接（可选）" style="width:100%;margin-bottom:8px;">
+      </div>
+      <input id="insp-tags-input" placeholder="标签，空格或逗号分隔" style="width:100%;margin-bottom:10px;">
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary btn-sm" onclick="inspSave()">保存</button>
+        <button class="btn btn-sm" onclick="inspToggleForm()">取消</button>
+      </div>
+    </div>
+
+    <input id="insp-search" placeholder="搜索标题 / 内容 / 标签" oninput="renderInspirations()" style="width:100%;margin-bottom:10px;">
+    <div id="insp-tagbar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
+    <div id="insp-list"></div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
 
@@ -1197,7 +1308,7 @@ const Store = {
 const SYNC_KEYS = [
   'tasks', 'wallet', 'courses', 'habits', 'completionLog', 'dailyLog',
   'sleep', 'dailyTemplates', 'profile', 'timeAlloc', 'aiReports', 'aiModel',
-  'investJournal', 'scheduleOverride'
+  'investJournal', 'scheduleOverride', 'budget', 'inspirations'
 ];
 // 注意 journal（日记）**不在**白名单：它由日记 API + 服务器 SQLite 负责，
 // 两个通道同时写同一条数据会互相覆盖。
@@ -1509,6 +1620,371 @@ function bindSectionToggles() {
   });
 }
 
+
+// === 财务洞察：预算 / 快速记账 / 分类占比 / 趋势图 ===
+let _quickCat = null;
+
+// ---- 预算 ----
+function monthExpenseTotal() {
+  const month = TODAY().slice(0, 7);
+  return (Store.get('wallet', {}).transactions || [])
+    .filter(t => t.type === 'expense' && dateOf(t.date).startsWith(month))
+    .reduce((a, t) => a + Number(t.amount || 0), 0);
+}
+
+function setBudget() {
+  const cur = Store.get('budget', {});
+  const v = prompt('设置本月支出预算（元）。留空或填 0 表示取消：', cur.monthly || '');
+  if (v === null) return;
+  const n = parseFloat(v);
+  if (!n || n <= 0) { Store.set('budget', {}); showToast('已取消预算', 'info'); }
+  else { Store.set('budget', { monthly: n }); showToast('预算已设为 ¥' + n.toFixed(0), 'success'); }
+  renderBudget();
+}
+
+function renderBudget() {
+  const el = document.getElementById('budget-section');
+  if (!el) return;
+  const b = Store.get('budget', {});
+  if (!b.monthly) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const spent = monthExpenseTotal();
+  const pct = (spent / b.monthly) * 100;
+  const fill = document.getElementById('budget-fill');
+  document.getElementById('budget-spent').textContent = '¥' + spent.toFixed(1);
+  document.getElementById('budget-total').textContent = '/ ¥' + Number(b.monthly).toFixed(0);
+  fill.style.width = Math.min(100, pct).toFixed(1) + '%';
+  fill.className = 'budget-fill' + (pct > 100 ? ' over' : (pct > 80 ? ' warn' : ''));
+  const hint = document.getElementById('budget-hint');
+  if (pct > 100) hint.textContent = '已超支 ¥' + (spent - b.monthly).toFixed(1) + '（' + pct.toFixed(0) + '%）';
+  else if (pct > 80) hint.textContent = '已用 ' + pct.toFixed(0) + '%，剩 ¥' + (b.monthly - spent).toFixed(1) + '，悠着点';
+  else hint.textContent = '已用 ' + pct.toFixed(0) + '%，还剩 ¥' + (b.monthly - spent).toFixed(1);
+}
+
+// ---- 快速记账 ----
+function topCategories() {
+  const txns = Store.get('wallet', {}).transactions || [];
+  const freq = {};
+  txns.forEach(t => { if (t.category) freq[t.category] = (freq[t.category] || 0) + 1; });
+  const used = Object.entries(freq).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+  const fallback = ['餐饮', '交通', '购物', '学习', '医疗', '娱乐'];
+  return [...new Set(used.concat(fallback))].slice(0, 6);
+}
+
+function renderQuickCats() {
+  const el = document.getElementById('quick-cats');
+  if (!el) return;
+  el.innerHTML = topCategories().map(function (c) {
+    return '<button class="quick-cat' + (c === _quickCat ? ' active' : '') + '" onclick="quickPick(&quot;' + c + '&quot;)">' + c + '</button>';
+  }).join('');
+}
+
+function quickPick(cat) {
+  _quickCat = cat;
+  renderQuickCats();
+  document.getElementById('quick-input-row').style.display = 'flex';
+  document.getElementById('quick-cat-label').textContent = cat;
+  const amt = document.getElementById('quick-amount');
+  amt.value = '';
+  amt.focus();
+}
+
+function quickCancel() {
+  _quickCat = null;
+  document.getElementById('quick-input-row').style.display = 'none';
+  renderQuickCats();
+}
+
+function quickConfirm() {
+  const amt = parseFloat(document.getElementById('quick-amount').value);
+  if (!_quickCat) { showToast('先选一个分类', 'warning'); return; }
+  if (!amt || amt <= 0) { showToast('请输入金额', 'warning'); return; }
+  const w = Store.get('wallet', { balance: 0, initialSet: false, transactions: [] });
+  w.transactions.unshift({ type: 'expense', amount: amt, category: _quickCat, date: localStamp(), note: '' });
+  w.balance = Number(w.balance || 0) - amt;
+  Store.set('wallet', w);
+  showToast('已记 ' + _quickCat + ' ¥' + amt.toFixed(2), 'success');
+  quickCancel();
+  renderAll();
+}
+
+// ---- 分类占比 ----
+function renderCategoryBreakdown() {
+  const el = document.getElementById('cat-breakdown');
+  if (!el) return;
+  const month = TODAY().slice(0, 7);
+  const txns = (Store.get('wallet', {}).transactions || [])
+    .filter(t => t.type === 'expense' && dateOf(t.date).startsWith(month));
+  if (!txns.length) {
+    el.innerHTML = '<div style="color:var(--text-dim);font-size:0.78rem;text-align:center;padding:8px;">本月还没有支出记录</div>';
+    return;
+  }
+  const byCat = {};
+  txns.forEach(t => { const c = t.category || '其他'; byCat[c] = (byCat[c] || 0) + Number(t.amount || 0); });
+  const total = Object.values(byCat).reduce((a, b) => a + b, 0) || 1;
+  el.innerHTML = Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(function (e) {
+    const cat = e[0], amt = e[1], pct = amt / total * 100;
+    return '<div class="cat-row"><div class="cat-row-head"><span>' + cat + '</span><span class="amt">¥' + amt.toFixed(1) + ' · ' + pct.toFixed(0) + '%</span></div>' +
+      '<div class="cat-bar"><div class="cat-bar-fill" style="width:' + pct.toFixed(1) + '%"></div></div></div>';
+  }).join('');
+}
+
+// ---- 近 6 个月趋势（canvas 手绘，不引第三方库）----
+function renderTrendChart() {
+  const canvas = document.getElementById('trend-chart');
+  if (!canvas) return;
+  const txns = Store.get('wallet', {}).transactions || [];
+  const now = new Date();
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({ key: localDate(d).slice(0, 7), label: (d.getMonth() + 1) + '月', exp: 0, inc: 0 });
+  }
+  txns.forEach(t => {
+    const k = dateOf(t.date).slice(0, 7);
+    const m = months.find(x => x.key === k);
+    if (!m) return;
+    if (t.type === 'expense') m.exp += Number(t.amount || 0); else m.inc += Number(t.amount || 0);
+  });
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.clientWidth || 300, H = canvas.clientHeight || 140;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const max = Math.max.apply(null, months.map(m => Math.max(m.exp, m.inc)).concat([1]));
+  const padB = 20, padT = 8, chartH = H - padB - padT;
+  const slot = W / months.length;
+  const barW = Math.min(14, slot / 3.2);
+  const cExp = (typeof cssColor === 'function' ? cssColor('--expense') : '') || '#f08aa8';
+  const cInc = (typeof cssColor === 'function' ? cssColor('--success') : '') || '#52d489';
+  const cDim = (typeof cssColor === 'function' ? cssColor('--text-dim') : '') || '#76808f';
+  months.forEach((m, i) => {
+    const cx = slot * i + slot / 2;
+    const hExp = chartTtl(m.exp, max, chartH), hInc = chartTtl(m.inc, max, chartH);
+    ctx.fillStyle = cExp;
+    ctx.fillRect(cx - barW - 1, padT + chartH - hExp, barW, hExp);
+    ctx.fillStyle = cInc;
+    ctx.fillRect(cx + 1, padT + chartH - hInc, barW, hInc);
+    ctx.fillStyle = cDim;
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(m.label, cx, H - 6);
+  });
+}
+function chartTtl(v, max, h) { return max > 0 ? h * (v / max) : 0; }
+
+function renderFinanceInsights() {
+  renderBudget();
+  renderQuickCats();
+  renderCategoryBreakdown();
+  renderTrendChart();
+}
+// === 财务洞察 END ===
+
+
+// === 灵感库 ===
+// 图片本体存服务器（走 /api/files），元数据进 KV 同步 —— 换设备能看到卡片，图按需拉。
+let _inspKind = 'thought';
+let _inspImage = null;      // { id, url }
+let _inspTagFilter = '';
+
+function inspData() { return Store.get('inspirations', []); }
+function inspSaveData(list) { Store.set('inspirations', list); }
+
+function openInspiration() {
+  document.getElementById('insp-overlay').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  renderInspirations();
+}
+function closeInspiration() {
+  document.getElementById('insp-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+  updateInspEntryCount();
+}
+
+function inspToggleForm() {
+  const f = document.getElementById('insp-form');
+  const open = f.style.display !== 'none';
+  f.style.display = open ? 'none' : 'block';
+  if (!open) {
+    _inspKind = 'thought'; _inspImage = null;
+    document.getElementById('insp-title').value = '';
+    document.getElementById('insp-content').value = '';
+    document.getElementById('insp-link').value = '';
+    document.getElementById('insp-tags-input').value = '';
+    document.getElementById('insp-preview').innerHTML = '';
+    inspSetKind('thought');
+    document.getElementById('insp-title').focus();
+  }
+}
+
+function inspSetKind(kind) {
+  _inspKind = kind;
+  document.querySelectorAll('.insp-kind').forEach(b => b.classList.toggle('active', b.dataset.kind === kind));
+  document.getElementById('insp-material-fields').style.display = kind === 'material' ? 'block' : 'none';
+}
+
+// 拍照/选图：先用 canvas 压到长边 1600，再上传
+function inspPickImage(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const prev = document.getElementById('insp-preview');
+  prev.innerHTML = '<div style="font-size:0.72rem;color:var(--text-dim);">处理中…</div>';
+  compressImage(file).then(function (dataUrl) {
+    prev.innerHTML = '<img src="' + dataUrl + '" style="max-height:140px;border-radius:var(--radius-sm);">';
+    return uploadImage(dataUrl, file.name).then(function (r) {
+      if (r.error) { prev.innerHTML = ''; _inspImage = null; showToast('上传失败：' + r.error, 'error'); return; }
+      _inspImage = r;
+      showToast('图片已上传（' + Math.round(r.size / 1024) + 'KB）', 'success');
+    });
+  }).catch(function (e) {
+    prev.innerHTML = ''; _inspImage = null; showToast('图片处理失败：' + e.message, 'error');
+  });
+}
+
+function compressImage(file, maxSide, quality) {
+  maxSide = maxSide || 1600; quality = quality || 0.82;
+  return new Promise(function (resolve, reject) {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = function () {
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const m = Math.max(w, h);
+      if (m > maxSide) { const k = maxSide / m; w = Math.round(w * k); h = Math.round(h * k); }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      try { resolve(c.toDataURL('image/jpeg', quality)); } catch (e) { reject(e); }
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('图片读取失败')); };
+    img.src = url;
+  });
+}
+
+function uploadImage(dataUrl, name) {
+  return fetch(serverCfg().base + '/api/files', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + serverCfg().token },
+    body: JSON.stringify({ name: name || '', dataUrl: dataUrl })
+  }).then(function (r) { return r.json(); }).catch(function (e) { return { error: e.message }; });
+}
+
+function inspParseTags(str) {
+  return String(str || '').split(/[ ,，、]+/).map(function (t) { return t.trim(); }).filter(Boolean).slice(0, 8);
+}
+
+function inspSave() {
+  const title = document.getElementById('insp-title').value.trim();
+  const content = document.getElementById('insp-content').value.trim();
+  const link = document.getElementById('insp-link').value.trim();
+  const tags = inspParseTags(document.getElementById('insp-tags-input').value);
+  if (!title && !content && !_inspImage && !link) { showToast('至少写点什么', 'warning'); return; }
+  if (_inspKind === 'material' && !_inspImage && !link) { showToast('素材卡至少要有图或链接', 'warning'); return; }
+  const list = inspData();
+  list.unshift({
+    id: 'insp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    kind: _inspKind,
+    title: title,
+    content: content,
+    tags: tags,
+    link: link,
+    fileId: _inspImage ? _inspImage.id : '',
+    fileUrl: _inspImage ? _inspImage.url : '',
+    createdAt: localStamp()
+  });
+  inspSaveData(list);
+  showToast('已保存', 'success');
+  inspToggleForm();
+  renderInspirations();
+}
+
+function inspDelete(id) {
+  const it = inspData().find(function (x) { return x.id === id; });
+  if (!it) return;
+  if (!confirm('删除这条灵感？' + (it.fileId ? '（图片也会从服务器删除）' : ''))) return;
+  if (it.fileId) {
+    fetch(serverCfg().base + '/api/files/' + it.fileId, {
+      method: 'DELETE', headers: { 'Authorization': 'Bearer ' + serverCfg().token }
+    }).catch(function () {});
+  }
+  inspSaveData(inspData().filter(function (x) { return x.id !== id; }));
+  renderInspirations();
+  showToast('已删除', 'success');
+}
+
+function inspViewImage(url) {
+  const d = document.createElement('div');
+  d.className = 'insp-viewer';
+  d.innerHTML = '<img src="' + url + '">';
+  d.onclick = function () { d.remove(); };
+  document.body.appendChild(d);
+}
+
+function inspSetTagFilter(t) { _inspTagFilter = (_inspTagFilter === t ? '' : t); renderInspirations(); }
+
+function renderInspirations() {
+  const listEl = document.getElementById('insp-list');
+  const barEl = document.getElementById('insp-tagbar');
+  if (!listEl) return;
+  const all = inspData();
+  const q = (document.getElementById('insp-search').value || '').trim().toLowerCase();
+
+  // 标签栏
+  const freq = {};
+  all.forEach(function (it) { (it.tags || []).forEach(function (t) { freq[t] = (freq[t] || 0) + 1; }); });
+  const tags = Object.entries(freq).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 12);
+  barEl.innerHTML = tags.length ? tags.map(function (e) {
+    return '<button class="insp-tagbar-item' + (e[0] === _inspTagFilter ? ' active' : '') + '" onclick="inspSetTagFilter(&quot;' + e[0] + '&quot;)">#' + e[0] + ' ' + e[1] + '</button>';
+  }).join('') : '';
+
+  // 过滤
+  let items = all;
+  if (_inspTagFilter) items = items.filter(function (it) { return (it.tags || []).indexOf(_inspTagFilter) >= 0; });
+  if (q) {
+    items = items.filter(function (it) {
+      return ((it.title || '') + ' ' + (it.content || '') + ' ' + (it.tags || []).join(' ')).toLowerCase().indexOf(q) >= 0;
+    });
+  }
+
+  if (!items.length) {
+    listEl.innerHTML = '<div class="insp-empty">' + (all.length ? '没有匹配的灵感' : '还没有灵感 —— 点右上角「+ 新建」记一条') + '</div>';
+    return;
+  }
+
+  const base = serverCfg().base;
+  listEl.innerHTML = items.map(function (it) {
+    const img = it.fileUrl ? '<img class="insp-thumb" src="' + base + it.fileUrl + '" loading="lazy" onclick="inspViewImage(&quot;' + base + it.fileUrl + '&quot;)">' : '';
+    const link = it.link ? '<div style="margin-top:6px;"><a href="' + it.link + '" target="_blank" rel="noopener" style="font-size:0.72rem;color:var(--accent);word-break:break-all;">' + it.link + '</a></div>' : '';
+    const tagsHtml = (it.tags || []).map(function (t) { return '<span class="insp-tag">#' + t + '</span>'; }).join(' ');
+    const icon = it.kind === 'material' ? '🖼' : '💭';
+    return '<div class="insp-card">' +
+      '<div class="insp-card-head"><span style="font-size:0.85rem;">' + icon + '</span>' +
+      '<span class="insp-card-title">' + (it.title || (it.content || '').slice(0, 24) || '(无标题)') + '</span>' +
+      '<span class="insp-card-time">' + String(it.createdAt || '').slice(5, 16).replace('T', ' ') + '</span>' +
+      '<button class="btn btn-sm" style="padding:2px 8px;font-size:0.68rem;" onclick="inspDelete(&quot;' + it.id + '&quot;)">✕</button></div>' +
+      img +
+      (it.content ? '<div class="insp-card-body">' + escHtml(it.content) + '</div>' : '') +
+      link +
+      (tagsHtml ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + tagsHtml + '</div>' : '') +
+      '</div>';
+  }).join('');
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function updateInspEntryCount() {
+  const el = document.getElementById('insp-entry-count');
+  if (!el) return;
+  const n = inspData().length;
+  el.textContent = n ? (n + ' 条记录') : '记下想法和素材';
+}
+
+// === 灵感库 END ===
+
 // === Initialize Default Data ===
 function initData() {
   if (!Store.get('initialized')) {
@@ -1733,7 +2209,6 @@ function renderTodayTasks() {
           ${t.deadline ? `<span>📅 ${t.deadline}${t.deadline < today ? ' · 已逾期' : ''}</span>` : ''}
         </div>
       </div>
-      <div class="task-reward">+${t.xp}XP +${t.coins}💰</div>
     </div>
   `).join('') || '<div style="color:var(--text-dim);font-size:0.8rem;padding:8px;">今天没有到期任务，去「任务」里安排一个周期任务吧</div>';
 }
@@ -2207,73 +2682,6 @@ function showToast(msg, type = 'info') {
   setTimeout(() => toast.remove(), 2500);
 }
 
-// === Level System ===
-const LEVELS = [
-  { level: 1, xp: 100, title: '数据残片' },
-  { level: 2, xp: 250, title: '数据残片' },
-  { level: 3, xp: 450, title: '数据残片' },
-  { level: 4, xp: 700, title: '数据残片' },
-  { level: 5, xp: 1000, title: '数据残片' },
-  { level: 6, xp: 1400, title: '街头佣兵' },
-  { level: 7, xp: 1900, title: '街头佣兵' },
-  { level: 8, xp: 2500, title: '街头佣兵' },
-  { level: 9, xp: 3200, title: '街头佣兵' },
-  { level: 10, xp: 4000, title: '街头佣兵' },
-  { level: 11, xp: 5000, title: '网络行者' },
-  { level: 12, xp: 6200, title: '网络行者' },
-  { level: 13, xp: 7600, title: '网络行者' },
-  { level: 14, xp: 9200, title: '网络行者' },
-  { level: 15, xp: 11000, title: '网络行者' },
-  { level: 16, xp: 13200, title: '赛博武士' },
-  { level: 17, xp: 15800, title: '赛博武士' },
-  { level: 18, xp: 18800, title: '赛博武士' },
-  { level: 19, xp: 22200, title: '赛博武士' },
-  { level: 20, xp: 26000, title: '赛博武士' },
-  { level: 21, xp: 31000, title: '系统骇客' },
-  { level: 22, xp: 37000, title: '系统骇客' },
-  { level: 23, xp: 44000, title: '系统骇客' },
-  { level: 24, xp: 52000, title: '系统骇客' },
-  { level: 25, xp: 61000, title: '系统骇客' },
-  { level: 26, xp: 999999, title: '核心之主' }
-];
-
-function getLevelInfo(xp) {
-  for (let i = 0; i < LEVELS.length; i++) {
-    if (xp < LEVELS[i].xp) {
-      const prev = i > 0 ? LEVELS[i - 1].xp : 0;
-      const needed = LEVELS[i].xp;
-      return {
-        level: LEVELS[i].level,
-        title: LEVELS[i].title,
-        current: xp - prev,
-        needed: needed - prev,
-        progress: ((xp - prev) / (needed - prev)) * 100
-      };
-    }
-  }
-  return { level: 26, title: '核心之主', current: 999999, needed: 999999, progress: 100 };
-}
-
-function addXP(amount) {
-  const profile = Store.get('profile');
-  profile.xp += amount;
-  const oldLevel = profile.level;
-  const info = getLevelInfo(profile.xp);
-  profile.level = info.level;
-  Store.set('profile', profile);
-  if (profile.level > oldLevel) {
-    showToast(`⬆ 等级提升！Lv.${profile.level} ${info.title}`, 'success');
-  }
-  updateDashboard();
-}
-
-function addCoins(amount) {
-  const profile = Store.get('profile');
-  profile.coins += amount;
-  Store.set('profile', profile);
-  updateDashboard();
-}
-
 // === Task Management ===
 function generateId() { return 't_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6); }
 
@@ -2329,10 +2737,6 @@ function completeTask(id) {
   task.completedAt = localStamp();
   task.progress = 100;
   saveTasks(tasks);
-
-  // Rewards
-  addXP(task.xp);
-  addCoins(task.coins);
 
   // Update completion log
   const today = TODAY();
@@ -2431,8 +2835,6 @@ function openTaskModal(editId = null) {
       document.getElementById('task-name').value = task.title;
       document.getElementById('task-type').value = task.type;
       document.getElementById('task-priority').value = task.priority;
-      document.getElementById('task-xp').value = task.xp;
-      document.getElementById('task-coins').value = task.coins;
       document.getElementById('task-deadline').value = task.deadline;
       document.getElementById('task-note').value = task.note || '';
       populateTaskCourseSelect(task.course || '');
@@ -2444,8 +2846,6 @@ function openTaskModal(editId = null) {
     document.getElementById('task-name').value = '';
     document.getElementById('task-type').value = 'side';
     document.getElementById('task-priority').value = 'medium';
-    document.getElementById('task-xp').value = '50';
-    document.getElementById('task-coins').value = '30';
     document.getElementById('task-deadline').value = '';
     document.getElementById('task-note').value = '';
     populateTaskCourseSelect('');
@@ -2481,8 +2881,6 @@ function saveTask() {
     title: document.getElementById('task-name').value.trim(),
     type: document.getElementById('task-type').value,
     priority: document.getElementById('task-priority').value,
-    xp: document.getElementById('task-xp').value,
-    coins: document.getElementById('task-coins').value,
     deadline: document.getElementById('task-deadline').value,
     note: document.getElementById('task-note').value.trim(),
     course: document.getElementById('task-course').value,
@@ -2591,7 +2989,6 @@ function renderTasks() {
           ${progressHtml}
         </div>
       </div>
-      <div class="task-reward">+${t.xp}XP +${t.coins}💰</div>
       <div class="task-actions">
         <button class="btn btn-sm" onclick="event.stopPropagation(); openTaskModal('${t.id}')">编辑</button>
         <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteTask('${t.id}'); renderAll();">删除</button>
@@ -2890,7 +3287,8 @@ function renderWallet() {
   document.getElementById('wallet-month-income').textContent = '¥' + monthInc.toFixed(1);
 
   renderWalletHistory();
-}
+
+  renderFinanceInsights();}
 
 // === Investment Journal (交易复盘) ===
 function renderInvestJournal() {
@@ -3262,6 +3660,9 @@ function openSetBalanceModal() {
 
 // === Settings Functions ===
 function renderSettings() {
+  // 灵感库条目数
+  updateInspEntryCount();
+
   // 服务器连接回填 + 状态
   syncServerFields();
 
@@ -3269,7 +3670,6 @@ function renderSettings() {
   renderSettingsHabits();
 
   // Level info
-  renderSettingsLevel();
 }
 
 function renderSettingsHabits() {
@@ -3307,28 +3707,6 @@ function addHabit() {
   habits.templates.push({ id: 'h_' + Date.now(), name: name.trim(), icon: icon.trim(), enabled: true });
   Store.set('habits', habits);
   renderSettingsHabits();
-}
-
-function renderSettingsLevel() {
-  const profile = Store.get('profile', {});
-  const info = getLevelInfo(profile.xp || 0);
-  const el = document.getElementById('settings-level-info');
-  if (!el) return;
-  el.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;">
-      <div class="level-badge" style="width:48px;height:48px;font-size:1.3rem;">Lv.${info.level}</div>
-      <div style="flex:1;">
-        <div style="color:var(--accent-2);font-size:0.88rem;font-family:var(--font-mono);">${info.title}</div>
-        <div class="progress-bar" style="margin-top:6px;"><div class="progress-fill" style="width:${info.progress}%"></div></div>
-        <div style="font-size:0.72rem;color:var(--text-dim);margin-top:4px;">EXP ${info.current} / ${info.needed}</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;">
-      <div style="text-align:center;"><div style="font-family:var(--font-mono);color:var(--accent);">${profile.coins||0}</div><div style="font-size:0.68rem;color:var(--text-dim);">积分</div></div>
-      <div style="text-align:center;"><div style="font-family:var(--font-mono);color:var(--orange);">${profile.streak||0}</div><div style="font-size:0.68rem;color:var(--text-dim);">连续天数</div></div>
-      <div style="text-align:center;"><div style="font-family:var(--font-mono);color:var(--success);">${profile.totalCompleted||0}</div><div style="font-size:0.68rem;color:var(--text-dim);">完成任务</div></div>
-    </div>
-  `;
 }
 
 // === Data Export/Import ===
@@ -3826,7 +4204,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   KVSync.init();        // 内部会在短暂延迟后自动拉取一次
   syncServerFields();
-  bindSectionToggles(); // 今日面板区块折叠：标题行点击
+  bindSectionToggles();
+  updateInspEntryCount(); // 今日面板区块折叠：标题行点击
 });
 
 // Auto-refresh daily at midnight
