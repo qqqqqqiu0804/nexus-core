@@ -57,12 +57,25 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_entries_date ON entries(date);
 `);
 
+// 迁移：给日记加「客户端修改时间」(毫秒)。
+// 为什么需要：日记原本是「后写覆盖」——两台设备都写同一天时，最后到的那个赢，
+// 中途失败的推送则永远落后。加上客户端时间戳后可以判定谁更新，旧的推不动新的。
+// 老数据默认为 0 —— 任何一次新推送都能覆盖它们，符合预期。
+{
+  const cols = db.prepare('PRAGMA table_info(entries)').all().map(c => c.name);
+  if (!cols.includes('client_ts')) {
+    db.exec('ALTER TABLE entries ADD COLUMN client_ts INTEGER NOT NULL DEFAULT 0');
+    console.log('[migrate] entries 表已加 client_ts 列');
+  }
+}
+
 const stmts = {
-  all: db.prepare('SELECT date, content, chars, updated_at FROM entries ORDER BY date DESC'),
-  get: db.prepare('SELECT date, content, chars, updated_at FROM entries WHERE date = ?'),
-  upsert: db.prepare(`INSERT INTO entries (date, content, chars) VALUES (?, ?, ?)
+  all: db.prepare('SELECT date, content, chars, updated_at, client_ts FROM entries ORDER BY date DESC'),
+  get: db.prepare('SELECT date, content, chars, updated_at, client_ts FROM entries WHERE date = ?'),
+  upsert: db.prepare(`INSERT INTO entries (date, content, chars, client_ts) VALUES (?, ?, ?, ?)
                       ON CONFLICT(date) DO UPDATE SET content = excluded.content,
-                      chars = excluded.chars, updated_at = datetime('now','localtime')`),
+                      chars = excluded.chars, client_ts = excluded.client_ts,
+                      updated_at = datetime('now','localtime')`),
   del: db.prepare('DELETE FROM entries WHERE date = ?')
 };
 
@@ -138,13 +151,23 @@ app.get('/api/entries/:date', wrap(req => {
   return stmts.get.get(date) || null;
 }));
 
-// PUT /api/entries/:date —— 写/改某一天（同一天重复写 = 覆盖更新）
+// PUT /api/entries/:date —— 写/改某一天
+// 带客户端时间戳做「后写胜出」：服务端版本更新时不覆盖，而是把服务端版本回给前端，
+// 让两端收敛到同一份内容（与 /api/kv 同一套策略）。
 app.put('/api/entries/:date', wrap(req => {
   const { date } = req.params;
   if (!DATE_RE.test(date)) throw new Error('日期格式应为 YYYY-MM-DD');
   const content = String(req.body?.content ?? '');
-  const info = stmts.upsert.run(date, content, content.length);
-  return { ok: true, changes: Number(info.changes) };
+  const clientTs = Number(req.body?.updatedAt) || Date.now();
+  const cur = stmts.get.get(date);
+  if (cur && cur.client_ts > clientTs) {
+    return {
+      ok: true, conflict: true,
+      entry: { date: cur.date, content: cur.content, chars: cur.chars, updatedAt: cur.client_ts }
+    };
+  }
+  const info = stmts.upsert.run(date, content, content.length, clientTs);
+  return { ok: true, changes: Number(info.changes), updatedAt: clientTs };
 }));
 
 // DELETE /api/entries/:date
@@ -160,7 +183,7 @@ app.post('/api/entries/import', wrap(req => {
   const valid = list.filter(e => e && DATE_RE.test(e.date) && typeof e.content === 'string');
   db.exec('BEGIN');
   try {
-    for (const e of valid) stmts.upsert.run(e.date, e.content, e.content.length);
+    for (const e of valid) stmts.upsert.run(e.date, e.content, e.content.length, Number(e.updatedAt) || Date.now());
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK'); // 出错全回滚，不会导一半

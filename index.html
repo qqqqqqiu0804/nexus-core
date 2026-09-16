@@ -820,6 +820,7 @@ button:focus-visible { box-shadow: var(--ring); }
         <span class="section-title">◆ 今日记</span>
       </div>
       <textarea id="daily-journal" placeholder="写下今天的心情和想法..." style="min-height: 80px;" oninput="saveJournal()"></textarea>
+      <div id="journal-sync-hint" style="display:none;font-size:0.68rem;color:var(--warn);margin-top:6px;line-height:1.5;"></div>
     </div>
 
   </div>
@@ -1259,8 +1260,8 @@ button:focus-visible { box-shadow: var(--ring); }
       <textarea id="insp-content" placeholder="写点什么…" style="width:100%;min-height:80px;margin-bottom:8px;"></textarea>
       <div id="insp-material-fields" style="display:none;">
         <label style="display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border:1px dashed var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:0.78rem;cursor:pointer;margin-bottom:8px;">
-          📷 拍照 / 选图
-          <input type="file" accept="image/*" capture="environment" onchange="inspPickImage(this)" style="display:none;">
+          🖼 从相册选图
+          <input type="file" accept="image/*" onchange="inspPickImage(this)" style="display:none;">
         </label>
         <div id="insp-preview" style="margin-bottom:8px;"></div>
         <input id="insp-link" placeholder="原链接（可选）" style="width:100%;margin-bottom:8px;">
@@ -2098,15 +2099,29 @@ function renderDailyHub() {
   const journalEl = document.getElementById('daily-journal');
   if (journalEl && journal[today] !== undefined) journalEl.value = journal[today];
   else if (journalEl) journalEl.value = '';
-  // 配置了后端时，以服务端内容为准（仅在用户尚未输入新内容时覆盖）
+  // 配置了后端时，只有「服务端版本确实更新过」且「用户还没在这页输入」才覆盖本地显示。
+  // 两个条件缺一不可：只比字符串会让本机较新的内容被服务端旧版盖掉（本地副本还在，
+  // 但界面上显示旧内容，用户一输入就把新内容真写没了）。
   if (journalApiOn() && journalEl) {
     const cached = journal[today] || '';
+    const localTs = Number(journalMeta()[today]) || 0;
     const { base } = journalApiCfg();
     fetch(`${base}/api/entries/${today}`, { headers: journalHeaders() })
       .then(r => r.ok ? r.json() : null)
-      .then(e => { if (e && typeof e.content === 'string' && journalEl.value === cached) journalEl.value = e.content; })
+      .then(e => {
+        const serverContent = (e && typeof e.content === 'string') ? e.content : null;
+        const serverTs = serverContent !== null ? (Number(e.client_ts) || 0) : 0;
+        // 服务端更新 → 采用服务端版本
+        if (serverContent !== null && serverTs > localTs && journalEl.value === cached) {
+          adoptServerEntry(today, { content: serverContent, updatedAt: serverTs });
+          return;
+        }
+        // 本机更新（或服务端还没有这天）→ 把本机版本推上去，别让服务端停在旧版
+        if (localTs > serverTs && cached.trim()) pushJournalEntry(today, cached);
+      })
       .catch(() => {});
   }
+  updateJournalSyncHint();
 }
 
 // --- Time Allocation ---
@@ -2343,12 +2358,23 @@ function renderDailyExpense() {
 }
 
 // --- Journal ---
+// 日记有两条并行的存储：localStorage（本机即时、离线可用）与服务器 SQLite（权威副本）。
+// journalMeta 记录「本机最后一次改动某天日记的时刻」，用于和服务端的 client_ts 比大小，
+// 决定冲突时谁赢 —— 没有它就只能「后写覆盖」，两台设备会互相盖掉。
+function journalMeta() { return Store.get('journalMeta', {}); }
+function stampJournalMeta(date, ts) {
+  const m = journalMeta();
+  m[date] = ts;
+  Store.set('journalMeta', m);
+}
 function saveJournal() {
   const journal = Store.get('journal', {});
+  const date = TODAY();
   const val = document.getElementById('daily-journal').value;
-  journal[TODAY()] = val;
+  journal[date] = val;
   Store.set('journal', journal);
-  scheduleJournalSync(TODAY(), val); // 配置了后端则 1s 防抖后同步
+  stampJournalMeta(date, Date.now());
+  scheduleJournalSync(date, val); // 配置了后端则 1s 防抖后同步
 }
 
 // === 日记后端（server/ 目录，Express + SQLite）===
@@ -2371,19 +2397,143 @@ function journalHeaders() {
   return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + journalApiCfg().token };
 }
 // 防抖同步：输入停顿 1 秒后 PUT 到后端；localStorage 始终同步写（离线兜底）
+//
+// 失败处理是这里的关键：原来失败只弹一个 2 秒的提示就没了 —— 手机信号差或后端瞬断时，
+// 那天的日记就只留在本机，而她根本来不及看清提示。现在改成「待补推队列」：
+// 失败内容落进 nexus_journalPending，联网后（启动时 / 手动同步后）自动重试，
+// 并在日记框下方常驻一行提示，直到真的传上去为止。
+function journalPending() { return Store.get('journalPending', {}); }
+function queueJournalPending(date, content, ts) {
+  const q = journalPending();
+  q[date] = { content: content, updatedAt: ts };
+  Store.set('journalPending', q);
+  updateJournalSyncHint();
+}
+function clearJournalPending(date) {
+  const q = journalPending();
+  if (!(date in q)) return;
+  delete q[date];
+  Store.set('journalPending', q);
+  updateJournalSyncHint();
+}
+
 let _journalSyncTimer = null;
 function scheduleJournalSync(date, content) {
-  if (!journalApiOn()) return;
+  if (!journalApiOn()) {
+    // 没配服务器时日记只有本机一份 —— 必须让她看得见，不能以为已经上云了
+    updateJournalSyncHint();
+    return;
+  }
   clearTimeout(_journalSyncTimer);
   _journalSyncTimer = setTimeout(() => pushJournalEntry(date, content), 1000);
 }
+
+// 采用服务端版本（冲突时服务端更新）：写回本地 + 更新 meta + 刷新输入框
+function adoptServerEntry(date, entry) {
+  const journal = Store.get('journal', {});
+  journal[date] = entry.content;
+  Store.set('journal', journal);
+  stampJournalMeta(date, Number(entry.updatedAt) || Date.now());
+  const el = document.getElementById('daily-journal');
+  if (el && date === TODAY()) el.value = entry.content;
+}
+
 async function pushJournalEntry(date, content) {
+  const ts = journalMeta()[date] || Date.now();
   try {
     const { base } = journalApiCfg();
-    const r = await fetch(`${base}/api/entries/${date}`, { method: 'PUT', headers: journalHeaders(), body: JSON.stringify({ content }) });
+    const r = await fetch(`${base}/api/entries/${date}`, {
+      method: 'PUT', headers: journalHeaders(),
+      body: JSON.stringify({ content: content, updatedAt: ts })
+    });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-  } catch (e) { showToast('日记同步后端失败：' + e.message, 'error'); }
+    const j = await r.json().catch(() => null);
+    if (j && j.conflict && j.entry) {
+      // 服务端有更新的版本（多半是另一台设备刚写的）→ 采用它，两端收敛
+      adoptServerEntry(date, j.entry);
+      clearJournalPending(date);
+      showToast('这天的日记在别的设备上更新过，已同步为最新版本', 'info');
+      return;
+    }
+    clearJournalPending(date);
+  } catch (e) {
+    queueJournalPending(date, content, ts);
+    showToast('日记已存本机，联网后自动补传', 'warning');
+  }
 }
+
+// 补推队列：启动时与手动同步后调用。单条失败不影响其它条，留着下次再试。
+async function flushJournalPending() {
+  if (!journalApiOn()) return { ok: false, pushed: 0 };
+  const dates = Object.keys(journalPending());
+  if (!dates.length) return { ok: true, pushed: 0 };
+  let pushed = 0;
+  for (const d of dates) {
+    const item = journalPending()[d];
+    if (!item) continue;
+    try {
+      const { base } = journalApiCfg();
+      const r = await fetch(`${base}/api/entries/${d}`, {
+        method: 'PUT', headers: journalHeaders(),
+        body: JSON.stringify({ content: item.content, updatedAt: item.updatedAt })
+      });
+      if (!r.ok) continue;
+      const j = await r.json().catch(() => null);
+      if (j && j.conflict && j.entry) adoptServerEntry(d, j.entry);
+      clearJournalPending(d);
+      pushed++;
+    } catch (e) { /* 还是连不上，下次再试 */ }
+  }
+  if (pushed) showToast('已补传 ' + pushed + ' 天的日记到服务器', 'success');
+  return { ok: true, pushed: pushed };
+}
+
+// 启动时把本机与服务器两边的日记做一次全量对齐（与 KV 同步同一套思路）：
+//   服务端更新的日期 → 采用服务端版本（新设备因此能自动恢复全部历史日记）
+//   本机更新的日期   → 推上服务器（别让服务端停在旧版）
+// 只多发一个请求（全量列表本来就很小），换来的是日记真正双向一致。
+async function syncJournalAll() {
+  if (!journalApiOn()) return { ok: false, error: '未配置' };
+  try {
+    const list = await fetchAllEntries();
+    const server = {};
+    (Array.isArray(list) ? list : []).forEach(e => { server[e.date] = e; });
+    const meta = journalMeta();
+    const local = Store.get('journal', {});
+    const dates = new Set(Object.keys(local).concat(Object.keys(server)));
+    let pulled = 0, pushed = 0;
+    for (const d of dates) {
+      const s = server[d];
+      const serverTs = s ? (Number(s.client_ts) || 0) : 0;
+      const localTs = Number(meta[d]) || 0;
+      const localContent = typeof local[d] === 'string' ? local[d] : '';
+      if (s && serverTs > localTs) { adoptServerEntry(d, { content: s.content, updatedAt: serverTs }); pulled++; }
+      else if (localTs > serverTs && localContent.trim()) { await pushJournalEntry(d, localContent); pushed++; }
+    }
+    if (pulled || pushed) { try { renderJournalArchive(); } catch (e) {} updateJournalSyncHint(); }
+    return { ok: true, pulled: pulled, pushed: pushed };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+// 日记同步状态提示（常驻一行，不靠一闪而过的 toast）
+function updateJournalSyncHint() {
+  const el = document.getElementById('journal-sync-hint');
+  if (!el) return;
+  const n = Object.keys(journalPending()).length;
+  if (n) {
+    el.style.display = 'block';
+    el.textContent = '⚠ ' + n + ' 天的日记还没传到服务器（已存本机，联网后自动补传）';
+    return;
+  }
+  if (!journalApiOn() && Object.keys(Store.get('journal', {})).length) {
+    el.style.display = 'block';
+    el.textContent = '⚠ 未连接服务器：日记目前只存在这台设备上（去「我的 → 服务器同步」填访问令牌）';
+    return;
+  }
+  el.style.display = 'none';
+  el.textContent = '';
+}
+
 async function fetchAllEntries() {
   const { base } = journalApiCfg();
   const r = await fetch(`${base}/api/entries`, { headers: journalHeaders() });
@@ -2413,6 +2563,7 @@ function saveServerCfg() {
     showToast('连接成功（服务端 ' + r.keys + ' 项），正在同步…', 'success');
     const p = await KVSync.pull();
     if (p.ok) showToast('同步完成：拉取 ' + p.pulled + ' 项，上传 ' + p.pushed + ' 项', 'success');
+    await flushJournalPending();   // 顺手把没传上去的日记补掉
     syncServerFields();
   });
 }
@@ -2423,13 +2574,20 @@ async function syncNow() {
   const p = await KVSync.pull();
   if (p.ok) showToast('同步完成：拉取 ' + p.pulled + ' 项，上传 ' + p.pushed + ' 项', 'success');
   else showToast('同步失败：' + p.error, 'error');
+  await flushJournalPending();
+  updateJournalSyncHint();
 }
 
 async function importJournalToServer() {
   if (!journalApiOn()) { showToast('请先配置并保存日记后端', 'warning'); return; }
   const j = Store.get('journal', {});
+  const meta = journalMeta();
   const entries = Object.entries(j)
-    .map(([date, v]) => ({ date, content: typeof v === 'string' ? v : (v && v.text) || '' }))
+    .map(([date, v]) => ({
+      date,
+      content: typeof v === 'string' ? v : (v && v.text) || '',
+      updatedAt: Number(meta[date]) || Date.now()
+    }))
     .filter(e => e.content.trim());
   if (!entries.length) { showToast('本机没有可导入的日记', 'info'); return; }
   try {
@@ -2438,6 +2596,8 @@ async function importJournalToServer() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const res = await r.json();
     showToast(`导入完成：${res.imported} 篇入后端，${res.skipped} 篇跳过`, 'success');
+    // 导入成功后这批内容算已上传，清掉对应的待补推记录
+    entries.forEach(e => clearJournalPending(e.date));
     renderJournalArchive();
   } catch (e) { showToast('导入失败：' + e.message, 'error'); }
 }
@@ -4223,6 +4383,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   boot('仪表盘', updateDashboard);
 
   safe('同步初始化', () => KVSync.init());      // 内部会在短暂延迟后自动拉取一次
+  safe('日记补推', () => {
+    if (!journalApiOn()) return;
+    setTimeout(async () => { await flushJournalPending(); await syncJournalAll(); }, 1500);
+  });
   safe('服务器字段回填', syncServerFields);
   safe('折叠点击绑定', bindSectionToggles);
   safe('灵感入口计数', updateInspEntryCount);
