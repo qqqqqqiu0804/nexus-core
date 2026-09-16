@@ -1116,7 +1116,10 @@ button:focus-visible { box-shadow: var(--ring); }
           </div>
           <div class="form-group" style="margin-bottom:8px;">
             <label style="font-size:0.72rem;">访问令牌</label>
-            <input type="password" id="cfg-server-token" placeholder="AUTH_TOKEN" style="width:100%;">
+            <div style="display:flex;gap:6px;">
+              <input type="password" id="cfg-server-token" placeholder="AUTH_TOKEN" style="flex:1;min-width:0;">
+              <button class="btn btn-sm" onclick="copyServerToken()" title="复制令牌，方便粘到另一台设备">复制</button>
+            </div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-primary btn-sm" onclick="saveServerCfg()">保存并连接</button>
@@ -4254,6 +4257,27 @@ function gotoServerSetup() {
     card.scrollIntoView({ block: 'center' });
     setTimeout(() => card.focus(), 300);
   }
+}
+
+// 复制已保存的令牌：换设备 / 换容器（如 iOS 主屏应用）时不用再翻服务器。
+// 只写剪贴板、不上屏，避免令牌被截图带走。
+function copyServerToken() {
+  const t = Store.get('serverToken', '') || '';
+  if (!t) { showToast('还没填令牌', 'warning'); return; }
+  const done = () => showToast('令牌已复制，去另一台设备的「服务器同步」里粘贴', 'success');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(done).catch(() => fallbackCopy(t, done));
+  } else fallbackCopy(t, done);
+}
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) { showToast('复制失败，请手动查看服务器配置', 'error'); }
+  ta.remove();
 }
 
 // === Initialize ===
