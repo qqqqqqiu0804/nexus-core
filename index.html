@@ -41,6 +41,7 @@
   --radius-sm: 8px;
   --radius: 12px;
   --radius-lg: 16px;
+  --overlay: rgba(10, 12, 16, 0.55);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-pop: 0 4px 12px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.45);
   --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
@@ -68,6 +69,7 @@ html.light {
   --expense: #c2507a;
   --violet: #7c5cd6;
   --orange: #c26a1e;
+  --overlay: rgba(16, 24, 40, 0.35);
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.07);
   --shadow-pop: 0 4px 12px rgba(16, 24, 40, 0.1), 0 16px 40px rgba(16, 24, 40, 0.14);
 }
@@ -101,12 +103,12 @@ body {
   position: relative;
 }
 .header-title {
-  font-size: 1.35rem; font-weight: 700;
+  font-size:1.3rem; font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--text-primary);
 }
 .header-subtitle {
-  font-size: 0.75rem; color: var(--text-dim);
+  font-size:0.78rem; color: var(--text-dim);
   letter-spacing: 0.02em; margin-top: 2px;
 }
 
@@ -134,10 +136,10 @@ body {
   margin-bottom: 8px;
 }
 .card-title {
-  font-size: 0.9rem; font-weight: 600;
+  font-size:0.88rem; font-weight: 600;
   color: var(--text-primary);
 }
-.card-subtitle { font-size: 0.75rem; color: var(--text-dim); }
+.card-subtitle { font-size:0.78rem; color: var(--text-dim); }
 
 /* === Progress Bar === */
 .progress-bar {
@@ -153,7 +155,7 @@ body {
 /* === Status Badge === */
 .badge {
   display: inline-block; padding: 2px 8px; border-radius: 999px;
-  font-size: 0.68rem; font-weight: 500;
+  font-size:0.68rem; font-weight: 500;
 }
 .badge-cyan { background: var(--accent-soft); color: var(--accent); }
 .badge-magenta { background: color-mix(in srgb, var(--accent-2) 14%, transparent); color: var(--accent-2); }
@@ -167,7 +169,7 @@ body {
 .btn {
   padding: 8px 16px; border: 1px solid var(--border-subtle);
   background: var(--bg-card); color: var(--text-secondary);
-  font-family: var(--font-sans); font-size: 0.8rem; font-weight: 500;
+  font-family: var(--font-sans); font-size:0.8rem; font-weight: 500;
   border-radius: var(--radius-sm); cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
@@ -181,14 +183,14 @@ body {
 .btn-primary:hover { background: color-mix(in srgb, var(--accent) 85%, #fff); color: #fff; }
 .btn-danger { border-color: color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger); }
 .btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
-.btn-sm { padding: 4px 10px; font-size: 0.72rem; }
+.btn-sm { padding: 4px 10px; font-size:0.72rem; }
 .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
 
 /* === Forms === */
 input, select, textarea {
   background: var(--bg-deep); border: 1px solid var(--border-subtle);
   color: var(--text-primary); font-family: var(--font-sans);
-  font-size: 0.85rem; padding: 8px 12px; border-radius: var(--radius-sm);
+  font-size:0.88rem; padding: 8px 12px; border-radius: var(--radius-sm);
   width: 100%; outline: none; transition: border-color 0.15s, box-shadow 0.15s;
 }
 input:focus, select:focus, textarea:focus {
@@ -199,7 +201,7 @@ textarea { resize: vertical; min-height: 60px; }
 select { cursor: pointer; appearance: none; }
 select option { background: var(--bg-panel); color: var(--text-primary); }
 label {
-  display: block; font-size: 0.75rem; color: var(--text-secondary);
+  display: block; font-size:0.78rem; color: var(--text-secondary);
   margin-bottom: 4px;
 }
 .form-group { margin-bottom: 12px; }
@@ -220,10 +222,10 @@ label {
   border-radius: var(--radius); padding: 16px; text-align: center;
 }
 .stat-value {
-  font-family: var(--font-mono); font-size: 1.5rem; font-weight: 700;
+  font-family: var(--font-mono); font-size:1.5rem; font-weight: 700;
   color: var(--text-primary);
 }
-.stat-label { font-size: 0.7rem; color: var(--text-dim); margin-top: 4px; }
+.stat-label { font-size:0.72rem; color: var(--text-dim); margin-top: 4px; }
 
 /* === Level Display === */
 .level-display {
@@ -236,15 +238,15 @@ label {
   width: 56px; height: 56px; border-radius: 50%;
   border: 2px solid var(--accent);
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700;
+  font-family: var(--font-mono); font-size:1.5rem; font-weight: 700;
   color: var(--accent); flex-shrink: 0;
 }
 .level-info { flex: 1; }
 .level-title {
-  font-size: 0.9rem; font-weight: 600;
+  font-size:0.88rem; font-weight: 600;
   color: var(--text-primary);
 }
-.level-xp { font-size: 0.7rem; color: var(--text-dim); margin-top: 4px; }
+.level-xp { font-size:0.72rem; color: var(--text-dim); margin-top: 4px; }
 
 /* === Task List === */
 .task-item {
@@ -261,7 +263,7 @@ label {
   width: 20px; height: 20px; border: 2px solid var(--border-subtle);
   border-radius: 6px; cursor: pointer; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  transition: background 0.15s, border-color 0.15s; font-size: 0.7rem;
+  transition: background 0.15s, border-color 0.15s; font-size:0.72rem;
 }
 .task-check:hover { border-color: var(--accent); }
 .task-check.checked {
@@ -269,12 +271,12 @@ label {
   color: #fff;
 }
 .task-info { flex: 1; min-width: 0; }
-.task-title { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-title { font-size:0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .task-meta {
-  font-size: 0.7rem; color: var(--text-dim);
+  font-size:0.72rem; color: var(--text-dim);
   display: flex; gap: 12px; margin-top: 2px;
 }
-.task-reward { font-size: 0.7rem; color: var(--warn); flex-shrink: 0; }
+.task-reward { font-size:0.72rem; color: var(--warn); flex-shrink: 0; }
 .task-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
 /* === Section Header === */
@@ -284,18 +286,18 @@ label {
   border-bottom: 1px solid var(--border-subtle);
 }
 .section-title {
-  font-size: 0.85rem; font-weight: 600;
+  font-size:0.88rem; font-weight: 600;
   color: var(--text-primary);
 }
 .section-count {
-  font-size: 0.72rem;
+  font-size:0.72rem;
   color: var(--text-dim);
 }
 
 /* === Modal === */
 .modal-overlay {
   display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(10, 12, 16, 0.55); backdrop-filter: blur(4px); z-index: 100;
+  background: var(--overlay); backdrop-filter: blur(4px); z-index: 100;
   align-items: center; justify-content: center;
 }
 .modal-overlay.show { display: flex; }
@@ -307,7 +309,7 @@ label {
   max-height: 85vh; overflow-y: auto;
 }
 .modal-title {
-  font-size: 1rem; font-weight: 700;
+  font-size:1rem; font-weight: 700;
   color: var(--text-primary); margin-bottom: 16px;
 }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
@@ -327,7 +329,7 @@ label {
 }
 .toast {
   padding: 10px 16px; border-radius: var(--radius-sm);
-  font-size: 0.8rem; box-shadow: var(--shadow-pop);
+  font-size:0.8rem; box-shadow: var(--shadow-pop);
   border: 1px solid;
 }
 .toast-success { background: var(--bg-card); border-color: var(--success); color: var(--success); }
@@ -355,7 +357,7 @@ button:focus-visible { box-shadow: var(--ring); }
   padding: 6px 12px; background: var(--bg-card);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
   cursor: pointer; white-space: nowrap;
-  font-size: 0.75rem; color: var(--text-secondary);
+  font-size:0.78rem; color: var(--text-secondary);
   transition: border-color 0.15s, color 0.15s;
 }
 .sync-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -372,7 +374,7 @@ button:focus-visible { box-shadow: var(--ring); }
 @keyframes syncPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 .checkbox-label {
   display: flex; align-items: center; gap: 8px;
-  font-family: var(--font-sans); font-size: 0.8rem;
+  font-family: var(--font-sans); font-size:0.8rem;
   cursor: pointer; letter-spacing: 0;
 }
 .checkbox-label input[type="checkbox"] { width: auto; margin: 0; }
@@ -380,18 +382,18 @@ button:focus-visible { box-shadow: var(--ring); }
 /* === Daily Hub Styles === */
 .daily-date-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 18px; background: var(--bg-card); border: 1px solid var(--border-subtle);
+  padding:16px; background: var(--bg-card); border: 1px solid var(--border-subtle);
   border-radius: var(--radius); margin-bottom: 16px;
   box-shadow: var(--shadow-card);
 }
 .daily-date-main { display: flex; align-items: center; gap: 12px; }
 .daily-date-big {
-  font-family: var(--font-mono); font-size: 2.5rem; font-weight: 700;
+  font-family: var(--font-mono); font-size:2.5rem; font-weight: 700;
   color: var(--text-primary); line-height: 1;
 }
-.daily-date-info { font-size: 0.8rem; color: var(--text-secondary); }
+.daily-date-info { font-size:0.8rem; color: var(--text-secondary); }
 .daily-streak-badge {
-  font-family: var(--font-mono); font-size: 0.75rem;
+  font-family: var(--font-mono); font-size:0.78rem;
   padding: 4px 10px; border-radius: 12px;
   background: color-mix(in srgb, var(--orange) 10%, transparent); border: 1px solid color-mix(in srgb, var(--orange) 30%, transparent);
   color: var(--orange);
@@ -408,28 +410,28 @@ button:focus-visible { box-shadow: var(--ring); }
   cursor: pointer; transition: border-color 0.15s;
 }
 .daily-meal-card:hover { border-color: var(--accent-line); }
-.daily-meal-icon { font-size: 1.3rem; margin-bottom: 4px; }
-.daily-meal-label { font-size: 0.65rem; color: var(--text-dim); margin-bottom: 4px; }
-.daily-meal-content { font-size: 0.7rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.daily-meal-icon { font-size:1.3rem; margin-bottom: 4px; }
+.daily-meal-label { font-size:0.68rem; color: var(--text-dim); margin-bottom: 4px; }
+.daily-meal-content { font-size:0.72rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .daily-sleep-row { display: flex; gap: 12px; }
 .daily-sleep-item { flex: 1; }
-.daily-sleep-item label { display: block; font-size: 0.7rem; color: var(--text-dim); margin-bottom: 4px; }
+.daily-sleep-item label { display: block; font-size:0.72rem; color: var(--text-dim); margin-bottom: 4px; }
 .daily-sleep-item input { width: 100%; }
 .daily-habit-item {
   display: flex; align-items: center; gap: 10px; padding: 8px 10px;
   border-bottom: 1px solid var(--border-subtle); cursor: pointer;
 }
 .daily-habit-item:last-child { border-bottom: none; }
-.daily-habit-icon { font-size: 1.2rem; width: 28px; text-align: center; }
-.daily-habit-name { flex: 1; font-size: 0.85rem; }
+.daily-habit-icon { font-size:1.3rem; width: 28px; text-align: center; }
+.daily-habit-name { flex: 1; font-size:0.88rem; }
 .daily-habit-check {
   width: 22px; height: 22px; border: 2px solid var(--border-subtle);
   border-radius: 4px; display: flex; align-items: center; justify-content: center;
-  transition: all 0.2s; font-size: 0.7rem; flex-shrink: 0;
+  transition: all 0.2s; font-size:0.72rem; flex-shrink: 0;
 }
 .daily-habit-check.checked { background: var(--success); border-color: var(--success); color: #fff; }
 .daily-time-tag {
-  padding: 4px 10px; border-radius: 12px; font-size: 0.7rem;
+  padding: 4px 10px; border-radius: 12px; font-size:0.72rem;
   background: var(--bg-deep); border: 1px solid var(--border-subtle);
   color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
 }
@@ -447,31 +449,31 @@ button:focus-visible { box-shadow: var(--ring); }
 }
 .tab-item {
   flex: 1; display: flex; flex-direction: column; align-items: center;
-  gap: 2px; padding: 7px 0; border: none; background: transparent;
+  gap: 2px; padding:6px 0; border: none; background: transparent;
   color: var(--text-dim); cursor: pointer; transition: color 0.15s;
-  font-size: 0.68rem; min-height: 52px;
+  font-size:0.68rem; min-height: 52px;
 }
 .tab-item:hover { color: var(--text-secondary); }
 .tab-item.active { color: var(--accent); font-weight: 600; }
-.tab-icon { font-size: 1.25rem; line-height: 1; }
-.tab-label { font-size: 0.66rem; }
+.tab-icon { font-size:1.3rem; line-height: 1; }
+.tab-label { font-size:0.68rem; }
 
 /* === Responsive === */
 @media (max-width: 768px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .form-row { flex-direction: column; gap: 0; }
   .stats-row { grid-template-columns: repeat(2, 1fr); }
-  .header-title { font-size: 1.15rem; }
+  .header-title { font-size:1.1rem; }
   .level-display { flex-direction: column; text-align: center; }
   .sync-btn { position: static; margin-top: 12px; }
   .app-container { padding: 12px 12px 76px; }
-  .panel { padding: 14px; min-height: auto; }
+  .panel { padding:12px; min-height: auto; }
   .daily-meals-grid { grid-template-columns: repeat(2, 1fr); }
   .task-item { min-height: 52px; }
   .tab-item { min-height: 52px; }
   .btn { min-height: 40px; }
   .btn-sm { min-height: 32px; }
-  .modal { width: 94%; padding: 18px; }
+  .modal { width: 94%; padding:16px; }
   .wallet-stats-row { grid-template-columns: repeat(2, 1fr); }
   input, select, textarea { font-size: 16px; }
 }
@@ -488,12 +490,12 @@ button:focus-visible { box-shadow: var(--ring); }
   box-shadow: var(--shadow-card);
 }
 .wallet-balance-label {
-  font-size: 0.75rem;
+  font-size:0.78rem;
   color: var(--text-dim);
   position: relative;
 }
 .wallet-balance-amount {
-  font-size: 2.4rem;
+  font-size:2.5rem;
   font-weight: 800;
   color: var(--text-primary);
   font-family: var(--font-mono);
@@ -512,16 +514,16 @@ button:focus-visible { box-shadow: var(--ring); }
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
-  padding: 14px 10px;
+  padding:12px 10px;
   text-align: center;
 }
 .wallet-stat-value {
-  font-size: 1.1rem;
+  font-size:1.1rem;
   font-weight: 700;
   font-family: var(--font-mono);
 }
 .wallet-stat-label {
-  font-size: 0.65rem;
+  font-size:0.68rem;
   color: var(--text-dim);
   margin-top: 4px;
 }
@@ -545,7 +547,7 @@ button:focus-visible { box-shadow: var(--ring); }
   background: transparent;
   border: none;
   color: var(--text-dim);
-  font-size: 0.85rem;
+  font-size:0.88rem;
   cursor: pointer;
   transition: all 0.2s;
   font-family: var(--font-mono);
@@ -573,7 +575,7 @@ button:focus-visible { box-shadow: var(--ring); }
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size:1rem;
   font-weight: bold;
   flex-shrink: 0;
 }
@@ -594,7 +596,7 @@ button:focus-visible { box-shadow: var(--ring); }
 /* 预告视图：明天 + 下周 */
 .forecast-block { margin-bottom: 22px; }
 .forecast-title { display:flex; align-items:baseline; gap:8px; margin-bottom:10px; }
-.forecast-title .ft-main { font-size:0.95rem; font-weight:600; color:var(--text-primary); }
+.forecast-title .ft-main { font-size:1rem; font-weight:600; color:var(--text-primary); }
 .forecast-title .ft-sub { font-size:0.72rem; color:var(--text-dim); font-family:var(--font-mono); }
 .forecast-day { margin-bottom:14px; }
 .forecast-day-head { display:flex; align-items:center; gap:8px; font-size:0.78rem; color:var(--text-secondary); margin-bottom:6px; }
@@ -603,23 +605,23 @@ button:focus-visible { box-shadow: var(--ring); }
 .forecast-row { display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--border-subtle); border-left:2px solid var(--accent); border-radius:var(--radius-sm); padding:8px 12px; margin-bottom:6px; font-size:0.8rem; }
 .forecast-row .fr-time { font-family:var(--font-mono); font-size:0.72rem; color:var(--accent); white-space:nowrap; }
 .forecast-row .fr-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.forecast-row .fr-loc { font-size:0.7rem; color:var(--text-dim); white-space:nowrap; }
+.forecast-row .fr-loc { font-size:0.72rem; color:var(--text-dim); white-space:nowrap; }
 .forecast-off { font-size:0.72rem; color:var(--text-dim); padding:8px 0; }
-.course-card { display:flex; gap:12px; align-items:center; background:var(--bg-card); border-left:3px solid var(--accent); border-radius:8px; padding:12px; margin-bottom:10px; }
+.course-card { display:flex; gap:12px; align-items:center; background:var(--bg-card); border-left:2px solid var(--accent); border-radius:var(--radius-sm); padding:12px; margin-bottom:10px; }
 .course-time { font-family:var(--font-mono); font-size:0.8rem; color:var(--accent); text-align:center; min-width:48px; line-height:1.3; }
 .course-body { flex:1; min-width:0; }
-.course-name { font-size:0.95rem; color:var(--text-primary); font-weight:600; }
+.course-name { font-size:1rem; color:var(--text-primary); font-weight:600; }
 .course-meta { font-size:0.72rem; color:var(--text-dim); margin-top:3px; }
 .course-countdown { font-size:0.72rem; color:var(--success); white-space:nowrap; }
-.course-empty { text-align:center; color:var(--text-dim); padding:30px 0; font-size:0.85rem; }
-.week-grid { display:grid; grid-template-columns: 52px repeat(7,1fr); gap:4px; font-size:0.7rem; }
+.course-empty { text-align:center; color:var(--text-dim); padding:24px 0; font-size:0.88rem; }
+.week-grid { display:grid; grid-template-columns: 52px repeat(7,1fr); gap:4px; font-size:0.72rem; }
 .week-corner { }
 .week-head { text-align:center; color:var(--accent); padding:6px 0; font-weight:600; }
 .week-sec { background:var(--bg-card); border-radius:6px; padding:6px 2px; text-align:center; color:var(--text-secondary); line-height:1.2; }
-.week-sec-time { font-size:0.58rem; color:var(--text-dim); font-family:var(--font-mono); }
-.week-cell { background:var(--bg-card); border-radius:6px; min-height:46px; padding:3px; }
-.week-cell-course { background:color-mix(in srgb, var(--accent) 8%, transparent); border:1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius:4px; padding:3px; margin-bottom:3px; color:var(--text-primary); line-height:1.2; word-break:break-all; }
-.week-cell-loc { font-size:0.56rem; color:var(--text-dim); }
+.week-sec-time { font-size:0.6rem; color:var(--text-dim); font-family:var(--font-mono); }
+.week-cell { background:var(--bg-card); border-radius:6px; min-height:46px; padding:4px; }
+.week-cell-course { background:color-mix(in srgb, var(--accent) 8%, transparent); border:1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius:4px; padding:4px; margin-bottom:3px; color:var(--text-primary); line-height:1.2; word-break:break-all; }
+.week-cell-loc { font-size:0.6rem; color:var(--text-dim); }
 .daily-next-class { background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:12px; font-size:0.8rem; color:var(--accent); }
 </style>
 </head>
@@ -654,7 +656,7 @@ button:focus-visible { box-shadow: var(--ring); }
         <div class="daily-date-big" id="daily-day-num"></div>
         <div class="daily-date-info">
           <div id="daily-month-year"></div>
-          <div id="daily-weekday" style="color: var(--text-dim); font-size: 0.75rem;"></div>
+          <div id="daily-weekday" style="color: var(--text-dim); font-size:0.78rem;"></div>
         </div>
       </div>
       <div class="daily-streak-badge" id="daily-streak-badge">🔥 连续 0 天</div>
@@ -683,7 +685,7 @@ button:focus-visible { box-shadow: var(--ring); }
       </div>
       <div style="display: flex; gap: 16px; align-items: center;">
         <canvas id="daily-time-chart" width="120" height="120"></canvas>
-        <div id="daily-time-legend" style="flex: 1; font-size: 0.75rem;"></div>
+        <div id="daily-time-legend" style="flex: 1; font-size:0.78rem;"></div>
       </div>
       <div id="daily-time-tags" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;"></div>
     </div>
@@ -701,7 +703,7 @@ button:focus-visible { box-shadow: var(--ring); }
     <div class="daily-section">
       <div class="section-header">
         <span class="section-title">◆ 饮食记录</span>
-        <span id="daily-kcal-total" style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--orange);"></span>
+        <span id="daily-kcal-total" style="font-family: var(--font-mono); font-size:0.78rem; color: var(--orange);"></span>
       </div>
       <div class="daily-meals-grid">
         <div class="daily-meal-card" onclick="addMeal('breakfast')">
@@ -731,13 +733,13 @@ button:focus-visible { box-shadow: var(--ring); }
     <div class="daily-section">
       <div class="section-header">
         <span class="section-title">◆ 习惯打卡</span>
-        <span id="daily-habit-count" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim);"></span>
+        <span id="daily-habit-count" style="font-family: var(--font-mono); font-size:0.72rem; color: var(--text-dim);"></span>
       </div>
       <div id="daily-habit-list"></div>
       <!-- 习惯管理（原在设置页） -->
       <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:0.75rem;color:var(--text-dim);">🎯 习惯管理</span>
-        <button class="btn btn-sm" onclick="addHabit()" style="padding:2px 10px;font-size:0.7rem;">+ 新增习惯</button>
+        <span style="font-size:0.78rem;color:var(--text-dim);">🎯 习惯管理</span>
+        <button class="btn btn-sm" onclick="addHabit()" style="padding:2px 10px;font-size:0.72rem;">+ 新增习惯</button>
       </div>
       <div id="settings-habits" style="margin-top:6px;"></div>
     </div>
@@ -758,7 +760,7 @@ button:focus-visible { box-shadow: var(--ring); }
         </div>
         <div class="daily-sleep-item" style="text-align: center;">
           <label>时长</label>
-          <div id="sleep-duration" style="font-family: var(--font-mono); color: var(--accent); font-size: 0.9rem;">--</div>
+          <div id="sleep-duration" style="font-family: var(--font-mono); color: var(--accent); font-size:0.88rem;">--</div>
         </div>
       </div>
     </div>
@@ -767,16 +769,16 @@ button:focus-visible { box-shadow: var(--ring); }
     <div class="daily-section" style="cursor: pointer;" onclick="switchTab('data')">
       <div class="section-header">
         <span class="section-title">◆ 今日支出</span>
-        <span style="font-size: 0.7rem; color: var(--text-dim);">查看全部 →</span>
+        <span style="font-size:0.72rem; color: var(--text-dim);">查看全部 →</span>
       </div>
       <div style="display: flex; gap: 16px;">
         <div style="flex: 1; text-align: center; padding: 8px; background: var(--bg-card); border-radius: 6px;">
-          <div id="daily-expense-amt" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--expense);">¥0</div>
-          <div style="font-size: 0.65rem; color: var(--text-dim);">今日支出</div>
+          <div id="daily-expense-amt" style="font-family: var(--font-mono); font-size:1.1rem; color: var(--expense);">¥0</div>
+          <div style="font-size:0.68rem; color: var(--text-dim);">今日支出</div>
         </div>
         <div style="flex: 1; text-align: center; padding: 8px; background: var(--bg-card); border-radius: 6px;">
-          <div id="daily-income-amt" style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--success);">¥0</div>
-          <div style="font-size: 0.65rem; color: var(--text-dim);">今日收入</div>
+          <div id="daily-income-amt" style="font-family: var(--font-mono); font-size:1.1rem; color: var(--success);">¥0</div>
+          <div style="font-size:0.68rem; color: var(--text-dim);">今日收入</div>
         </div>
       </div>
     </div>
@@ -796,8 +798,8 @@ button:focus-visible { box-shadow: var(--ring); }
   <div class="panel" id="panel-courses">
     <div class="daily-date-header" style="margin-bottom:12px;">
       <div>
-        <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:2px;">COURSE SCHEDULE</div>
-        <div style="font-size:1.4rem;font-weight:bold;color:var(--accent);margin:4px 0;" id="course-week-label">第 1 周</div>
+        <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-dim);letter-spacing:2px;">COURSE SCHEDULE</div>
+        <div style="font-size:1.5rem;font-weight:bold;color:var(--accent);margin:4px 0;" id="course-week-label">第 1 周</div>
         <div style="font-size:0.8rem;color:var(--orange);margin-top:2px;" id="course-season-label"></div>
       </div>
       <div class="course-view-toggle">
@@ -910,14 +912,14 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- 交易复盘 (投资思考日记) -->
     <div class="section-header" style="margin-top: 16px;">
       <span class="section-title">◆ 交易复盘</span>
-      <span style="font-size:0.7rem;color:var(--text-dim);">记录你的投资思考</span>
+      <span style="font-size:0.72rem;color:var(--text-dim);">记录你的投资思考</span>
     </div>
     <div class="card">
       <textarea id="invest-journal" placeholder="今天对市场/基金/股票有什么想法？记录下来方便以后回顾..." style="min-height:100px;" oninput="saveInvestJournal()"></textarea>
     </div>
     <!-- 历史复盘 -->
     <div class="section-header" style="margin-top:12px;">
-      <span class="section-title" style="font-size:0.75rem;">◆ 历史复盘</span>
+      <span class="section-title" style="font-size:0.78rem;">◆ 历史复盘</span>
     </div>
     <div id="invest-history-list"></div>
 
@@ -925,22 +927,22 @@ button:focus-visible { box-shadow: var(--ring); }
     <div class="section-header" style="margin-top: 16px;">
       <span class="section-title">◆ 交易记录</span>
       <div style="display: flex; gap: 8px; align-items: center;">
-        <select id="wallet-filter" style="width: auto; font-size: 0.75rem;" onchange="renderWalletHistory()">
+        <select id="wallet-filter" style="width: auto; font-size:0.78rem;" onchange="renderWalletHistory()">
           <option value="all">全部</option>
           <option value="today">今天</option>
           <option value="week">本周</option>
           <option value="month">本月</option>
         </select>
-        <button class="btn btn-sm btn-danger" onclick="clearWalletHistory()" style="padding: 2px 8px; font-size: 0.7rem;">清空</button>
+        <button class="btn btn-sm btn-danger" onclick="clearWalletHistory()" style="padding: 2px 8px; font-size:0.72rem;">清空</button>
       </div>
     </div>
     <div id="wallet-history-list"></div>
 
     <!-- 每日打卡档案 (原 history 面板内容) -->
-    <div class="daily-date-header" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:8px;padding:20px;margin:16px 0;">
+    <div class="daily-date-header" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:20px;margin:16px 0;">
       <div>
-        <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:2px;">DAILY LOG COLLECTION</div>
-        <div style="font-size:1.8rem;font-weight:bold;color:var(--text-primary);margin:4px 0;">每日统计</div>
+        <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-dim);letter-spacing:2px;">DAILY LOG COLLECTION</div>
+        <div style="font-size:1.5rem;font-weight:bold;color:var(--text-primary);margin:4px 0;">每日统计</div>
         <div style="font-size:0.8rem;color:var(--text-dim);">打卡合集 · <span id="history-year"></span></div>
       </div>
       <div style="text-align:right;">
@@ -959,15 +961,15 @@ button:focus-visible { box-shadow: var(--ring); }
 
     <!-- Entries List -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:1px;">ENTRIES</span>
-      <span id="history-entry-count" style="font-size:0.7rem;color:var(--text-dim);"></span>
+      <span style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-dim);letter-spacing:1px;">ENTRIES</span>
+      <span id="history-entry-count" style="font-size:0.72rem;color:var(--text-dim);"></span>
     </div>
     <div id="history-entries-list"></div>
 
     <!-- 日记回顾 -->
     <div class="section-header" style="margin-top:20px;">
       <span class="section-title">◆ 日记回顾</span>
-      <span id="journal-arch-stats" style="font-size:0.7rem;color:var(--text-dim);"></span>
+      <span id="journal-arch-stats" style="font-size:0.72rem;color:var(--text-dim);"></span>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
       <button class="btn btn-sm" onclick="journalMonthShift(-1)">‹</button>
@@ -980,7 +982,7 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- AI 周报（本地 Ollama，经后端 SSE 代理） -->
     <div class="section-header" style="margin-top:20px;">
       <span class="section-title">◆ AI 周报</span>
-      <span id="ai-week-status" style="font-size:0.7rem;color:var(--text-dim);"></span>
+      <span id="ai-week-status" style="font-size:0.72rem;color:var(--text-dim);"></span>
     </div>
     <div class="card" style="padding:12px;">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
@@ -988,10 +990,10 @@ button:focus-visible { box-shadow: var(--ring); }
         <span id="ai-week-label" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--accent);"></span>
         <button class="btn btn-sm" onclick="aiWeekShift(1)">›</button>
         <span style="flex:1;"></span>
-        <input type="text" id="ai-model" placeholder="模型名，如 qwen2.5:7b" style="width:170px;font-size:0.75rem;" onchange="saveAiModel()">
+        <input type="text" id="ai-model" placeholder="模型名，如 qwen2.5:7b" style="width:170px;font-size:0.78rem;" onchange="saveAiModel()">
         <button class="btn btn-primary btn-sm" id="ai-gen-btn" onclick="generateWeeklyReport()">✦ 生成周报</button>
       </div>
-      <div id="ai-week-output" style="display:none;white-space:pre-wrap;font-size:0.8rem;line-height:1.8;color:var(--text-primary);background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:14px;max-height:420px;overflow-y:auto;"></div>
+      <div id="ai-week-output" style="display:none;white-space:pre-wrap;font-size:0.8rem;line-height:1.8;color:var(--text-primary);background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:12px;max-height:420px;overflow-y:auto;"></div>
     </div>
     <div id="ai-reports-list"></div>
   </div>
@@ -1005,10 +1007,10 @@ button:focus-visible { box-shadow: var(--ring); }
     <div style="margin-top:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
         <span style="font-size:1rem;">📚</span>
-        <span style="font-size:0.85rem;color:var(--text-primary);">课表数据</span>
+        <span style="font-size:0.88rem;color:var(--text-primary);">课表数据</span>
       </div>
       <div class="card" style="padding:12px;">
-        <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">
+        <div style="font-size:0.72rem;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">
           课表已嵌入本地（来自湖南科技学院教务系统，2026-2027-1 学期）。调课时点此覆盖更新。
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -1022,17 +1024,17 @@ button:focus-visible { box-shadow: var(--ring); }
     <div style="margin-top:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
         <span style="font-size:1rem;">☁️</span>
-        <span style="font-size:0.85rem;color:var(--text-primary);">服务器同步</span>
+        <span style="font-size:0.88rem;color:var(--text-primary);">服务器同步</span>
         <span id="srv-dot" class="srv-dot"></span>
-        <span id="srv-status-text" style="font-size:0.65rem;color:var(--text-dim);">未连接</span>
+        <span id="srv-status-text" style="font-size:0.68rem;color:var(--text-dim);">未连接</span>
       </div>
       <div class="card" style="padding:12px;">
         <div class="form-group" style="margin-bottom:8px;">
-          <label style="font-size:0.7rem;">服务器地址（留空 = 当前网址）</label>
+          <label style="font-size:0.72rem;">服务器地址（留空 = 当前网址）</label>
           <input type="text" id="cfg-server-base" placeholder="留空即用当前网址" style="width:100%;">
         </div>
         <div class="form-group" style="margin-bottom:8px;">
-          <label style="font-size:0.7rem;">访问令牌</label>
+          <label style="font-size:0.72rem;">访问令牌</label>
           <input type="password" id="cfg-server-token" placeholder="AUTH_TOKEN" style="width:100%;">
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -1040,7 +1042,7 @@ button:focus-visible { box-shadow: var(--ring); }
           <button class="btn btn-sm" onclick="syncNow()">立即同步</button>
           <button class="btn btn-sm" onclick="importJournalToServer()">导入本机旧日记</button>
         </div>
-        <div style="font-size:0.65rem;color:var(--text-dim);margin-top:8px;line-height:1.5;">
+        <div style="font-size:0.68rem;color:var(--text-dim);margin-top:8px;line-height:1.5;">
           任务 / 记账 / 课表 / 习惯等全部数据自动同步到你的服务器，手机电脑保持一致；日记另存服务器数据库，长期可检索。
         </div>
       </div>
@@ -1050,26 +1052,26 @@ button:focus-visible { box-shadow: var(--ring); }
     <div style="margin-top:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
         <span style="font-size:1rem;">💾</span>
-        <span style="font-size:0.85rem;color:var(--text-primary);">数据管理</span>
+        <span style="font-size:0.88rem;color:var(--text-primary);">数据管理</span>
       </div>
       <div class="card" style="cursor:pointer;padding:12px;" onclick="exportAllData()">
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:1rem;">📤</span>
-          <span style="flex:1;font-size:0.85rem;">导出数据</span>
+          <span style="flex:1;font-size:0.88rem;">导出数据</span>
           <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
         </div>
       </div>
       <div class="card" style="cursor:pointer;padding:12px;margin-top:8px;" onclick="importDataPrompt()">
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:1rem;">📥</span>
-          <span style="flex:1;font-size:0.85rem;">导入数据</span>
+          <span style="flex:1;font-size:0.88rem;">导入数据</span>
           <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
         </div>
       </div>
       <div class="card" style="cursor:pointer;padding:12px;margin-top:8px;" onclick="copyDataToClipboard()">
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:1rem;">📋</span>
-          <span style="flex:1;font-size:0.85rem;">复制数据（手机推荐）</span>
+          <span style="flex:1;font-size:0.88rem;">复制数据（手机推荐）</span>
           <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
         </div>
       </div>
@@ -1077,8 +1079,8 @@ button:focus-visible { box-shadow: var(--ring); }
 
     <!-- 关于 -->
     <div style="margin-top:20px;text-align:center;padding:12px;">
-      <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-dim);letter-spacing:2px;">NEXUS CORE v2.0</div>
-      <div style="font-size:0.65rem;color:var(--text-dim);margin-top:4px;">赛博朋克个人管理面板</div>
+      <div style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-dim);letter-spacing:2px;">NEXUS CORE v2.0</div>
+      <div style="font-size:0.68rem;color:var(--text-dim);margin-top:4px;">赛博朋克个人管理面板</div>
     </div>
   </div>
 </div>
@@ -1582,7 +1584,7 @@ function renderTimeAlloc() {
     return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
       <span style="width:8px;height:8px;border-radius:50%;background:${TIME_COLORS[i]};flex-shrink:0;"></span>
       <span style="flex:1;color:var(--text-secondary);">${cat}</span>
-      <span style="font-family:var(--font-mono);color:var(--text-dim);font-size:0.7rem;">${h>0?h+'h':''}${m}m</span>
+      <span style="font-family:var(--font-mono);color:var(--text-dim);font-size:0.72rem;">${h>0?h+'h':''}${m}m</span>
     </div>`;
   }).join('');
 
@@ -1948,7 +1950,7 @@ function renderJournalArchiveList(el, entries) {
       <summary style="cursor:pointer;list-style:none;display:flex;gap:8px;align-items:baseline;">
         <span style="font-family:var(--font-mono);color:var(--accent);font-size:0.8rem;white-space:nowrap;">${m}-${d}</span>
         <span style="flex:1;font-size:0.78rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${preview}</span>
-        <span style="font-size:0.65rem;color:var(--text-dim);white-space:nowrap;">${e.content.length}字</span>
+        <span style="font-size:0.68rem;color:var(--text-dim);white-space:nowrap;">${e.content.length}字</span>
       </summary>
       <div style="white-space:pre-wrap;font-size:0.8rem;color:var(--text-primary);line-height:1.7;padding:10px 2px 2px;border-top:1px solid var(--border-subtle);margin-top:8px;">${e.content}</div>
     </details>`;
@@ -2105,12 +2107,12 @@ function renderAiReports() {
   if (!list) return;
   const reports = Store.get('aiReports', []);
   if (!reports.length) return;
-  list.innerHTML = `<div style="font-size:0.7rem;color:var(--text-dim);margin:10px 0 6px;">往期周报（存于本机）</div>` + reports.map(r => `
+  list.innerHTML = `<div style="font-size:0.72rem;color:var(--text-dim);margin:10px 0 6px;">往期周报（存于本机）</div>` + reports.map(r => `
     <details class="card" style="padding:10px;margin-bottom:8px;">
       <summary style="cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center;">
-        <span style="font-family:var(--font-mono);color:var(--accent);font-size:0.75rem;white-space:nowrap;">${r.range}</span>
+        <span style="font-family:var(--font-mono);color:var(--accent);font-size:0.78rem;white-space:nowrap;">${r.range}</span>
         <span style="flex:1;font-size:0.72rem;color:var(--text-dim);">${r.model} · ${r.createdAt}</span>
-        <button class="btn btn-sm btn-danger" onclick="event.preventDefault();deleteAiReport('${r.id}')" style="padding:1px 8px;font-size:0.65rem;">✕</button>
+        <button class="btn btn-sm btn-danger" onclick="event.preventDefault();deleteAiReport('${r.id}')" style="padding:2px 8px;font-size:0.68rem;">✕</button>
       </summary>
       <div style="white-space:pre-wrap;font-size:0.8rem;color:var(--text-primary);line-height:1.7;padding:10px 2px 2px;border-top:1px solid var(--border-subtle);margin-top:8px;">${r.content}</div>
     </details>`).join('');
@@ -2506,11 +2508,11 @@ function renderTasks() {
           <div style="flex:1;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;">
             <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px;"></div>
           </div>
-          <span style="font-size:0.65rem;color:var(--text-dim);white-space:nowrap;">☑ ${stDone}/${st.length} ${expanded ? '▲' : '▼'}</span>
+          <span style="font-size:0.68rem;color:var(--text-dim);white-space:nowrap;">☑ ${stDone}/${st.length} ${expanded ? '▲' : '▼'}</span>
         </div>
         ${expanded ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px;" onclick="event.stopPropagation();">
           ${st.map((s, i) => `
-            <label style="display:flex;align-items:center;gap:6px;font-size:0.75rem;color:${s.done ? 'var(--text-dim)' : 'var(--text-secondary)'};cursor:pointer;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:${s.done ? 'var(--text-dim)' : 'var(--text-secondary)'};cursor:pointer;">
               <input type="checkbox" ${s.done ? 'checked' : ''} onchange="toggleSubtask('${t.id}', ${i})" style="width:auto;" onclick="event.stopPropagation();">
               <span style="${s.done ? 'text-decoration:line-through;' : ''}">${s.title}</span>
             </label>`).join('')}
@@ -2538,7 +2540,7 @@ function renderTasks() {
         <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteTask('${t.id}'); renderAll();">删除</button>
       </div>
     </div>`;
-  }).join('') || '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 8px;">暂无任务，点击右上角"新增任务"开始吧！</div>';
+  }).join('') || '<div style="color: var(--text-dim); font-size:0.8rem; padding: 8px;">暂无任务，点击右上角"新增任务"开始吧！</div>';
 }
 
 // 子任务展开状态（内存级，不持久化）
@@ -2614,9 +2616,9 @@ function renderStats() {
     const isToday = d.date === TODAY();
     return `
       <div style="text-align: center; flex: 1;">
-        <div style="font-size: 0.8rem; font-weight: bold; color: ${isToday ? 'var(--accent)' : 'var(--text-secondary)'};">${d.count}</div>
+        <div style="font-size:0.8rem; font-weight: bold; color: ${isToday ? 'var(--accent)' : 'var(--text-secondary)'};">${d.count}</div>
         <div style="height: ${Math.max(h, 4)}px; background: ${isToday ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 30%, transparent)'}; border-radius: 2px; margin: 4px 0; min-width: 20px; "></div>
-        <div style="font-size: 0.65rem; color: var(--text-dim);">${d.label}</div>
+        <div style="font-size:0.68rem; color: var(--text-dim);">${d.label}</div>
       </div>
     `;
   }).join('');
@@ -2867,7 +2869,7 @@ function renderInvestHistory() {
     const preview = text.length > 60 ? text.slice(0, 60) + '...' : text;
     return `<div class="card" style="padding:10px;margin-bottom:8px;cursor:pointer;" onclick="showInvestEntry('${date}')">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-        <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--accent);">${label}</span>
+        <span style="font-family:var(--font-mono);font-size:0.78rem;color:var(--accent);">${label}</span>
       </div>
       <div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.4;">${preview}</div>
     </div>`;
@@ -2929,7 +2931,7 @@ function renderHistory() {
   const list = document.getElementById('history-entries-list');
 
   if (dates.length === 0) {
-    list.innerHTML = '<div style="color:var(--text-dim);font-size:0.85rem;padding:24px;text-align:center;">暂无记录，去「每日」页面开始打卡吧</div>';
+    list.innerHTML = '<div style="color:var(--text-dim);font-size:0.88rem;padding:24px;text-align:center;">暂无记录，去「每日」页面开始打卡吧</div>';
     return;
   }
 
@@ -2963,14 +2965,14 @@ function renderHistory() {
     const totalMins = Object.values(time).reduce((s,v) => s + v, 0);
     const timeStr = totalMins > 0 ? `${Math.floor(totalMins/60)}h${totalMins%60}m` : '';
 
-    return `<div class="card" style="padding:14px;margin-bottom:10px;cursor:pointer;" onclick="showDayDetail('${date}')">
+    return `<div class="card" style="padding:12px;margin-bottom:10px;cursor:pointer;" onclick="showDayDetail('${date}')">
       <div style="display:flex;gap:12px;align-items:flex-start;">
         <div style="text-align:center;min-width:44px;">
           <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:bold;color:${isToday ? 'var(--accent)' : 'var(--text-primary)'};">${month} / ${day}</div>
-          <div style="font-size:0.65rem;color:var(--text-dim);">${weekday}</div>
+          <div style="font-size:0.68rem;color:var(--text-dim);">${weekday}</div>
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:0.75rem;color:var(--text-secondary);margin-bottom:4px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:0.78rem;color:var(--text-secondary);margin-bottom:4px;">
             ${tasksDone > 0 ? `<span>✅ ${tasksDone}项任务</span>` : ''}
             ${habitDone > 0 ? `<span>🎯 ${habitDone}/${habitTotal}习惯</span>` : ''}
             ${kcal > 0 ? `<span>🍽️ ${kcal}kcal</span>` : ''}
@@ -2979,7 +2981,7 @@ function renderHistory() {
           </div>
           ${journalPreview ? `<div style="font-size:0.8rem;color:var(--text-dim);line-height:1.4;margin-top:4px;">${journalPreview}</div>` : ''}
         </div>
-        <div style="font-size:0.7rem;color:var(--text-dim);flex-shrink:0;">→</div>
+        <div style="font-size:0.72rem;color:var(--text-dim);flex-shrink:0;">→</div>
       </div>
     </div>`;
   }).join('');
@@ -3082,7 +3084,7 @@ function renderWalletHistory() {
 
   const list = document.getElementById('wallet-history-list');
   if (filtered.length === 0) {
-    list.innerHTML = '<div style="color: var(--text-dim); font-size: 0.8rem; padding: 16px; text-align: center;">暂无交易记录</div>';
+    list.innerHTML = '<div style="color: var(--text-dim); font-size:0.8rem; padding: 16px; text-align: center;">暂无交易记录</div>';
     return;
   }
 
@@ -3107,8 +3109,8 @@ function renderWalletHistory() {
     return `
       <div style="margin-bottom: 12px;">
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border-subtle); margin-bottom: 6px;">
-          <span style="font-size: 0.75rem; color: ${isToday ? 'var(--accent)' : 'var(--text-dim)'}; font-family: var(--font-mono);">${dayLabel} ${dateLabel}</span>
-          <span style="font-size: 0.7rem; color: var(--text-dim); font-family: var(--font-mono);">
+          <span style="font-size:0.78rem; color: ${isToday ? 'var(--accent)' : 'var(--text-dim)'}; font-family: var(--font-mono);">${dayLabel} ${dateLabel}</span>
+          <span style="font-size:0.72rem; color: var(--text-dim); font-family: var(--font-mono);">
             ${dayExp > 0 ? `支 ¥${dayExp.toFixed(1)}` : ''} ${dayInc > 0 ? ` 收 ¥${dayInc.toFixed(1)}` : ''}
           </span>
         </div>
@@ -3118,13 +3120,13 @@ function renderWalletHistory() {
               ${t.type === 'expense' ? '↘' : '↗'}
             </div>
             <div style="flex: 1; min-width: 0;">
-              <div style="font-size: 0.85rem; color: var(--text-primary);">${t.category || '其他'}${t.note ? ' · ' + t.note : ''}</div>
-              <div style="font-size: 0.65rem; color: var(--text-dim); font-family: var(--font-mono);">${timeOf(t.date)}</div>
+              <div style="font-size:0.88rem; color: var(--text-primary);">${t.category || '其他'}${t.note ? ' · ' + t.note : ''}</div>
+              <div style="font-size:0.68rem; color: var(--text-dim); font-family: var(--font-mono);">${timeOf(t.date)}</div>
             </div>
-            <div style="font-size: 0.9rem; font-weight: bold; color: ${t.type === 'expense' ? 'var(--expense)' : 'var(--success)'}; font-family: var(--font-mono);">
+            <div style="font-size:0.88rem; font-weight: bold; color: ${t.type === 'expense' ? 'var(--expense)' : 'var(--success)'}; font-family: var(--font-mono);">
               ${t.type === 'expense' ? '-' : '+'}¥${t.amount.toFixed(2)}
             </div>
-            <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${t.id}')" style="padding: 2px 6px; font-size: 0.65rem; flex-shrink: 0;">✕</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${t.id}')" style="padding: 2px 6px; font-size:0.68rem; flex-shrink: 0;">✕</button>
           </div>
         `).join('')}
       </div>
@@ -3221,8 +3223,8 @@ function renderSettingsHabits() {
     <div class="card" style="display:flex;align-items:center;gap:10px;padding:10px;">
       <input type="checkbox" ${h.enabled?'checked':''} onchange="toggleHabitTemplate('${h.id}')" style="width:auto;">
       <span style="font-size:1.1rem;">${h.icon}</span>
-      <span style="flex:1;font-size:0.85rem;">${h.name}</span>
-      <button class="btn btn-sm btn-danger" onclick="deleteHabitTemplate('${h.id}')" style="padding:2px 6px;font-size:0.65rem;">✕</button>
+      <span style="flex:1;font-size:0.88rem;">${h.name}</span>
+      <button class="btn btn-sm btn-danger" onclick="deleteHabitTemplate('${h.id}')" style="padding:2px 6px;font-size:0.68rem;">✕</button>
     </div>
   `).join('') || '<div style="color:var(--text-dim);font-size:0.8rem;">暂无习惯</div>';
 }
@@ -3257,17 +3259,17 @@ function renderSettingsLevel() {
   if (!el) return;
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;">
-      <div class="level-badge" style="width:48px;height:48px;font-size:1.2rem;">Lv.${info.level}</div>
+      <div class="level-badge" style="width:48px;height:48px;font-size:1.3rem;">Lv.${info.level}</div>
       <div style="flex:1;">
-        <div style="color:var(--accent-2);font-size:0.85rem;font-family:var(--font-mono);">${info.title}</div>
+        <div style="color:var(--accent-2);font-size:0.88rem;font-family:var(--font-mono);">${info.title}</div>
         <div class="progress-bar" style="margin-top:6px;"><div class="progress-fill" style="width:${info.progress}%"></div></div>
-        <div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px;">EXP ${info.current} / ${info.needed}</div>
+        <div style="font-size:0.72rem;color:var(--text-dim);margin-top:4px;">EXP ${info.current} / ${info.needed}</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;">
-      <div style="text-align:center;"><div style="font-family:var(--font-mono);color:var(--accent);">${profile.coins||0}</div><div style="font-size:0.65rem;color:var(--text-dim);">积分</div></div>
-      <div style="text-align:center;"><div style="font-family:var(--font-mono);color:var(--orange);">${profile.streak||0}</div><div style="font-size:0.65rem;color:var(--text-dim);">连续天数</div></div>
-      <div style="text-align:center;"><div style="font-family:var(--font-mono);color:var(--success);">${profile.totalCompleted||0}</div><div style="font-size:0.65rem;color:var(--text-dim);">完成任务</div></div>
+      <div style="text-align:center;"><div style="font-family:var(--font-mono);color:var(--accent);">${profile.coins||0}</div><div style="font-size:0.68rem;color:var(--text-dim);">积分</div></div>
+      <div style="text-align:center;"><div style="font-family:var(--font-mono);color:var(--orange);">${profile.streak||0}</div><div style="font-size:0.68rem;color:var(--text-dim);">连续天数</div></div>
+      <div style="text-align:center;"><div style="font-family:var(--font-mono);color:var(--success);">${profile.totalCompleted||0}</div><div style="font-size:0.68rem;color:var(--text-dim);">完成任务</div></div>
     </div>
   `;
 }
