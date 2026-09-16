@@ -131,6 +131,76 @@ app.post('/api/entries/import', wrap(req => {
   return { ok: true, imported: valid.length, skipped: list.length - valid.length };
 }));
 
+// ===== KV 存储 API（v2：让服务器接管全部前端数据）=====
+// 为什么用 KV 而不是给每种数据建表？
+//   前端数据形状变化很快（今天加记账、明天加习惯），KV 让它零成本演进：
+//   前端存什么后端就存什么，不用改表结构。代价是失去 SQL 查询能力——
+//   对「单人使用 + 全量读取」这个量级来说，不亏。
+// 合并策略：逐键「后写胜出」(last-write-wins)，按客户端 updatedAt 毫秒数比较。
+//   冲突时**不覆盖服务端**，而是把服务端的值回给前端，由前端更新本地——
+//   这样两端永远收敛到同一状态，不会各说各话。这也是旧 JSONBin 方案最大的缺陷：
+//   它只会整体覆盖，导致 2026-09-13 那次数据丢失事故。
+db.exec(`
+  CREATE TABLE IF NOT EXISTS kv (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,      -- JSON 字符串
+    updated_at INTEGER NOT NULL    -- 客户端写入时间（毫秒时间戳）
+  );
+`);
+
+const kvStmts = {
+  all: db.prepare('SELECT key, value, updated_at FROM kv'),
+  get: db.prepare('SELECT value, updated_at FROM kv WHERE key = ?'),
+  put: db.prepare(`INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?)
+                   ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+                   updated_at = excluded.updated_at`),
+  del: db.prepare('DELETE FROM kv WHERE key = ?')
+};
+
+// GET /api/kv —— 全量读出（单人量级，直接全给，合并交给前端）
+app.get('/api/kv', wrap(() => {
+  const data = {}, meta = {};
+  for (const r of kvStmts.all.all()) {
+    try { data[r.key] = JSON.parse(r.value); meta[r.key] = Number(r.updated_at); }
+    catch { /* 坏数据跳过，不影响其它键 */ }
+  }
+  return { ok: true, data, meta };
+}));
+
+// PUT /api/kv —— 批量合并写入
+app.put('/api/kv', wrap(req => {
+  const items = req.body?.items;
+  if (!items || typeof items !== 'object') throw new Error('缺少 items');
+  const applied = [], conflicts = {};
+  db.exec('BEGIN');
+  try {
+    for (const [k, v] of Object.entries(items)) {
+      if (!k || typeof v !== 'object' || v === null) continue;
+      const ts = Number(v.updatedAt) || 0;
+      const cur = kvStmts.get.get(k);
+      if (!cur || ts > Number(cur.updated_at)) {
+        kvStmts.put.run(k, JSON.stringify(v.value ?? null), ts);
+        applied.push(k);
+      } else if (ts < Number(cur.updated_at)) {
+        // 服务端更新 → 回给前端，让前端更新本地（前端负责收敛）
+        try { conflicts[k] = { value: JSON.parse(cur.value), updatedAt: Number(cur.updated_at) }; }
+        catch { /* 服务端数据坏了，忽略此键 */ }
+      }
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  return { ok: true, applied, conflicts };
+}));
+
+// DELETE /api/kv/:key —— 删单个键（前端重置某类数据时用）
+app.delete('/api/kv/:key', wrap(req => ({
+  ok: true,
+  changes: Number(kvStmts.del.run(String(req.params.key)).changes)
+})));
+
 // POST /api/ai/weekly —— AI 周报（流式）。
 // 学点：SSE（Server-Sent Events）。前端 fetch 拿到的不是一次性 JSON，
 // 而是 ReadableStream——后端从 Ollama 的 JSON-lines 流里逐个抠出 token，
@@ -202,6 +272,7 @@ app.post('/api/ai/weekly', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`[nexus-core server] 已启动 → http://localhost:${PORT}`);
   console.log(`  日记 API: http://localhost:${PORT}/api/entries`);
+  console.log(`  KV 同步:  GET/PUT http://localhost:${PORT}/api/kv`);
   console.log(`  AI 周报:  POST ${PORT === 80 ? '' : ':' + PORT}/api/ai/weekly (SSE) → Ollama ${OLLAMA_URL}`);
   console.log(`  CORS 放行: ${CORS_ORIGINS.join(' , ')}`);
   console.log(`  数据库: ${DB_PATH}`);

@@ -362,6 +362,9 @@ button:focus-visible { box-shadow: var(--ring); }
 .sync-btn.synced { border-color: color-mix(in srgb, var(--success) 40%, transparent); color: var(--success); }
 .sync-btn.syncing { border-color: color-mix(in srgb, var(--warn) 40%, transparent); color: var(--warn); }
 .sync-btn.error { border-color: color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger); }
+.srv-dot { width:7px; height:7px; border-radius:50%; background:var(--text-dim); display:inline-block; flex:none; }
+.srv-dot.ok { background:var(--success); box-shadow:0 0 6px var(--success); }
+.srv-dot.err { background:#e5484d; }
 .sync-dot {
   width: 6px; height: 6px; border-radius: 50%;
   background: currentColor; animation: syncPulse 2s infinite;
@@ -630,10 +633,6 @@ button:focus-visible { box-shadow: var(--ring); }
     <div style="display:flex;gap:8px;position:absolute;top:24px;right:0;">
       <button class="sync-btn" id="theme-toggle" onclick="toggleTheme()" title="切换主题">
         <span id="theme-icon">☀️</span>
-      </button>
-      <button class="sync-btn" id="sync-btn" onclick="openSyncModal()">
-        <span class="sync-dot"></span>
-        <span id="sync-btn-text">云同步</span>
       </button>
     </div>
   </header>
@@ -1002,19 +1001,6 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- 个人等级 -->
     <div class="card" id="settings-level-info" style="margin-bottom:16px;"></div>
 
-    <!-- 云同步 -->
-    <div class="card" style="cursor:pointer;padding:14px;" onclick="openSyncModal()">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:1.3rem;">☁️</span>
-        <div style="flex:1;">
-          <div style="font-size:0.9rem;color:var(--text-primary);">云同步</div>
-          <div style="font-size:0.7rem;color:var(--text-dim);margin-top:2px;" id="settings-sync-status">未配置</div>
-        </div>
-        <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
-      </div>
-    </div>
-
-
     <!-- 课表数据 -->
     <div style="margin-top:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
@@ -1032,47 +1018,30 @@ button:focus-visible { box-shadow: var(--ring); }
         </div>
       </div>
 
-    <!-- 日记后端 -->
+    <!-- 服务器同步 -->
     <div style="margin-top:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-        <span style="font-size:1rem;">📓</span>
-        <span style="font-size:0.85rem;color:var(--text-primary);">日记后端</span>
-        <span id="journal-api-status" style="font-size:0.65rem;color:var(--text-dim);"></span>
+        <span style="font-size:1rem;">☁️</span>
+        <span style="font-size:0.85rem;color:var(--text-primary);">服务器同步</span>
+        <span id="srv-dot" class="srv-dot"></span>
+        <span id="srv-status-text" style="font-size:0.65rem;color:var(--text-dim);">未连接</span>
       </div>
       <div class="card" style="padding:12px;">
         <div class="form-group" style="margin-bottom:8px;">
-          <label style="font-size:0.7rem;">API 地址（留空 = 仅本机存储）</label>
-          <input type="text" id="cfg-journal-api" placeholder="http://localhost:3000" style="width:100%;">
+          <label style="font-size:0.7rem;">服务器地址（留空 = 当前网址）</label>
+          <input type="text" id="cfg-server-base" placeholder="留空即用当前网址" style="width:100%;">
         </div>
         <div class="form-group" style="margin-bottom:8px;">
-          <label style="font-size:0.7rem;">Token</label>
-          <input type="password" id="cfg-journal-token" placeholder="AUTH_TOKEN" style="width:100%;">
+          <label style="font-size:0.7rem;">访问令牌</label>
+          <input type="password" id="cfg-server-token" placeholder="AUTH_TOKEN" style="width:100%;">
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" onclick="saveJournalApiCfg()">保存并测试连接</button>
+          <button class="btn btn-primary btn-sm" onclick="saveServerCfg()">保存并连接</button>
+          <button class="btn btn-sm" onclick="syncNow()">立即同步</button>
           <button class="btn btn-sm" onclick="importJournalToServer()">导入本机旧日记</button>
         </div>
         <div style="font-size:0.65rem;color:var(--text-dim);margin-top:8px;line-height:1.5;">
-          启动方式见 server/README.md（npm install → 设 AUTH_TOKEN → npm start）。
-          配置后今日记自动同步后端 SQLite；不配置也照常能用（仅本机）。
-        </div>
-      </div>
-    </div>
-
-    <!-- 作息季节 -->
-    <div style="margin-top:16px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-        <span style="font-size:1rem;">🕐</span>
-        <span style="font-size:0.85rem;color:var(--text-primary);">作息季节</span>
-      </div>
-      <div class="card" style="padding:12px;">
-        <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:10px;line-height:1.5;">
-          默认按日期自动套用（5–9月夏季，其余春秋冬季）。可手动锁定某套作息以预览课表时间。
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;" id="schedule-mode-group">
-          <button class="btn btn-sm" data-mode="auto" onclick="setScheduleOverride('auto')" style="padding:4px 12px;">🌗 自动</button>
-          <button class="btn btn-sm" data-mode="summer" onclick="setScheduleOverride('summer')" style="padding:4px 12px;">🌤 夏季</button>
-          <button class="btn btn-sm" data-mode="standard" onclick="setScheduleOverride('standard')" style="padding:4px 12px;">🍂 秋季冬季</button>
+          任务 / 记账 / 课表 / 习惯等全部数据自动同步到你的服务器，手机电脑保持一致；日记另存服务器数据库，长期可检索。
         </div>
       </div>
     </div>
@@ -1083,7 +1052,7 @@ button:focus-visible { box-shadow: var(--ring); }
         <span style="font-size:1rem;">💾</span>
         <span style="font-size:0.85rem;color:var(--text-primary);">数据管理</span>
       </div>
-      <div class="card" style="cursor:pointer;padding:12px;" onclick="exportData()">
+      <div class="card" style="cursor:pointer;padding:12px;" onclick="exportAllData()">
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:1rem;">📤</span>
           <span style="flex:1;font-size:0.85rem;">导出数据</span>
@@ -1186,77 +1155,6 @@ button:focus-visible { box-shadow: var(--ring); }
 </div>
 
 <!-- Sync Modal -->
-<div class="modal-overlay" id="sync-modal">
-  <div class="modal" style="max-width: 520px;">
-    <div class="modal-title">// 云同步设置</div>
-
-    <!-- Setup Section (not configured) -->
-    <div id="sync-setup-section">
-      <div class="form-group">
-        <label>JSONBin API Key</label>
-        <input type="password" id="sync-token" placeholder="粘贴你的 JSONBin API Key">
-        <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 4px; line-height: 1.6;">
-          前往 <a href="https://jsonbin.io/login" target="_blank" style="color: var(--accent);">jsonbin.io</a> 登录/注册<br>
-          → Create API Key → 复制 Key 填入此处（免费）
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>Bin ID（已有同步则填入，留空自动创建）</label>
-        <input type="text" id="sync-gist-id-input" placeholder="留空将自动创建新的存储空间">
-      </div>
-
-      <div class="form-group">
-        <label class="checkbox-label">
-          <input type="checkbox" id="sync-auto" checked>
-          自动同步（数据变更后自动上传，3秒延迟）
-        </label>
-      </div>
-    </div>
-
-    <!-- Connected Section (configured) -->
-    <div id="sync-connected-section" style="display: none;">
-      <div style="background: var(--bg-card); padding: 14px; border-radius: 6px; margin-bottom: 12px; border: 1px solid var(--border-subtle);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">同步状态</span>
-          <span id="sync-state-badge" class="badge badge-green">已连接</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">Bin ID</span>
-          <span id="sync-gist-display" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent); word-break: break-all; text-align: right; max-width: 280px;"></span>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">上次同步</span>
-          <span id="sync-last-time" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dim);"></span>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="color: var(--text-secondary); font-size: 0.75rem; font-family: var(--font-mono);">自动同步</span>
-          <span id="sync-auto-status" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--success);">已开启</span>
-        </div>
-      </div>
-
-      <div style="background: color-mix(in srgb, var(--accent) 5%, transparent); padding: 10px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent); font-size: 0.7rem; color: var(--text-secondary); line-height: 1.6;">
-        <strong style="color: var(--accent);">使用方法：</strong><br>
-        <strong style="color:var(--warn);">⚠ 顺序很重要：</strong>第一次连接会把云端数据覆盖到本机（不是合并）。<br>
-        1. 在「数据最全的那台设备」上完成配置（它会创建云空间）<br>
-        2. 复制上方 Bin ID，到其他设备输入相同的 API Key 和 Bin ID<br>
-        3. 其他设备连接后，会以云端数据为准覆盖本机（系统会先自动备份，可一键还原）
-      </div>
-    </div>
-
-    <div class="modal-actions" style="flex-wrap: wrap; gap: 8px;">
-      <button class="btn btn-danger btn-sm" id="sync-disconnect-btn" onclick="disconnectSync()" style="display: none;">断开</button>
-      <button class="btn btn-sm" id="sync-restore-btn" onclick="restorePrePullBackup()" style="display: none;">↩ 还原备份</button>
-      <div style="flex: 1;"></div>
-      <button class="btn" onclick="closeSyncModal()">关闭</button>
-      <button class="btn" id="sync-pull-btn" onclick="manualPull()" style="display: none;">↓ 下载</button>
-      <button class="btn" id="sync-push-btn" onclick="manualPush()" style="display: none;">↑ 上传</button>
-      <button class="btn btn-primary" id="sync-save-btn" onclick="saveSyncSettings()">保存并连接</button>
-      <button class="btn btn-primary" id="sync-now-btn" onclick="manualSync()" style="display: none;">⟳ 立即同步</button>
-    </div>
-  </div>
-</div>
-
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
 
@@ -1281,8 +1179,36 @@ const Store = {
   }
 };
 
-// 同步时需跳过的键：同步配置自身 + 拉取前的本机备份
-const SYNC_SKIP_KEYS = ['nexus_syncConfig', 'nexus_backup_before_pull'];
+// ===== 同步范围 =====
+// 正向白名单：只同步「业务数据」。以后新加配置键不会意外被传到服务器——
+// 反向排除（哪些不同步）容易漏，正向列举才是安全的那一侧。
+const SYNC_KEYS = [
+  'tasks', 'wallet', 'courses', 'habits', 'completionLog', 'dailyLog',
+  'sleep', 'dailyTemplates', 'profile', 'timeAlloc', 'aiReports', 'aiModel',
+  'investJournal', 'scheduleOverride'
+];
+// 注意 journal（日记）**不在**白名单：它由日记 API + 服务器 SQLite 负责，
+// 两个通道同时写同一条数据会互相覆盖。
+
+// 导出/导入时跳过的键（连接配置与内部标记，不属于「数据」）
+const SYNC_SKIP_KEYS = [
+  'nexus_serverBase', 'nexus_serverToken',  // 服务器连接配置（每台设备各自一份）
+  'nexus_syncConfig',                       // 旧 JSONBin 配置，已被 KV 取代
+  'nexus_kv_meta',                          // 每键最后修改时间戳
+  'nexus_backup_before_pull',               // 拉取前快照
+  'nexus_initialized'                       // 初始化标记
+];
+
+// 每个数据键的最后修改时间（毫秒时间戳）—— 合并冲突时靠它判断谁更新
+const KV_META_KEY = 'nexus_kv_meta';
+function kvMeta() {
+  try { return JSON.parse(localStorage.getItem(KV_META_KEY) || '{}'); } catch { return {}; }
+}
+function kvTouch(key) {
+  const m = kvMeta();
+  m[key] = Date.now();
+  try { localStorage.setItem(KV_META_KEY, JSON.stringify(m)); } catch {}
+}
 
 // 本机现有几项数据（用于覆盖前警告）
 function countLocalDataKeys() {
@@ -1306,207 +1232,223 @@ function restorePrePullBackup() {
   setTimeout(() => location.reload(), 600);
 }
 
-// === Cloud Sync Manager (JSONBin.io) ===
-const SyncManager = {
-  config: { apiKey: '', binId: '', autoSync: true, lastSync: 0, lastLocalModify: 0 },
-  _pushTimer: null,
-  _isSyncing: false,
+// === 服务器同步（KV 存储）===
+// 取代旧的 JSONBin 方案。旧方案两个致命缺陷：
+//   ① 整体覆盖 —— 2026-09-13 那次数据丢失事故的根源
+//   ② 依赖第三方免费服务 —— key 失效时报错看不懂，数据也不在自己手里
+// 新方案：数据存自己的服务器，逐键「后写胜出」合并，两端永远收敛到同一状态。
+const KVSync = {
+  _timer: null,
+  _busy: false,
+  _suppress: false,   // 同步写入期间抑制回推，避免「拉取→触发推送→再拉取」的死循环
   _initialized: false,
-  _suppressAutoPush: false,
-  API_BASE: 'https://api.jsonbin.io/v3',
+  lastSync: 0,
+  lastError: '',
+
+  base() { return serverCfg().base; },
+  token() { return serverCfg().token; },
+  configured() { return serverConfigured(); },
+
+  headers() {
+    const h = { 'Content-Type': 'application/json' };
+    const t = this.token();
+    if (t) h['Authorization'] = 'Bearer ' + t;
+    return h;
+  },
 
   init() {
-    const saved = Store.get('syncConfig');
-    if (saved) this.config = { ...this.config, ...saved };
     this._initialized = true;
-    this.updateButton();
-    // Auto-pull on startup if configured
-    if (this.isConfigured() && this.config.autoSync) {
-      setTimeout(() => this.pull().catch(() => {}), 1000);
-    }
+    this.updateUI();
+    if (this.configured()) setTimeout(() => this.pull(), 700);
   },
 
-  isConfigured() {
-    return !!(this.config.apiKey && this.config.binId);
-  },
+  // ---------- 拉取 + 逐键合并 ----------
+  async pull() {
+    if (!this.configured()) return { ok: false, error: '未配置服务器' };
+    if (this._busy) return { ok: false, error: '正在同步中' };
+    this._busy = true;
+    this.updateUI('syncing');
+    try {
+      const res = await fetch(this.base() + '/api/kv', { headers: this.headers() });
+      if (!res.ok) throw new Error(this._errText(res.status));
+      const j = await res.json();
+      const data = j.data || {}, meta = j.meta || {};
+      const localMeta = kvMeta();
+      const toPush = {};
+      let pulled = 0;
 
-  // Export all nexus data (excluding syncConfig)
-  exportData() {
-    const data = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(key)) {
-        try { data[key] = JSON.parse(localStorage.getItem(key)); }
-        catch { data[key] = localStorage.getItem(key); }
+      // ① 服务端有的键：比我新就采用；比我旧就回推
+      for (const [k, v] of Object.entries(data)) {
+        if (!SYNC_KEYS.includes(k)) continue;
+        const lts = localMeta[k] || 0, sts = meta[k] || 0;
+        if (sts > lts) { this._writeLocal(k, v, sts); pulled++; }
+        else if (lts > sts) toPush[k] = { value: Store.get(k), updatedAt: lts };
       }
-    }
-    return { app: 'nexus-core', version: '1.0', timestamp: Date.now(), data: data };
+      // ② 只有本机有的键：推上去
+      for (const k of SYNC_KEYS) {
+        if (k in data) continue;
+        const v = Store.get(k);
+        if (v === null || v === undefined) continue;
+        toPush[k] = { value: v, updatedAt: localMeta[k] || Date.now() };
+      }
+      // ③ 回推；服务端更新的键反向覆盖本地（收敛）
+      let pushed = 0;
+      if (Object.keys(toPush).length) {
+        const r = await this._put(toPush);
+        pushed = (r.applied || []).length;
+        for (const [k, c] of Object.entries(r.conflicts || {})) this._writeLocal(k, c.value, c.updatedAt);
+      }
+      this.lastSync = Date.now();
+      this.lastError = '';
+      this.updateUI();
+      if (pulled || pushed) { try { renderAll(); } catch (e) { console.warn(e); } }
+      return { ok: true, pulled, pushed };
+    } catch (e) {
+      this.lastError = e.message;
+      this.updateUI('error');
+      return { ok: false, error: e.message };
+    } finally { this._busy = false; }
   },
 
-  // Import remote data (replaces all local nexus data)
-  importData(payload) {
-    if (!payload || !payload.data) return;
-    this._suppressAutoPush = true;
-    // 先给本机数据拍快照——覆盖是有去无回的，至少留一份后悔药
-    const snapshot = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(key)) snapshot[key] = localStorage.getItem(key);
-    }
-    if (Object.keys(snapshot).length) {
-      localStorage.setItem('nexus_backup_before_pull', JSON.stringify({ at: Date.now(), data: snapshot }));
-    }
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(key)) keysToRemove.push(key);
-    }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
-    for (const [key, value] of Object.entries(payload.data)) {
-      if (key.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(key)) {
-        localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
-      }
-    }
-    this._suppressAutoPush = false;
+  // ---------- 推送（本机改动后防抖 1.5 秒）----------
+  pushSoon() {
+    if (!this.configured() || this._suppress) return;
+    clearTimeout(this._timer);
+    this._timer = setTimeout(() => this.push(), 1500);
   },
 
   async push() {
-    if (!this.isConfigured()) return { success: false, error: '未配置同步' };
-    if (this._isSyncing) return { success: false, error: '正在同步中' };
-    this._isSyncing = true;
-    this.updateButton('syncing');
-    try {
-      const data = this.exportData();
-      const res = await fetch(`${this.API_BASE}/b/${this.config.binId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': this.config.apiKey,
-        },
-        body: JSON.stringify({ 'nexus-core-sync': data }),
-      });
-      if (!res.ok) {
-        const t = await res.text().catch(() => '');
-        let msg;
-        try { msg = JSON.parse(t).message || t; } catch { msg = t; }
-        throw new Error(`HTTP ${res.status}: ${msg}`);
-      }
-      this.config.lastSync = Date.now();
-      this.saveConfig();
-      this.updateButton('synced');
-      return { success: true };
-    } catch (e) {
-      console.error('[NEXUS Sync] Push error:', e.message);
-      this.updateButton('error', e.message);
-      return { success: false, error: e.message };
-    } finally {
-      this._isSyncing = false;
+    if (!this.configured() || this._busy) return { ok: false, error: '未配置或忙' };
+    const meta = kvMeta();
+    const items = {};
+    for (const k of SYNC_KEYS) {
+      const v = Store.get(k);
+      if (v === null || v === undefined) continue;
+      items[k] = { value: v, updatedAt: meta[k] || Date.now() };
     }
-  },
-
-  async pull() {
-    if (!this.isConfigured()) return { success: false, error: '未配置同步' };
-    if (this._isSyncing) return { success: false, error: '正在同步中' };
-    this._isSyncing = true;
-    this.updateButton('syncing');
+    if (!Object.keys(items).length) return { ok: true, pushed: 0 };
+    this._busy = true;
+    this.updateUI('syncing');
     try {
-      const res = await fetch(`${this.API_BASE}/b/${this.config.binId}/latest`, {
-        headers: { 'X-Master-Key': this.config.apiKey },
-      });
-      if (!res.ok) {
-        const t = await res.text().catch(() => '');
-        let msg;
-        try { msg = JSON.parse(t).message || t; } catch { msg = t; }
-        throw new Error(`HTTP ${res.status}: ${msg}`);
-      }
-      const result = await res.json();
-      const payload = result.record['nexus-core-sync'];
-      if (!payload) throw new Error('云端数据格式异常');
-      // Only import if remote is newer than last sync
-      if (payload.timestamp > (this.config.lastSync || 0)) {
-        this.importData(payload);
-        this.config.lastSync = Date.now();
-        this.config.lastLocalModify = payload.timestamp;
-        this.saveConfig();
-        this.updateButton('synced');
-        return { success: true, pulled: true };
-      }
-      this.updateButton('synced');
-      return { success: true, pulled: false, message: '本地数据已是最新' };
+      const r = await this._put(items);
+      for (const [k, c] of Object.entries(r.conflicts || {})) this._writeLocal(k, c.value, c.updatedAt);
+      this.lastSync = Date.now();
+      this.lastError = '';
+      this.updateUI();
+      return { ok: true, pushed: (r.applied || []).length };
     } catch (e) {
-      console.error('[NEXUS Sync] Pull error:', e.message);
-      this.updateButton('error', e.message);
-      return { success: false, error: e.message };
-    } finally {
-      this._isSyncing = false;
-    }
+      this.lastError = e.message;
+      this.updateUI('error');
+      return { ok: false, error: e.message };
+    } finally { this._busy = false; }
   },
 
-  // Create a new JSONBin for sync
-  async createBin() {
-    if (!this.config.apiKey) return { success: false, error: '请先输入 API Key' };
+  async _put(items) {
+    const res = await fetch(this.base() + '/api/kv', {
+      method: 'PUT', headers: this.headers(), body: JSON.stringify({ items })
+    });
+    if (!res.ok) throw new Error(this._errText(res.status));
+    return await res.json();
+  },
+
+  _errText(code) {
+    if (code === 401) return 'HTTP 401：token 不对或没填';
+    if (code === 404) return 'HTTP 404：地址不对（检查端口）';
+    return 'HTTP ' + code;
+  },
+
+  // 同步专用写入：不触发回推，并采用服务端的时间戳
+  _writeLocal(key, val, ts) {
+    this._suppress = true;
+    try { Store.set(key, val); } finally { this._suppress = false; }
+    const m = kvMeta();
+    m[key] = ts;
+    try { localStorage.setItem(KV_META_KEY, JSON.stringify(m)); } catch {}
+  },
+
+  // ---------- 状态与自检 ----------
+  updateUI(state) {
+    const dot = document.getElementById('srv-dot');
+    const txt = document.getElementById('srv-status-text');
+    if (txt) {
+      if (!this.configured()) txt.textContent = '未连接';
+      else if (state === 'syncing') txt.textContent = '同步中…';
+      else if (this.lastError) txt.textContent = '同步失败';
+      else if (this.lastSync) {
+        const d = new Date(this.lastSync);
+        txt.textContent = '已同步 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      } else txt.textContent = '已连接';
+    }
+    if (dot) dot.className = 'srv-dot' + (this.configured() ? (this.lastError ? ' err' : ' ok') : '');
+  },
+
+  async test() {
     try {
-      const data = this.exportData();
-      const res = await fetch(`${this.API_BASE}/b`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': this.config.apiKey,
-          'X-Bin-Name': 'nexus-core-sync',
-        },
-        body: JSON.stringify({ 'nexus-core-sync': data }),
-      });
-      if (!res.ok) {
-        const t = await res.text().catch(() => '');
-        let msg;
-        try { msg = JSON.parse(t).message || t; } catch { msg = t; }
-        throw new Error(`HTTP ${res.status}: ${msg}`);
-      }
-      const result = await res.json();
-      this.config.binId = result.metadata.id;
-      this.config.lastSync = Date.now();
-      this.config.lastLocalModify = Date.now();
-      this.saveConfig();
-      return { success: true, binId: result.metadata.id };
+      const res = await fetch(this.base() + '/api/kv', { headers: this.headers() });
+      if (res.status === 401) return { ok: false, error: 'token 不对' };
+      if (!res.ok) return { ok: false, error: this._errText(res.status) };
+      const j = await res.json();
+      return { ok: true, keys: Object.keys(j.data || {}).length };
     } catch (e) {
-      console.error('[NEXUS Sync] Create bin error:', e.message);
-      return { success: false, error: e.message };
-    }
-  },
-
-  // Debounced auto-push (3s delay)
-  autoPush() {
-    if (!this._initialized || this._suppressAutoPush || !this.config.autoSync || !this.isConfigured()) return;
-    this.config.lastLocalModify = Date.now();
-    this.saveConfig();
-    clearTimeout(this._pushTimer);
-    this._pushTimer = setTimeout(async () => {
-      const r = await this.push();
-      if (!r.success) console.warn('[NEXUS Sync] Auto-push failed:', r.error);
-    }, 3000);
-  },
-
-  saveConfig() { localStorage.setItem('nexus_syncConfig', JSON.stringify(this.config)); },
-
-  updateButton(state, error = '') {
-    const btn = document.getElementById('sync-btn');
-    const text = document.getElementById('sync-btn-text');
-    if (!btn || !text) return;
-    btn.classList.remove('synced', 'syncing', 'error');
-    if (!this.isConfigured()) { text.textContent = '云同步'; return; }
-    if (state === 'syncing') { btn.classList.add('syncing'); text.textContent = '同步中...'; }
-    else if (state === 'error') { btn.classList.add('error'); text.textContent = '同步失败'; }
-    else {
-      btn.classList.add('synced');
-      const t = this.config.lastSync ? new Date(this.config.lastSync) : null;
-      text.textContent = t ? `已同步 ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}` : '已连接';
+      return { ok: false, error: '连不上：' + e.message };
     }
   }
 };
 
-// Subscribe Store changes to auto-push (exclude syncConfig & initialized)
+// ---------- 导出 / 导入（备份用；日常同步已由 KV 承担）----------
+function exportAllData() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(k)) {
+      try { data[k] = JSON.parse(localStorage.getItem(k)); }
+      catch { data[k] = localStorage.getItem(k); }
+    }
+  }
+  return { app: 'nexus-core', version: '2.0', timestamp: Date.now(), data: data };
+}
+
+// 兼容两种格式：标准导出（{data:{...}}）与裸 dump（直接 {nexus_x:...}，手机导出常见）
+function importAllData(payload) {
+  const d = (payload && payload.data && typeof payload.data === 'object') ? payload.data : payload;
+  if (!d || typeof d !== 'object') return { error: '文件格式不对' };
+  const snapshot = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(k)) snapshot[k] = localStorage.getItem(k);
+  }
+  if (Object.keys(snapshot).length) {
+    localStorage.setItem('nexus_backup_before_import', JSON.stringify({ at: Date.now(), data: snapshot }));
+  }
+  let n = 0;
+  for (const [k, v] of Object.entries(d)) {
+    const key = k.startsWith('nexus_') ? k : 'nexus_' + k;
+    if (SYNC_SKIP_KEYS.includes(key)) continue;
+    try { localStorage.setItem(key, typeof v === 'string' ? v : JSON.stringify(v)); n++; } catch {}
+  }
+  return { ok: true, imported: n };
+}
+
+function restorePreImportBackup() {
+  const raw = localStorage.getItem('nexus_backup_before_import');
+  if (!raw) { alert('没有可还原的备份'); return; }
+  let b; try { b = JSON.parse(raw); } catch { alert('备份已损坏'); return; }
+  if (!confirm('将把数据还原到 ' + new Date(b.at).toLocaleString('zh-CN') + ' 的状态？\n当前数据会被替换。')) return;
+  for (const [k, v] of Object.entries(b.data)) { try { localStorage.setItem(k, v); } catch {} }
+  alert('已还原，页面将刷新');
+  location.reload();
+}
+
+// Store 写入 → 标记时间戳 + 排队推送（同步写入不算「本机修改」）
+// 首次初始化默认数据期间，不把默认值当「用户修改」——
+// 否则新设备第一次打开，会用一堆空默认值盖掉服务器上的真实数据。
+let _dataInitRunning = false;
+
 Store.onSet((key) => {
-  if (key !== 'syncConfig' && key !== 'initialized') SyncManager.autoPush();
+  if (KVSync._suppress || _dataInitRunning) return;
+  if (!SYNC_KEYS.includes(key)) return;
+  kvTouch(key);
+  KVSync.pushSoon();
 });
 
 // === Initialize Default Data ===
@@ -1866,13 +1808,21 @@ function saveJournal() {
 }
 
 // === 日记后端（server/ 目录，Express + SQLite）===
-function journalApiCfg() {
-  return { base: (Store.get('journalApiBase', '') || '').replace(/\/+$/, ''), token: Store.get('journalApiToken', '') };
+// ===== 服务器连接配置（唯一真来源）=====
+// KV 数据同步与日记 API 共用同一套「地址 + token」，前端只出现一个服务器输入区。
+// 地址留空 = 与页面同源 —— 页面既然是服务器托管的，就不该让人再手输一遍 IP:端口。
+function serverCfg() {
+  const raw = String(Store.get('serverBase', '') || '').trim().replace(/\/+$/, '');
+  const httpPage = /^https?:$/.test(location.protocol);
+  return {
+    base: raw || (httpPage ? location.origin : ''),
+    token: String(Store.get('serverToken', '') || '').trim()
+  };
 }
-function journalApiOn() {
-  const c = journalApiCfg();
-  return !!(c.base && c.token);
-}
+function serverConfigured() { const c = serverCfg(); return !!(c.base && c.token); }
+// 兼容旧名：日记 API 各处沿用 journalApiCfg / journalApiOn
+function journalApiCfg() { return serverCfg(); }
+function journalApiOn() { return serverConfigured(); }
 function journalHeaders() {
   return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + journalApiCfg().token };
 }
@@ -1896,28 +1846,41 @@ async function fetchAllEntries() {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
-function saveJournalApiCfg() {
-  const base = document.getElementById('cfg-journal-api').value.trim();
-  const token = document.getElementById('cfg-journal-token').value.trim();
-  Store.set('journalApiBase', base);
-  Store.set('journalApiToken', token);
-  const status = document.getElementById('journal-api-status');
-  if (!base || !token) {
-    if (status) status.textContent = '未启用（仅本机存储）';
-    showToast('已保存：日记仅存本机', 'info');
-    renderJournalArchive();
-    return;
-  }
-  if (status) status.textContent = '测试连接中...';
-  fetchAllEntries().then(() => {
-    if (status) status.textContent = '已连接 ✓';
-    showToast('日记后端连接成功', 'success');
-    renderJournalArchive();
-  }).catch(e => {
-    if (status) status.textContent = '连接失败：' + e.message;
-    showToast('连接失败，请检查服务是否启动 / token 是否正确', 'error');
+// === 服务器同步 UI ===
+function syncServerFields() {
+  const b = document.getElementById('cfg-server-base');
+  const t = document.getElementById('cfg-server-token');
+  if (b && document.activeElement !== b) b.value = Store.get('serverBase', '') || '';
+  if (t && document.activeElement !== t) t.value = Store.get('serverToken', '') || '';
+  KVSync.updateUI();
+}
+
+function saveServerCfg() {
+  const bEl = document.getElementById('cfg-server-base');
+  const tEl = document.getElementById('cfg-server-token');
+  const base = (bEl ? bEl.value : '').trim().replace(/\/+$/, '');
+  const token = (tEl ? tEl.value : '').trim();
+  Store.set('serverBase', base);
+  Store.set('serverToken', token);
+  if (!token) { showToast('已清空连接，数据只存本机', 'info'); KVSync.updateUI(); return; }
+  showToast('正在测试连接…', 'info');
+  KVSync.test().then(async (r) => {
+    if (!r.ok) { showToast('连接失败：' + r.error, 'error'); KVSync.updateUI(); return; }
+    showToast('连接成功（服务端 ' + r.keys + ' 项），正在同步…', 'success');
+    const p = await KVSync.pull();
+    if (p.ok) showToast('同步完成：拉取 ' + p.pulled + ' 项，上传 ' + p.pushed + ' 项', 'success');
+    syncServerFields();
   });
 }
+
+async function syncNow() {
+  if (!KVSync.configured()) { showToast('请先填写访问令牌', 'warning'); return; }
+  showToast('正在同步…', 'info');
+  const p = await KVSync.pull();
+  if (p.ok) showToast('同步完成：拉取 ' + p.pulled + ' 项，上传 ' + p.pushed + ' 项', 'success');
+  else showToast('同步失败：' + p.error, 'error');
+}
+
 async function importJournalToServer() {
   if (!journalApiOn()) { showToast('请先配置并保存日记后端', 'warning'); return; }
   const j = Store.get('journal', {});
@@ -2812,156 +2775,6 @@ function getPriorityColor(p) {
   return map[p] || 'cyan';
 }
 
-// === Cloud Sync UI ===
-function openSyncModal() {
-  document.getElementById('sync-modal').classList.add('show');
-  if (SyncManager.isConfigured()) {
-    document.getElementById('sync-setup-section').style.display = 'none';
-    document.getElementById('sync-connected-section').style.display = 'block';
-    document.getElementById('sync-save-btn').style.display = 'none';
-    document.getElementById('sync-now-btn').style.display = 'inline-block';
-    document.getElementById('sync-pull-btn').style.display = 'inline-block';
-    document.getElementById('sync-push-btn').style.display = 'inline-block';
-    document.getElementById('sync-disconnect-btn').style.display = 'inline-block';
-    updateSyncModalStatus();
-    updateRestoreButton();
-  } else {
-    document.getElementById('sync-setup-section').style.display = 'block';
-    document.getElementById('sync-connected-section').style.display = 'none';
-    document.getElementById('sync-save-btn').style.display = 'inline-block';
-    document.getElementById('sync-now-btn').style.display = 'none';
-    document.getElementById('sync-pull-btn').style.display = 'none';
-    document.getElementById('sync-push-btn').style.display = 'none';
-    document.getElementById('sync-disconnect-btn').style.display = 'none';
-    document.getElementById('sync-token').value = '';
-    document.getElementById('sync-gist-id-input').value = '';
-    document.getElementById('sync-auto').checked = true;
-    updateRestoreButton();
-  }
-}
-
-function updateRestoreButton() {
-  const btn = document.getElementById('sync-restore-btn');
-  if (!btn) return;
-  let snap = null;
-  try { snap = JSON.parse(localStorage.getItem('nexus_backup_before_pull') || 'null'); } catch {}
-  if (snap && snap.data) {
-    const d = new Date(snap.at);
-    const label = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-    btn.textContent = '↩ 还原 ' + label + ' 备份';
-    btn.style.display = 'inline-block';
-  } else {
-    btn.style.display = 'none';
-  }
-}
-
-function closeSyncModal() {
-  document.getElementById('sync-modal').classList.remove('show');
-}
-
-async function saveSyncSettings() {
-  const apiKey = document.getElementById('sync-token').value.trim();
-  const binId = document.getElementById('sync-gist-id-input').value.trim();
-  const autoSync = document.getElementById('sync-auto').checked;
-  if (!apiKey) { showToast('请输入 JSONBin API Key', 'warning'); return; }
-
-  SyncManager.config.apiKey = apiKey;
-  SyncManager.config.autoSync = autoSync;
-  SyncManager._initialized = true;
-
-  if (binId) {
-    // Connect to existing Bin —— 这是「用云端覆盖本机」的操作，先讲清后果
-    const localItems = countLocalDataKeys();
-    if (localItems > 0) {
-      const okGo = confirm('⚠ 注意：连接后本机数据会被云端数据覆盖\n\n本机现有 ' + localItems + ' 项数据，将被云端内容整体替换（不是合并）。\n系统会先自动备份一份，可在同步设置里一键还原。\n\n确定继续连接吗？');
-      if (!okGo) { showToast('已取消连接，本机数据未变动', 'info'); return; }
-    }
-    SyncManager.config.binId = binId;
-    SyncManager.saveConfig();
-    showToast('正在连接...', 'info');
-    const result = await SyncManager.pull();
-    if (result.success) {
-      if (result.pulled) { renderAll(); updateDashboard(); showToast('已从云端同步数据！', 'success'); }
-      else { showToast('连接成功！本地数据已是最新', 'success'); }
-      SyncManager.updateButton('synced');
-      openSyncModal();
-    } else {
-      showToast('连接失败: ' + result.error, 'warning');
-    }
-  } else {
-    // Create new Bin
-    showToast('正在创建同步空间...', 'info');
-    SyncManager.saveConfig();
-    const result = await SyncManager.createBin();
-    if (result.success) {
-      showToast('同步空间创建成功！', 'success');
-      SyncManager.updateButton('synced');
-      openSyncModal();
-    } else {
-      showToast('创建失败: ' + result.error, 'warning');
-    }
-  }
-}
-
-async function manualSync() {
-  showToast('正在同步...', 'info');
-  const pullResult = await SyncManager.pull();
-  if (pullResult.pulled) { renderAll(); updateDashboard(); }
-  const pushResult = await SyncManager.push();
-  if (pushResult.success) showToast('同步完成！', 'success');
-  else showToast('同步出错: ' + (pullResult.error || pushResult.error), 'warning');
-  updateSyncModalStatus();
-}
-
-async function manualPush() {
-  showToast('正在上传...', 'info');
-  const r = await SyncManager.push();
-  showToast(r.success ? '上传成功！' : '上传失败: ' + r.error, r.success ? 'success' : 'warning');
-  updateSyncModalStatus();
-}
-
-async function manualPull() {
-  showToast('正在下载...', 'info');
-  const r = await SyncManager.pull();
-  if (r.success) {
-    if (r.pulled) { renderAll(); updateDashboard(); showToast('下载成功，数据已更新！', 'success'); }
-    else showToast(r.message || '本地数据已是最新', 'info');
-  } else {
-    showToast('下载失败: ' + r.error, 'warning');
-  }
-  updateSyncModalStatus();
-}
-
-function disconnectSync() {
-  if (!confirm('确定断开云同步？本地数据不会被删除，但将不再自动同步。')) return;
-  SyncManager.config = { apiKey: '', binId: '', autoSync: true, lastSync: 0, lastLocalModify: 0 };
-  SyncManager.saveConfig();
-  SyncManager.updateButton();
-  showToast('已断开云同步', 'info');
-  openSyncModal();
-}
-
-function updateSyncModalStatus() {
-  if (!SyncManager.isConfigured()) return;
-  document.getElementById('sync-gist-display').textContent = SyncManager.config.binId;
-  const ls = SyncManager.config.lastSync;
-  if (ls) {
-    const d = new Date(ls);
-    document.getElementById('sync-last-time').textContent =
-      `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-  } else {
-    document.getElementById('sync-last-time').textContent = '从未';
-  }
-  const autoEl = document.getElementById('sync-auto-status');
-  autoEl.textContent = SyncManager.config.autoSync ? '已开启' : '已关闭';
-  autoEl.style.color = SyncManager.config.autoSync ? 'var(--success)' : 'var(--text-dim)';
-}
-
-// Close sync modal on overlay click
-document.getElementById('sync-modal')?.addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) closeSyncModal();
-});
-
 // === Daily Task Template Manager ===
 // === Wallet / Finance Manager ===
 let _walletType = 'expense';
@@ -3285,8 +3098,9 @@ function renderWalletHistory() {
   list.innerHTML = Object.entries(grouped).map(([day, items]) => {
     const d = parseStamp(day);
     const isToday = day === todayStr;
-    const dayLabel = isToday ? '今天' : `周${dayNames[d.getDay()] || '?'}`;
-    const dateLabel = `${d.getMonth() + 1}/${d.getDate()}`;
+    // 脏数据（缺日期 / 格式异常）不该让整个面板崩掉
+    const dayLabel = !d ? '未标日期' : (isToday ? '今天' : `周${dayNames[d.getDay()] || '?'}`);
+    const dateLabel = d ? `${d.getMonth() + 1}/${d.getDate()}` : '';
     const dayExp = items.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     const dayInc = items.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
 
@@ -3389,22 +3203,8 @@ function openSetBalanceModal() {
 
 // === Settings Functions ===
 function renderSettings() {
-  // Sync status
-  const syncStatus = document.getElementById('settings-sync-status');
-  if (syncStatus) {
-    syncStatus.textContent = SyncManager.isConfigured() ? '已连接' : '未配置';
-    syncStatus.style.color = SyncManager.isConfigured() ? 'var(--success)' : 'var(--text-dim)';
-  }
-
-  // 日记后端配置回填
-  const apiInput = document.getElementById('cfg-journal-api');
-  const tokenInput = document.getElementById('cfg-journal-token');
-  if (apiInput && document.activeElement !== apiInput) apiInput.value = Store.get('journalApiBase', '');
-  if (tokenInput && document.activeElement !== tokenInput) tokenInput.value = Store.get('journalApiToken', '');
-  const jStatus = document.getElementById('journal-api-status');
-  if (jStatus && !jStatus.textContent.includes('✓') && !jStatus.textContent.includes('失败')) {
-    jStatus.textContent = journalApiOn() ? '已启用' : '未启用（仅本机存储）';
-  }
+  // 服务器连接回填 + 状态
+  syncServerFields();
 
   // Habits
   renderSettingsHabits();
@@ -3532,16 +3332,13 @@ function importDataPrompt() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        // 去掉可能的 BOM（Windows 记事本/部分手机导出会带）
+        // 去掉可能的 BOM（Windows 记事本 / 部分手机导出会带）
         const text = String(ev.target.result).replace(/^\uFEFF/, '');
         const data = JSON.parse(text);
-        if (!confirm('导入将覆盖当前所有数据，确定继续？')) return;
-        Object.entries(data).forEach(([key, value]) => {
-          if (key.startsWith('nexus_')) {
-            localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
-          }
-        });
-        showToast('数据已导入，刷新页面生效', 'success');
+        if (!confirm('导入会用文件里的数据替换本机现有数据（原数据会自动备份，可还原）。继续？')) return;
+        const r = importAllData(data);
+        if (r.error) { showToast('导入失败：' + r.error, 'error'); return; }
+        showToast('已导入 ' + r.imported + ' 项，刷新页面生效', 'success');
         setTimeout(() => location.reload(), 1000);
       } catch (e) {
         showToast('导入失败：文件格式错误', 'warning');
@@ -3941,23 +3738,35 @@ function migrateDailyTemplatesToTasks() {
 }
 
 // === Initialize ===
-document.addEventListener('DOMContentLoaded', async () => {
-  loadTheme();
-  SyncManager.init();
-  initData();
-  migrateDailyTemplatesToTasks();
-  renderAll();
-  updateDashboard();
+// 一次性迁移：旧的「日记后端」配置 → 统一的「服务器」配置（免得重填 token）
+function migrateLegacyConfig() {
+  try {
+    const oldBase = localStorage.getItem('nexus_journalApiBase');
+    const oldToken = localStorage.getItem('nexus_journalApiToken');
+    if (!localStorage.getItem('nexus_serverBase') && oldBase) localStorage.setItem('nexus_serverBase', oldBase);
+    if (!localStorage.getItem('nexus_serverToken') && oldToken) localStorage.setItem('nexus_serverToken', oldToken);
+    localStorage.removeItem('nexus_journalApiBase');
+    localStorage.removeItem('nexus_journalApiToken');
+    localStorage.removeItem('nexus_syncConfig');   // JSONBin 配置（含 apiKey），彻底退役
+  } catch {}
+}
 
-  // Auto-pull from cloud if configured
-  if (SyncManager.isConfigured()) {
-    const result = await SyncManager.pull();
-    if (result.pulled) {
-      renderAll();
-      updateDashboard();
-      showToast('已从云端同步数据', 'success');
-    }
+document.addEventListener('DOMContentLoaded', async () => {
+  // 启动阶段的所有写入都属「派生/默认值」，一律不算用户修改——
+  // 否则新设备第一次打开，会用空默认值盖掉服务器上的真实数据（实测踩到过）。
+  _dataInitRunning = true;
+  try {
+    loadTheme();
+    migrateLegacyConfig();
+    initData();
+    migrateDailyTemplatesToTasks();
+    renderAll();
+    updateDashboard();
+  } finally {
+    _dataInitRunning = false;
   }
+  KVSync.init();        // 内部会在短暂延迟后自动拉取一次
+  syncServerFields();
 });
 
 // Auto-refresh daily at midnight
