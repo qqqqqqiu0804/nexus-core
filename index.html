@@ -654,6 +654,21 @@ button:focus-visible { box-shadow: var(--ring); }
 .week-cell-course { background:color-mix(in srgb, var(--accent) 8%, transparent); border:1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius:4px; padding:4px; margin-bottom:3px; color:var(--text-primary); line-height:1.2; word-break:break-all; }
 .week-cell-loc { font-size:0.6rem; color:var(--text-dim); }
 .daily-next-class { background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:12px; font-size:0.8rem; color:var(--accent); }
+
+/* === 假期 / 调休补课标注 === */
+.week-head-holiday { color:var(--text-dim); font-weight:500; }
+.week-head-hol-label, .week-head-makeup-label { display:block; font-size:0.6rem; font-weight:600; margin-top:2px; line-height:1.2; }
+.week-head-hol-label { color:var(--orange); }
+.week-head-makeup-label { color:var(--accent); }
+.week-cell-holiday { background:repeating-linear-gradient(45deg, color-mix(in srgb, var(--text-dim) 7%, transparent) 0 5px, transparent 5px 10px); }
+.holiday-card { display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--border-subtle); border-left:2px solid var(--orange); border-radius:var(--radius-sm); padding:12px; font-size:0.88rem; color:var(--text-primary); }
+.holiday-card .hc-icon { font-size:1.3rem; }
+.holiday-card .hc-sub { font-size:0.72rem; color:var(--text-dim); margin-top:3px; }
+.makeup-bar { font-size:0.75rem; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:var(--radius-sm); padding:8px 10px; margin-bottom:8px; }
+.daily-next-class-holiday { background:color-mix(in srgb, var(--orange) 10%, transparent); border-color:color-mix(in srgb, var(--orange) 28%, transparent); color:var(--orange); }
+.forecast-holiday { font-size:0.75rem; color:var(--orange); padding:6px 0; }
+.forecast-day-head .fd-hol { font-size:0.72rem; color:var(--orange); }
+.forecast-day-head .fd-makeup { font-size:0.72rem; color:var(--accent); }
 </style>
 </head>
 <body>
@@ -3918,6 +3933,28 @@ function seasonIcon(key = scheduleKeyForDate()) {
 const DAY_NAMES = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
 const SEC_CN = ['一','二','三','四','五','六'];
 
+// === 校历假期与调休补课（2026-2027-1 学期）===
+// 来源：学校《2026 年中秋节、国庆节放假通知》
+//   中秋：9月25日—9月27日放假，共 3 天
+//   国庆：10月1日—10月7日放假调休，共 7 天
+//   9月20日（星期日）、10月10日（星期六）上班，分别补 10月6日（星期二）、10月7日（星期三）的课
+// 放假当天课表自动隐去并标注假期名；补课日照常显示（课程已登记在 DEFAULT_COURSES 末尾）。
+const HOLIDAYS = [
+  { name:'中秋节', short:'中秋', icon:'🌕', from:'2026-09-25', to:'2026-09-27', note:'9月25日—9月27日' },
+  { name:'国庆节', short:'国庆', icon:'🇨🇳', from:'2026-10-01', to:'2026-10-07', note:'10月1日—10月7日' }
+];
+
+// 调休补课日：仅用于标注「这天为什么有课」
+const MAKEUP_DAYS = {
+  '2026-09-20': '补第 5 周星期二的课',
+  '2026-10-10': '补第 5 周星期三的课'
+};
+
+function holidayForDate(d) {
+  const s = localDate(d);
+  return HOLIDAYS.find(h => s >= h.from && s <= h.to) || null;
+}
+
 // 来自湖南科技学院教务系统（2026-2027-1 学期），跨 22 周抓取合并
 const DEFAULT_COURSES = [
   { day:'星期一', section:1, name:'数据库原理', location:'致远楼606', weeks:[1,2,3,4,5,6,7,8,9,10] },
@@ -3953,7 +3990,16 @@ const DEFAULT_COURSES = [
   { day:'星期日', section:1, name:'Python语言程序设计', location:'知行楼306', weeks:[2] },
   { day:'星期日', section:2, name:'概率论与数理统计', location:'知行楼307', weeks:[2] },
   { day:'星期日', section:3, name:'习近平新时代中国特色社会主义思想概论', location:'明理楼207', weeks:[2] },
-  { day:'星期日', section:4, name:'毛泽东思想和中国特色社会主义理论体系概论', location:'明理楼106', weeks:[2] }
+  { day:'星期日', section:4, name:'毛泽东思想和中国特色社会主义理论体系概论', location:'明理楼106', weeks:[2] },
+
+  // === 临时调课：2026-10-10（第 5 周周六）补「第 5 周星期三」的课 ===
+  // 通知原文：「9月20日（星期日）、10月10日（星期六）上班，分别补10月6日（星期二）、10月7日（星期三）的课」
+  // 推算：第 5 周为 10/5–10/11，10/10 为周六 → weeks 填 [5]。
+  // 第 5 周周三仅白天 2 门（数据库原理 1-10 周、操作系统 1-10 周；形势与政策 11-12 周、
+  // 数据库原理换教室 11-14 周、数据结构 13-16 周均不覆盖第 5 周）。
+  // 经用户确认：周三无晚间跨专业选修课，故只补这 2 门。
+  { day:'星期六', section:1, name:'数据库原理', location:'致远楼606', weeks:[5] },
+  { day:'星期六', section:3, name:'操作系统', location:'知行楼309', weeks:[5] }
 ];
 
 function getCourses() { return Store.get('courses', DEFAULT_COURSES); }
@@ -3976,6 +4022,20 @@ function getWeekRange(week) {
 
 function courseMatches(c, week) { return c.weeks && c.weeks.indexOf(week) >= 0; }
 
+// 某周 7 天的实际日期（周一 → 周日），供课表按「日期」而不是「星期名」判断假期
+function getWeekDates(week) {
+  const mon = new Date(new Date(TERM_START + 'T00:00:00').getTime() + (week - 1) * 7 * 86400000);
+  return Array.from({ length: 7 }, (_, i) => new Date(mon.getTime() + i * 86400000));
+}
+
+// 统一取课入口：放假当天一律无课，其余按「星期 + 周次」匹配
+function coursesForDate(d) {
+  if (holidayForDate(d)) return [];
+  const week = weekForDate(d);
+  const name = DAY_NAMES[d.getDay()];
+  return getCourses().filter(c => c.day === name && courseMatches(c, week)).sort((a, b) => a.section - b.section);
+}
+
 let _courseView = 'day';
 function switchCourseView(v) { _courseView = v; renderCourses(); }
 
@@ -3987,8 +4047,11 @@ function renderCourses() {
   if (wl) wl.textContent = `第 ${week} 周 · ${getWeekRange(week)}`;
   const sl = document.getElementById('course-season-label');
   if (sl) {
-    const key = Store.get('scheduleOverride', null) || scheduleKeyForDate();
-    sl.textContent = `${seasonIcon(key)} ${seasonDisplayName(new Date(), key)} · ${SCHEDULES[key].range}`;
+    // 作息按「所查看这一周的周一」推算，而不是按今天：
+    // 否则翻到 10 月的周次时，标签还停在夏季作息，和表内上课时间对不上。
+    const anchor = getWeekDates(week)[0];
+    const key = Store.get('scheduleOverride', null) || scheduleKeyForDate(anchor);
+    sl.textContent = `${seasonIcon(key)} ${seasonDisplayName(anchor, key)} · ${SCHEDULES[key].range}`;
   }
   document.querySelectorAll('.course-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === _courseView));
   const dayEl = document.getElementById('course-day-view');
@@ -4015,16 +4078,17 @@ function courseRow(c) {
 function renderCourseForecast() {
   const el = document.getElementById('course-forecast-view');
   if (!el) return;
-  const courses = getCourses();
 
   // ---- 明天 ----
   const tm = new Date(); tm.setDate(tm.getDate() + 1);
   const tWeek = weekForDate(tm);
   const tName = DAY_NAMES[tm.getDay()];
-  const tList = courses.filter(c => c.day === tName && courseMatches(c, tWeek)).sort((a, b) => a.section - b.section);
+  const tHol = holidayForDate(tm);
+  const tList = coursesForDate(tm);
   let html = `<div class="forecast-block">
     <div class="forecast-title"><span class="ft-main">明天</span><span class="ft-sub">${fmtMD(tm)} ${tName} · 第 ${tWeek} 周</span></div>
-    ${tList.length ? tList.map(courseRow).join('') : '<div class="forecast-off">明天没有课</div>'}
+    ${tHol ? `<div class="forecast-holiday">${tHol.icon} ${tHol.name}假期，不上课</div>`
+      : (tList.length ? tList.map(courseRow).join('') : '<div class="forecast-off">明天没有课</div>')}
   </div>`;
 
   // ---- 下周（下周一为基准，7 天全列）----
@@ -4038,10 +4102,15 @@ function renderCourseForecast() {
   for (let i = 0; i < 7; i++) {
     const d = new Date(nextMon.getTime() + i * 86400000);
     const name = DAY_NAMES[d.getDay()];
-    const list = courses.filter(c => c.day === name && courseMatches(c, nWeek)).sort((a, b) => a.section - b.section);
+    const hol = holidayForDate(d);
+    const makeup = MAKEUP_DAYS[localDate(d)];
+    const list = coursesForDate(d);
     total += list.length;
+    const tag = hol
+      ? `<span class="fd-hol">${hol.icon} ${hol.short}假期</span>`
+      : (makeup ? `<span class="fd-makeup">📌 ${makeup}</span>` : (list.length ? '' : '<span class="fd-none">无课</span>'));
     html += `<div class="forecast-day">
-      <div class="forecast-day-head"><span class="fd-tag">${fmtMD(d)} ${name}</span>${list.length ? '' : '<span class="fd-none">无课</span>'}</div>
+      <div class="forecast-day-head"><span class="fd-tag">${fmtMD(d)} ${name}</span>${tag}</div>
       ${list.map(courseRow).join('')}
     </div>`;
   }
@@ -4052,11 +4121,20 @@ function renderCourseForecast() {
 
 function renderCourseDay(week) {
   const el = document.getElementById('course-day-view');
-  const todayName = DAY_NAMES[new Date().getDay()];
-  const list = getCourses().filter(c => c.day === todayName && courseMatches(c, week)).sort((a, b) => a.section - b.section);
+  const today = new Date();
+  const hol = holidayForDate(today);
+  if (hol) {
+    el.innerHTML = `<div class="holiday-card"><span class="hc-icon">${hol.icon}</span>
+      <div><div>${hol.name}假期 · 今天不上课</div>
+      <div class="hc-sub">${hol.note} 放假（第 ${week} 周）</div></div></div>`;
+    return;
+  }
+  const todayName = DAY_NAMES[today.getDay()];
+  const list = coursesForDate(today);
   if (!list.length) { el.innerHTML = `<div class="course-empty">今天（${todayName}）第 ${week} 周无课 🎉</div>`; return; }
   const now = new Date();
-  el.innerHTML = list.map(c => {
+  const makeup = MAKEUP_DAYS[localDate(today)];
+  el.innerHTML = (makeup ? `<div class="makeup-bar">📌 今天为调休上课日（${makeup}）</div>` : '') + list.map(c => {
     const t = getCurrentSchedule()[c.section];
     const [h, m] = t.start.split(':').map(Number);
     const startDt = new Date(); startDt.setHours(h, m, 0, 0);
@@ -4081,15 +4159,23 @@ function renderCourseDay(week) {
 function renderCourseWeek(week) {
   const el = document.getElementById('course-week-view');
   const days = DAY_NAMES.slice(1).concat(['星期日']);
+  const dates = getWeekDates(week);
   let html = '<div class="week-grid"><div class="week-corner"></div>';
-  days.forEach(d => html += `<div class="week-head">${d.replace('星期', '周')}</div>`);
+  days.forEach((d, i) => {
+    const hol = holidayForDate(dates[i]);
+    const makeup = MAKEUP_DAYS[localDate(dates[i])];
+    const mark = hol ? `<span class="week-head-hol-label">${hol.short}</span>`
+      : (makeup ? '<span class="week-head-makeup-label">补课</span>' : '');
+    html += `<div class="week-head${hol ? ' week-head-holiday' : ''}">${d.replace('星期', '周')}${mark}</div>`;
+  });
   for (let s = 1; s <= 6; s++) {
     const st = getCurrentSchedule();
     html += `<div class="week-sec">第${SEC_CN[s - 1]}大节<br><span class="week-sec-time">${st[s].start}-${st[s].end}</span></div>`;
-    days.forEach(d => {
-      const cs = getCourses().filter(c => c.day === d && c.section === s && courseMatches(c, week));
+    days.forEach((d, i) => {
+      const hol = holidayForDate(dates[i]);
+      const cs = hol ? [] : getCourses().filter(c => c.day === d && c.section === s && courseMatches(c, week));
       const inner = cs.map(c => `<div class="week-cell-course" title="${c.name} @ ${c.location}">${c.name}<br><span class="week-cell-loc">${c.location || ''}</span></div>`).join('');
-      html += `<div class="week-cell">${inner}</div>`;
+      html += `<div class="week-cell${hol ? ' week-cell-holiday' : ''}">${inner}</div>`;
     });
   }
   html += '</div>';
@@ -4099,10 +4185,16 @@ function renderCourseWeek(week) {
 function renderNextClassBanner() {
   const el = document.getElementById('daily-next-class');
   if (!el) return;
-  const week = getCurrentWeek();
-  const todayName = DAY_NAMES[new Date().getDay()];
-  const list = getCourses().filter(c => c.day === todayName && courseMatches(c, week)).sort((a, b) => a.section - b.section);
   const now = new Date();
+  const hol = holidayForDate(now);
+  if (hol) {
+    el.classList.add('daily-next-class-holiday');
+    el.innerHTML = `${hol.icon} ${hol.name}假期 · 今天不上课（${hol.note}）`;
+    el.style.display = '';
+    return;
+  }
+  el.classList.remove('daily-next-class-holiday');
+  const list = coursesForDate(now);
   let next = null;
   for (const c of list) {
     const [eh, em] = getCurrentSchedule()[c.section].end.split(':').map(Number);
@@ -4125,13 +4217,20 @@ function renderTodayCourses() {
   const section = document.getElementById('daily-courses-section');
   const list = document.getElementById('daily-courses-list');
   if (!section || !list) return;
-  const week = getCurrentWeek();
-  const todayName = DAY_NAMES[new Date().getDay()];
-  const courses = getCourses().filter(c => c.day === todayName && courseMatches(c, week)).sort((a, b) => a.section - b.section);
+  const now = new Date();
+  const hol = holidayForDate(now);
+  if (hol) {
+    section.style.display = '';
+    list.innerHTML = `<div class="holiday-card"><span class="hc-icon">${hol.icon}</span>
+      <div><div>${hol.name}假期</div><div class="hc-sub">${hol.note} 不上课</div></div></div>`;
+    return;
+  }
+  const courses = coursesForDate(now);
   if (!courses.length) { section.style.display = 'none'; return; }
   section.style.display = '';
-  const now = new Date();
-  list.innerHTML = courses.map(c => {
+  const makeup = MAKEUP_DAYS[localDate(now)];
+  const makeupBar = makeup ? `<div class="makeup-bar">📌 今天为调休上课日（${makeup}）</div>` : '';
+  list.innerHTML = makeupBar + courses.map(c => {
     const t = getCurrentSchedule()[c.section];
     const [h, m] = t.start.split(':').map(Number);
     const startDt = new Date(); startDt.setHours(h, m, 0, 0);
@@ -4157,11 +4256,14 @@ function renderDailyTomorrowHint() {
   const el = document.getElementById('daily-tomorrow-hint');
   if (!el) return;
   const tm = new Date(); tm.setDate(tm.getDate() + 1);
-  const week = weekForDate(tm);
   const name = DAY_NAMES[tm.getDay()];
-  const list = getCourses().filter(c => c.day === name && courseMatches(c, week)).sort((a, b) => a.section - b.section);
+  const hol = holidayForDate(tm);
+  const makeup = MAKEUP_DAYS[localDate(tm)];
+  const list = coursesForDate(tm);
   const head = `<span style="font-family:var(--font-mono);color:var(--accent);">${fmtMD(tm)} ${name}</span>`;
-  if (!list.length) {
+  if (hol) {
+    el.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="color:var(--text-secondary);">明天</span>${head}<span style="color:var(--orange);">${hol.icon} ${hol.name}假期 · 不上课</span></div>`;
+  } else if (!list.length) {
     el.innerHTML = `<div style="display:flex;gap:8px;align-items:center;"><span style="color:var(--text-secondary);">明天</span>${head}<span style="color:var(--text-dim);">没有课</span></div>`;
   } else {
     const t = getCurrentSchedule()[list[0].section];
@@ -4169,6 +4271,7 @@ function renderDailyTomorrowHint() {
       <span style="color:var(--text-secondary);">明天</span>${head}
       <span style="color:var(--text-primary);">${list.length} 节课</span>
       <span style="color:var(--text-dim);">首节 ${t.start} ${list[0].name}</span>
+      ${makeup ? `<span style="color:var(--accent);">📌 ${makeup}</span>` : ''}
       <span style="color:var(--text-dim);margin-left:auto;white-space:nowrap;">查看下周 →</span>
     </div>`;
   }
