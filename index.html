@@ -1324,7 +1324,7 @@ button:focus-visible { box-shadow: var(--ring); }
   <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
     <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
       <span style="font-size:1.1rem;">📈</span>
-      <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">投资台账</span>
+      <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">资产台账</span>
       <button class="btn btn-sm" id="invest-refresh-btn" onclick="refreshQuotes(true)">刷新行情</button>
       <button class="btn btn-sm" onclick="closeInvest()">✕</button>
     </div>
@@ -1403,6 +1403,39 @@ button:focus-visible { box-shadow: var(--ring); }
   </div>
 </div>
 
+<!-- 电子产品编辑弹窗（「有数」那种：买价 ÷ 用过的天数 = 每天摊多少） -->
+<div class="modal-overlay" id="gadget-edit-modal">
+  <div class="modal">
+    <div class="modal-title" id="gadget-edit-title">添加一件</div>
+
+    <div style="margin-bottom:12px;">
+      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">名称</label>
+      <input id="gd-name" placeholder="例：机械革命蛟龙16 pro" style="width:100%;">
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">买的时候多少钱</label>
+      <input type="number" id="gd-price" placeholder="例：6479.20" inputmode="decimal" step="0.01" style="width:100%;">
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">购买日期</label>
+      <input type="date" id="gd-date" style="width:100%;">
+      <div id="gd-hint" style="font-size:0.66rem;color:var(--text-dim);margin-top:4px;">填了日期才算得出「已用多少天」和日均成本</div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">备注（可选）</label>
+      <input id="gd-note" placeholder="例：国补买的 / 二手" style="width:100%;">
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="closeGadgetEdit()">取消</button>
+      <button class="btn btn-primary" onclick="submitGadget()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
 
@@ -1434,7 +1467,7 @@ const SYNC_KEYS = [
   'tasks', 'wallet', 'courses', 'completionLog', 'dailyLog',
   'dailyTemplates', 'profile', 'aiReports', 'aiModel',
   'investJournal', 'scheduleOverride', 'budget', 'inspirations', 'videos',
-  'investments', 'investShots'
+  'investments', 'investShots', 'gadgets'
 ];
 // 注意 journal（日记）**不在**白名单：它由日记 API + 服务器 SQLite 负责，
 // 两个通道同时写同一条数据会互相覆盖。
@@ -4231,12 +4264,13 @@ function renderInvest() {
 
   if (!items.length) {
     sumEl.innerHTML = '';
+    // 没有投资持仓时，总览卡不显示（没有意义），但流动资金和电子产品照样要能看
     listEl.innerHTML = `<div class="card" style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.8rem;line-height:1.9;">
-      还没有持仓。<br>
+      还没有投资持仓。<br>
       点右上角「+ 添加持仓」，把产品页面上的<b style="color:var(--text-secondary);">持有金额</b>和
       <b style="color:var(--text-secondary);">持仓收益</b>抄进来，<br>收益率和回本缺口就自动算出来了。
       <br><br>嫌抄着麻烦，也可以直接在下面<b style="color:var(--text-secondary);">传持仓截图</b>，让 AI 认。
-    </div>`;
+    </div>` + cashGroupHtml() + gadgetGroupHtml();
     if (noteEl) noteEl.innerHTML = '';
     renderShots();
     return;
@@ -4291,7 +4325,8 @@ function renderInvest() {
   })).filter(g => g.items.length);
 
   listEl.innerHTML = cashGroupHtml()
-    + groups.map(g => investGroupHtml(g.def, g.items, quotes)).join('');
+    + groups.map(g => investGroupHtml(g.def, g.items, quotes)).join('')
+    + gadgetGroupHtml();
 
   // ---- 底部说明：行情什么时候更新的、哪些是查不到的 ----
   if (noteEl) {
@@ -4494,6 +4529,132 @@ function deleteCashAccount(id) {
   w.cashAccounts = list.filter(x => x.id !== id);
   Store.set('wallet', _recalcCash(w));
   renderInvest(); renderWallet();
+  showToast('已删除', 'success');
+}
+
+// ---------- 电子资产 ----------
+// 复刻「有数」那套算法：买价 ÷ 已经用了多少天 = 每天摊多少钱。
+//
+// 故意不并进上面的总市值 —— 手机电脑不会生钱，它是花掉的钱、只会贬值。
+// 混进"资产"里只会让数字虚高，看着像很有钱。这里单独看"这件东西每天值不值"。
+function loadGadgets() {
+  const v = Store.get('gadgets', null);
+  return Array.isArray(v) ? v : [];
+}
+function saveGadgets(l) { Store.set('gadgets', l); }
+
+// 已用天数。跟「有数」口径对齐：买的那天算第 0 天（不含当天）。
+function gadgetDays(g) {
+  if (!g.buyDate) return null;
+  const a = new Date(String(g.buyDate) + 'T00:00:00');
+  if (isNaN(a.getTime())) return null;
+  const b = new Date(localDate(new Date()) + 'T00:00:00');
+  const d = Math.round((b - a) / 86400000);
+  return d > 0 ? d : null;
+}
+
+function gadgetGroupHtml() {
+  const list = loadGadgets();
+  const total = list.reduce((s, g) => s + (Number(g.price) || 0), 0);
+  let daySum = 0;
+  list.forEach(g => { const d = gadgetDays(g); if (d) daySum += (Number(g.price) || 0) / d; });
+
+  const rows = list.length
+    ? list.map(g => {
+      const d = gadgetDays(g);
+      const per = d ? (Number(g.price) || 0) / d : null;
+      return `<div class="card" style="padding:12px;margin-bottom:8px;">
+        <div style="display:flex;align-items:flex-start;gap:8px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:0.88rem;color:var(--text-primary);word-break:break-all;">${escHtml(g.name)}</div>
+            <div style="font-size:0.66rem;color:var(--text-dim);margin-top:3px;">
+              ${g.buyDate ? escHtml(g.buyDate) + ' 买的' : '没记购买日期'}${d ? ` · 已用 ${d} 天` : ''}
+            </div>
+          </div>
+          <button class="btn btn-sm" style="flex:0 0 auto;white-space:nowrap;" onclick="openGadgetEdit('${g.id}')">改</button>
+          <button class="btn btn-sm" style="flex:0 0 auto;white-space:nowrap;" onclick="deleteGadget('${g.id}')">删</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;">
+          <span style="font-size:0.95rem;color:var(--text-primary);">¥${fmtAmount(g.price)}</span>
+          ${per ? `<span style="font-size:0.8rem;color:var(--text-secondary);">日均 ¥${per.toFixed(2)}</span>` : ''}
+        </div>
+        ${g.note ? `<div style="font-size:0.66rem;color:var(--text-dim);margin-top:5px;">${escHtml(g.note)}</div>` : ''}
+      </div>`;
+    }).join('')
+    : `<div style="font-size:0.72rem;color:var(--text-dim);padding:8px 14px;line-height:1.8;">
+        还没有记录。点下面「+ 加一件」，把手机、电脑这些记进来，就知道它们每天摊多少钱。
+      </div>`;
+
+  return `<details class="inv-group">
+    <summary class="inv-group-sum">
+      <span class="inv-group-head">
+        <span style="font-size:0.88rem;color:var(--text-primary);">电子资产</span>
+        <span class="inv-group-num">
+          ${list.length} 件 · ¥${fmtAmount(total)}${daySum ? ` · 日均 ¥${daySum.toFixed(2)}` : ''}
+        </span>
+      </span>
+    </summary>
+    <div class="inv-group-body">
+      <div class="inv-group-hint">
+        买的时候花了多少、摊到每天多少。它跟上面的投资不是一回事 ——
+        <b style="color:var(--text-secondary);">这些东西不会生钱，所以不计入总市值</b>。
+      </div>
+      ${rows}
+      <div style="padding:8px 14px 4px;">
+        <button class="btn btn-sm" onclick="openGadgetEdit(null)">+ 加一件</button>
+      </div>
+    </div>
+  </details>`;
+}
+
+let _gadgetEditId = null;
+
+function openGadgetEdit(id) {
+  _gadgetEditId = id || null;
+  const g = id ? loadGadgets().find(x => x.id === id) : null;
+  document.getElementById('gadget-edit-title').textContent = g ? '修改' : '添加一件';
+  document.getElementById('gd-name').value = g ? g.name : '';
+  document.getElementById('gd-price').value = g ? g.price : '';
+  document.getElementById('gd-date').value = g ? (g.buyDate || '') : '';
+  document.getElementById('gd-note').value = g ? (g.note || '') : '';
+  document.getElementById('gadget-edit-modal').classList.add('show');
+}
+
+function closeGadgetEdit() {
+  document.getElementById('gadget-edit-modal').classList.remove('show');
+}
+
+function submitGadget() {
+  const name = document.getElementById('gd-name').value.trim();
+  const price = parseFloat(document.getElementById('gd-price').value);
+  const buyDate = document.getElementById('gd-date').value;
+  const note = document.getElementById('gd-note').value.trim();
+
+  if (!name) { showToast('给它起个名字', 'warning'); return; }
+  if (!(price > 0)) { showToast('填一下买的时候多少钱', 'warning'); return; }
+
+  const list = loadGadgets();
+  const old = _gadgetEditId ? list.find(x => x.id === _gadgetEditId) : null;
+  const item = {
+    id: _gadgetEditId || ('gd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)),
+    name,
+    price: Math.round(price * 100) / 100,
+    buyDate: buyDate || '',
+    note,
+    updatedAt: Date.now()
+  };
+  saveGadgets(old ? list.map(x => (x.id === old.id ? item : x)) : list.concat([item]));
+  closeGadgetEdit();
+  renderInvest();
+  showToast('已保存', 'success');
+}
+
+function deleteGadget(id) {
+  const g = loadGadgets().find(x => x.id === id);
+  if (!g) return;
+  if (!confirm(`删掉「${g.name}」？`)) return;
+  saveGadgets(loadGadgets().filter(x => x.id !== id));
+  renderInvest();
   showToast('已删除', 'success');
 }
 
