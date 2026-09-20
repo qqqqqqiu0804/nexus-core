@@ -5485,30 +5485,22 @@ const DEFAULT_COURSES = [
   { day:'星期四', section:4, name:'形势与政策（三）', location:'博雅楼东1-2', weeks:[11,12] },
   { day:'星期三', section:1, name:'数据结构与算法', location:'知行楼305', weeks:[13,14,15,16] },
   { day:'星期五', section:1, name:'数据结构与算法', location:'知行楼305', weeks:[13,14,15,16] },
-  { day:'星期五', section:3, name:'Python语言程序设计', location:'知行楼306', weeks:[13,14,15,16] },
+  { day:'星期五', section:3, name:'Python语言程序设计', location:'知行楼306', weeks:[13,14,15,16] }
+];
 
-  // === 临时调课：2026-09-20（第 2 周周日）补「第五周（单数周）星期二」的课 ===
-  // 通知原文：「本周日补上第五周（单数周）星期二的课，周日课程全部停上（含晚上跨专业选修课）」
-  // 推算：TERM_START=2026-09-07 → 第 5 周周一为 10/5，周二 10/6 正落在国庆假期，
-  //       所以学校提前到本周日（9/20，第 2 周）补。故 weeks 填 [2]。
-  // 周二这四条课在奇偶周出现次数完全相同（不存在单双周差异），照搬即可。
-  // 周日原本无课，因此「周日课程停上」对本课表无影响。
+// 临时调课（调休补课）单独放，和常规课表分离；过期后整段删掉即可。
+// 第 1 段：2026-09-20（第 2 周周日）补第五周周二；第 2 段：2026-10-10（第 5 周周六）补第 5 周周三。
+// 两段都已按 weeks 限定，过对应周次后不会显示。有效期至 2026-10-10，之后可整段删除。
+const SCHEDULE_OVERRIDES = [
   { day:'星期日', section:1, name:'Python语言程序设计', location:'知行楼306', weeks:[2] },
   { day:'星期日', section:2, name:'概率论与数理统计', location:'知行楼307', weeks:[2] },
   { day:'星期日', section:3, name:'习近平新时代中国特色社会主义思想概论', location:'明理楼207', weeks:[2] },
   { day:'星期日', section:4, name:'毛泽东思想和中国特色社会主义理论体系概论', location:'明理楼106', weeks:[2] },
-
-  // === 临时调课：2026-10-10（第 5 周周六）补「第 5 周星期三」的课 ===
-  // 通知原文：「9月20日（星期日）、10月10日（星期六）上班，分别补10月6日（星期二）、10月7日（星期三）的课」
-  // 推算：第 5 周为 10/5–10/11，10/10 为周六 → weeks 填 [5]。
-  // 第 5 周周三仅白天 2 门（数据库原理 1-10 周、操作系统 1-10 周；形势与政策 11-12 周、
-  // 数据库原理换教室 11-14 周、数据结构 13-16 周均不覆盖第 5 周）。
-  // 经用户确认：周三无晚间跨专业选修课，故只补这 2 门。
   { day:'星期六', section:1, name:'数据库原理', location:'致远楼606', weeks:[5] },
   { day:'星期六', section:3, name:'操作系统', location:'知行楼309', weeks:[5] }
 ];
 
-function getCourses() { return Store.get('courses', DEFAULT_COURSES); }
+function getCourses() { return Store.get('courses', DEFAULT_COURSES).concat(SCHEDULE_OVERRIDES); }
 
 // 按任意日期算学期周次（明天/下周可能跨周，必须带日期参数）
 function weekForDate(date) {
