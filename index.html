@@ -281,9 +281,11 @@ label {
 }
 
 /* === Modal === */
+/* z-index 必须高于全屏浮层（insp/video/task-overlay 都是 200）——
+   否则从浮层里打开的新增/编辑弹窗会被浮层盖住，完全看不见。 */
 .modal-overlay {
   display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: var(--overlay); backdrop-filter: blur(4px); z-index: 100;
+  background: var(--overlay); backdrop-filter: blur(4px); z-index: 300;
   align-items: center; justify-content: center;
 }
 .modal-overlay.show { display: flex; }
@@ -643,7 +645,7 @@ button:focus-visible { box-shadow: var(--ring); }
   <!-- Header -->
   <header class="header">
     <div class="header-title">Nexus Core</div>
-    <div class="header-subtitle">个人工作台 · 任务 / 课表 / 数据</div>
+    <div class="header-subtitle">个人工作台 · 课表 / 记账 / 随手记</div>
     <div style="display:flex;gap:8px;position:absolute;top:24px;right:0;">
       <button class="sync-btn" id="theme-toggle" onclick="toggleTheme()" title="切换主题">
         <span id="theme-icon">☀️</span>
@@ -654,9 +656,8 @@ button:focus-visible { box-shadow: var(--ring); }
   <!-- Bottom Tab Bar -->
   <nav class="bottom-tab-bar" id="nav">
     <button class="tab-item active" data-panel="daily"><span class="tab-icon">📋</span><span class="tab-label">今日</span></button>
-    <button class="tab-item" data-panel="tasks"><span class="tab-icon">⚡</span><span class="tab-label">任务</span></button>
     <button class="tab-item" data-panel="courses"><span class="tab-icon">📚</span><span class="tab-label">课表</span></button>
-    <button class="tab-item" data-panel="data"><span class="tab-icon">📊</span><span class="tab-label">数据</span></button>
+    <button class="tab-item" data-panel="data"><span class="tab-icon">📒</span><span class="tab-label">账本</span></button>
     <button class="tab-item" data-panel="settings"><span class="tab-icon">⚙️</span><span class="tab-label">我的</span></button>
   </nav>
 
@@ -707,6 +708,7 @@ button:focus-visible { box-shadow: var(--ring); }
       <div class="section-header">
         <span class="section-title">◆ 今日任务</span>
         <span class="section-count" id="today-tasks-count"></span>
+        <button class="btn btn-sm" onclick="openTasks()">全部 →</button>
       </div>
       <div id="today-tasks-list"></div>
     </div>
@@ -795,26 +797,8 @@ button:focus-visible { box-shadow: var(--ring); }
   </div>
 
 
-  <!-- Panel: Tasks -->
-  <div class="panel" id="panel-tasks">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <div style="display: flex; gap: 8px;">
-        <select id="task-filter" style="width: auto;">
-          <option value="all">全部任务</option>
-          <option value="main">主线任务</option>
-          <option value="side">支线任务</option>
-          <option value="timed">限时任务</option>
-        </select>
-        <select id="task-sort" style="width: auto;">
-          <option value="newest">最新</option>
-          <option value="priority">优先级</option>
-          <option value="deadline">截止日期</option>
-        </select>
-      </div>
-      <button class="btn btn-primary" onclick="openTaskModal()">+ 新增任务</button>
-    </div>
-    <div id="all-tasks-list"></div>
-  </div>
+  <!-- 原「任务」面板已改为浮层（#task-overlay，见文件末尾），底部导航不再单列一格。
+       入口在今日面板「◆ 今日任务」标题右侧的「全部 →」 -->
 
 
 
@@ -1269,6 +1253,34 @@ button:focus-visible { box-shadow: var(--ring); }
     <input id="video-search" placeholder="搜索标题 / 备注 / 标签" oninput="renderVideos()" style="width:100%;margin-bottom:10px;">
     <div id="video-tagbar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
     <div id="video-list"></div>
+  </div>
+</div>
+
+<!-- 全部任务（浮层）：原「任务」tab。它装的是低频的管理动作（增删改、筛排序），
+     而每天勾选用的「今日任务」已经在今日面板里了，所以不必再占一格底部导航。
+     必须放在 .panel 外面 —— .panel 是 display:none，套在里面会被一起隐藏。 -->
+<div id="task-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:var(--bg-deep);overflow-y:auto;-webkit-overflow-scrolling:touch;">
+  <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
+    <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
+      <span style="font-size:1.1rem;">⚡</span>
+      <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">全部任务</span>
+      <button class="btn btn-sm" onclick="openTaskModal()">+ 新增</button>
+      <button class="btn btn-sm" onclick="closeTasks()">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+      <select id="task-filter" style="width:auto;">
+        <option value="all">全部任务</option>
+        <option value="main">主线任务</option>
+        <option value="side">支线任务</option>
+        <option value="timed">限时任务</option>
+      </select>
+      <select id="task-sort" style="width:auto;">
+        <option value="newest">最新</option>
+        <option value="priority">优先级</option>
+        <option value="deadline">截止日期</option>
+      </select>
+    </div>
+    <div id="all-tasks-list"></div>
   </div>
 </div>
 
@@ -2308,7 +2320,7 @@ function renderTodayTasks() {
         </div>
       </div>
     </div>
-  `).join('') || '<div style="color:var(--text-dim);font-size:0.8rem;padding:8px;">今天没有到期任务，去「任务」里安排一个周期任务吧</div>';
+  `).join('') || '<div style="color:var(--text-dim);font-size:0.8rem;padding:8px;">今天没有到期任务，点「全部 →」安排一个吧</div>';
 }
 
 // --- Meals ---
@@ -2756,7 +2768,7 @@ async function importJournalToServer() {
   } catch (e) { showToast('导入失败：' + e.message, 'error'); }
 }
 
-// === 日记回顾（数据面板）===
+// === 日记回顾（账本面板）===
 let _journalMonth = null; // 'YYYY-MM'，null = 当前月
 function journalMonthShift(d) {
   const now = _journalMonth ? new Date(parseInt(_journalMonth.slice(0,4)), parseInt(_journalMonth.slice(5,7))-1 + d, 1) : (() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth()+d, 1); })();
@@ -3249,6 +3261,20 @@ function updateDashboard() {
 
 
 
+// 全部任务浮层：原本是底部导航的「任务」tab。那个 tab 装的是低频的管理动作
+// （增删改、筛排序），而每天勾选用的「今日任务」已经在今日面板里了 —— 降级成
+// 从今日进入的浮层，底部导航就能少占一格。
+function openTasks() {
+  document.getElementById('task-overlay').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  renderTasks();
+}
+function closeTasks() {
+  document.getElementById('task-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+  renderTodayTasks(); // 里面可能增删改过任务，回来把今日列表刷新一下
+}
+
 function renderTasks() {
   const tasks = getTasks();
   const filter = document.getElementById('task-filter')?.value || 'all';
@@ -3332,7 +3358,7 @@ function renderTasks() {
         <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteTask('${t.id}'); renderAll();">删除</button>
       </div>
     </div>`;
-  }).join('') || '<div style="color: var(--text-dim); font-size:0.8rem; padding: 8px;">暂无任务，点击右上角"新增任务"开始吧！</div>';
+  }).join('') || '<div style="color: var(--text-dim); font-size:0.8rem; padding: 8px;">暂无任务，点右上角「+ 新增」开始吧！</div>';
 }
 
 // 子任务展开状态（内存级，不持久化）
