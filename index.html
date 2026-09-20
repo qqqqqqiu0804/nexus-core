@@ -771,21 +771,6 @@ button:focus-visible { box-shadow: var(--ring); }
       </div>
     </div>
 
-    <!-- ⑤ Habits -->
-    <div class="daily-section collapsible" id="sec-habits">
-      <div class="section-header">
-        <span class="section-title">◆ 习惯打卡</span>
-        <span id="daily-habit-count" style="font-family: var(--font-mono); font-size:0.72rem; color: var(--text-dim);"></span>
-      </div>
-      <div id="daily-habit-list"></div>
-      <!-- 习惯管理（原在设置页） -->
-      <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:0.78rem;color:var(--text-dim);">🎯 习惯管理</span>
-        <button class="btn btn-sm" onclick="addHabit()" style="padding:2px 10px;font-size:0.72rem;">+ 新增习惯</button>
-      </div>
-      <div id="settings-habits" style="margin-top:6px;"></div>
-    </div>
-
     <!-- ⑦ Today Expense -->
     <div class="daily-section collapsible" id="sec-expense" style="cursor: pointer;" onclick="switchTab('data')">
       <div class="section-header">
@@ -1029,7 +1014,6 @@ button:focus-visible { box-shadow: var(--ring); }
     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
       <button class="btn btn-sm history-filter active" data-filter="all" onclick="filterHistory('all')">全部</button>
       <button class="btn btn-sm history-filter" data-filter="calories" onclick="filterHistory('calories')">有饮食</button>
-      <button class="btn btn-sm history-filter" data-filter="habits" onclick="filterHistory('habits')">有打卡</button>
       <button class="btn btn-sm history-filter" data-filter="expense" onclick="filterHistory('expense')">有支出</button>
       <button class="btn btn-sm history-filter" data-filter="journal" onclick="filterHistory('journal')">有日记</button>
     </div>
@@ -1314,7 +1298,7 @@ const Store = {
 // 正向白名单：只同步「业务数据」。以后新加配置键不会意外被传到服务器——
 // 反向排除（哪些不同步）容易漏，正向列举才是安全的那一侧。
 const SYNC_KEYS = [
-  'tasks', 'wallet', 'courses', 'habits', 'completionLog', 'dailyLog',
+  'tasks', 'wallet', 'courses', 'completionLog', 'dailyLog',
   'dailyTemplates', 'profile', 'aiReports', 'aiModel',
   'investJournal', 'scheduleOverride', 'budget', 'inspirations'
 ];
@@ -1586,12 +1570,11 @@ Store.onSet((key) => {
 // === 今日面板：区块折叠 ===
 // 规则：有数据默认展开、无数据默认折叠（折成一行，点标题即展开）。
 // 用户手动点过就记住他的选择 —— 存本地，且刻意不进 SYNC_KEYS（折叠是每台设备各自的偏好）。
-const COLLAPSIBLE_SECTIONS = ['meals', 'habits', 'expense'];
+const COLLAPSIBLE_SECTIONS = ['meals', 'expense'];
 
 function sectionHasData(key) {
   const today = TODAY();
   if (key === 'meals')   return (((Store.get('dailyLog', {})[today]) || {}).meals || []).length > 0;
-  if (key === 'habits')  return (Store.get('habits', {}).templates || []).length > 0;
   if (key === 'expense') return (Store.get('wallet', {}).transactions || []).some(t => dateOf(t.date) === today);
   return true;
 }
@@ -2002,14 +1985,6 @@ function initData() {
     Store.set('completionLog', {}); // { 'YYYY-MM-DD': count }
     Store.set('wallet', { balance: 0, initialSet: false, transactions: [] });
     Store.set('dailyLog', {}); // { "YYYY-MM-DD": { meals: [{type,name,kcal}], totalKcal } }
-    Store.set('habits', {
-      templates: [
-        { id: 'h1', name: '喝水8杯', icon: '💧', enabled: true },
-        { id: 'h2', name: '运动30分钟', icon: '🏃', enabled: true },
-        { id: 'h3', name: '早起(7点前)', icon: '🌅', enabled: true }
-      ],
-      logs: {}
-    });
     Store.set('journal', {}); // { "YYYY-MM-DD": "text" }
     Store.set('investJournal', {}); // { "YYYY-MM-DD": "投资思考文本" }
     Store.set('initialized', true);
@@ -2084,10 +2059,6 @@ function renderDailyHub() {
 
   // ④ Meals
   renderMeals();
-
-  // ⑤ Habits
-  renderHabits();
-
 
   // ⑦ Today Expense
   renderDailyExpense();
@@ -2200,34 +2171,6 @@ function addMeal(type) {
   renderMeals();
   showToast(`${names[type]}已记录`, 'success');
 }
-
-// --- Habits ---
-function renderHabits() {
-  const habits = Store.get('habits', { templates: [], logs: {} });
-  const todayLog = habits.logs[TODAY()] || {};
-  const enabled = habits.templates.filter(t => t.enabled);
-  const doneCount = enabled.filter(t => todayLog[t.id]).length;
-  document.getElementById('daily-habit-count').textContent = `${doneCount}/${enabled.length}`;
-
-  const list = document.getElementById('daily-habit-list');
-  list.innerHTML = enabled.map(h => {
-    const checked = todayLog[h.id];
-    return `<div class="daily-habit-item" onclick="toggleHabit('${h.id}')">
-      <span class="daily-habit-icon">${h.icon}</span>
-      <span class="daily-habit-name">${h.name}</span>
-      <span class="daily-habit-check ${checked?'checked':''}">${checked?'✓':''}</span>
-    </div>`;
-  }).join('') || '<div style="color:var(--text-dim);font-size:0.8rem;padding:8px;">暂无习惯，在设置中添加</div>';
-}
-
-function toggleHabit(id) {
-  const habits = Store.get('habits', { templates: [], logs: {} });
-  if (!habits.logs[TODAY()]) habits.logs[TODAY()] = {};
-  habits.logs[TODAY()][id] = !habits.logs[TODAY()][id];
-  Store.set('habits', habits);
-  renderHabits();
-}
-
 
 // --- Daily Expense ---
 function renderDailyExpense() {
@@ -2585,8 +2528,6 @@ function collectWeekData(range) {
 
   const dailyLog = Store.get('dailyLog', {});
   const journal = Store.get('journal', {});
-  const habits = Store.get('habits', { templates: [], logs: {} });
-  const habitTotal = (habits.templates || []).filter(t => t.enabled).length;
   const WD = ['日','一','二','三','四','五','六'];
 
   const days = dates.map(date => {
@@ -2594,7 +2535,6 @@ function collectWeekData(range) {
     const txns = (Store.get('wallet', { transactions: [] }).transactions || []).filter(t => dateOf(t.date) === date);
     const expense = txns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     const incomeTx = txns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-    const logs = (habits.logs || {})[date] || {};
     let diary = journal[date] || '';
     if (typeof diary !== 'string') diary = diary.text || '';
     if (diary.length > 1200) diary = diary.slice(0, 1200) + '…(截断)';
@@ -2602,7 +2542,6 @@ function collectWeekData(range) {
       date, weekday: '周' + WD[new Date(date + 'T00:00:00').getDay()],
       tasksDone: (Store.get('completionLog', {})[date]) || 0,
       expense: Math.round(expense * 10) / 10, income: Math.round(incomeTx * 10) / 10,
-      habits: habitTotal ? `${Object.values(logs).filter(v => v).length}/${habitTotal}` : '',
       diary
     };
   });
@@ -3282,7 +3221,6 @@ function filterHistory(filter) {
 
 function renderHistory() {
   const dailyLog = Store.get('dailyLog', {});
-  const habits = Store.get('habits', { templates: [], logs: {} });
   const wallet = Store.get('wallet', { transactions: [] });
   const journal = Store.get('journal', {});
   const completionLog = Store.get('completionLog', {});
@@ -3290,7 +3228,6 @@ function renderHistory() {
   // Collect all dates that have any data
   const allDates = new Set();
   Object.keys(dailyLog).forEach(d => allDates.add(d));
-  Object.keys(habits.logs || {}).forEach(d => allDates.add(d));
   Object.keys(journal).forEach(d => { if (journal[d]?.trim()) allDates.add(d); });
   Object.keys(completionLog).forEach(d => allDates.add(d));
   (wallet.transactions || []).forEach(t => { const dd = dateOf(t.date); if (dd) allDates.add(dd); });
@@ -3299,7 +3236,6 @@ function renderHistory() {
   let dates = [...allDates].sort((a,b) => b.localeCompare(a));
 
   if (_historyFilter === 'calories') dates = dates.filter(d => dailyLog[d]?.meals?.length > 0);
-  else if (_historyFilter === 'habits') dates = dates.filter(d => habits.logs[d] && Object.values(habits.logs[d]).some(v => v));
   else if (_historyFilter === 'expense') dates = dates.filter(d => (wallet.transactions||[]).some(t => dateOf(t.date) === d && t.type === 'expense'));
   else if (_historyFilter === 'journal') dates = dates.filter(d => journal[d]?.trim());
 
@@ -3325,11 +3261,6 @@ function renderHistory() {
 
     // Calorie summary
     const kcal = dailyLog[date]?.totalKcal || 0;
-
-    // Habits summary
-    const dayHabits = habits.logs[date] || {};
-    const habitTotal = habits.templates.filter(t => t.enabled).length;
-    const habitDone = Object.values(dayHabits).filter(v => v).length;
 
     // Tasks completed
     const tasksDone = completionLog[date] || 0;
@@ -3374,7 +3305,6 @@ function showDayDetail(date) {
   const label = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 ${weekdays[d.getDay()]}`;
 
   const dailyLog = Store.get('dailyLog', {});
-  const habits = Store.get('habits', { templates: [], logs: {} });
   const wallet = Store.get('wallet', { transactions: [] });
   const journal = Store.get('journal', {});
 
@@ -3386,13 +3316,6 @@ function showDayDetail(date) {
     const mealStr = meals.map(m => `${m.name}(${m.kcal}kcal)`).join(', ');
     details.push(`🍽️ 饮食: ${mealStr}`);
     details.push(`   合计: ${dailyLog[date].totalKcal}kcal`);
-  }
-
-  // Habits
-  const dayHabits = habits.logs[date] || {};
-  const doneHabits = habits.templates.filter(t => t.enabled && dayHabits[t.id]);
-  if (doneHabits.length > 0) {
-    details.push(`🎯 习惯: ${doneHabits.map(t => t.icon + t.name).join(' · ')}`);
   }
 
   // Expense
@@ -3613,50 +3536,10 @@ function renderSettings() {
   // 服务器连接回填 + 状态
   syncServerFields();
 
-  // Habits
-  renderSettingsHabits();
-
   // 数据健康（最近备份 / 待上传积压）
   renderHealth();
 
   // Level info
-}
-
-function renderSettingsHabits() {
-  const habits = Store.get('habits', { templates: [], logs: {} });
-  const container = document.getElementById('settings-habits');
-  if (!container) return;
-  container.innerHTML = habits.templates.map(h => `
-    <div class="card" style="display:flex;align-items:center;gap:10px;padding:10px;">
-      <input type="checkbox" ${h.enabled?'checked':''} onchange="toggleHabitTemplate('${h.id}')" style="width:auto;">
-      <span style="font-size:1.1rem;">${h.icon}</span>
-      <span style="flex:1;font-size:0.88rem;">${h.name}</span>
-      <button class="btn btn-sm btn-danger" onclick="deleteHabitTemplate('${h.id}')" style="padding:2px 6px;font-size:0.68rem;">✕</button>
-    </div>
-  `).join('') || '<div style="color:var(--text-dim);font-size:0.8rem;">暂无习惯</div>';
-}
-
-function toggleHabitTemplate(id) {
-  const habits = Store.get('habits', { templates: [], logs: {} });
-  const t = habits.templates.find(x => x.id === id);
-  if (t) { t.enabled = !t.enabled; Store.set('habits', habits); }
-}
-
-function deleteHabitTemplate(id) {
-  const habits = Store.get('habits', { templates: [], logs: {} });
-  habits.templates = habits.templates.filter(t => t.id !== id);
-  Store.set('habits', habits);
-  renderSettingsHabits();
-}
-
-function addHabit() {
-  const name = prompt('输入习惯名称：');
-  if (!name || !name.trim()) return;
-  const icon = prompt('输入一个 emoji 图标：', '✅') || '✅';
-  const habits = Store.get('habits', { templates: [], logs: {} });
-  habits.templates.push({ id: 'h_' + Date.now(), name: name.trim(), icon: icon.trim(), enabled: true });
-  Store.set('habits', habits);
-  renderSettingsHabits();
 }
 
 // === Data Export/Import ===
