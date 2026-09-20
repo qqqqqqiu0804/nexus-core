@@ -139,6 +139,12 @@ const wrap = fn => (req, res) => {
   catch (e) { console.error(e); res.status(500).json({ error: String(e.message || e) }); }
 };
 
+// 异步版：抓外部页面这类要 await 的路由用它（wrap 直接 res.json(Promise) 会序列化成 {}）
+const wrapAsync = fn => async (req, res) => {
+  try { res.json(await fn(req, res)); }
+  catch (e) { console.error(e); res.status(500).json({ error: String(e.message || e) }); }
+};
+
 // ===== 日记 API =====
 
 // GET /api/entries —— 全量日记（单人使用量级很小，直接全给，前端做搜索/统计）
@@ -279,6 +285,110 @@ app.get('/api/health', wrap(() => {
   let dbBytes = 0;
   try { dbBytes = fs.statSync(DB_PATH).size; } catch {}
   return { ok: true, lastBackup, backups, dbBytes, serverTime: Date.now() };
+}));
+
+// ===== 链接标题（「视频收藏」用）=====
+// GET /api/link-title?url=...
+
+// 只放行这些站点，不做通用代理——否则等于在公网上开了个 SSRF 跳板。
+const LINK_HOSTS = [
+  'bilibili.com', 'b23.tv', 'youtube.com', 'youtu.be', 'douyin.com',
+  'v.qq.com', 'youku.com', 'iqiyi.com', 'mgtv.com', 'weibo.com',
+  'zhihu.com', 'xiaohongshu.com', 'xhslink.com'
+];
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+function linkHostAllowed(host) {
+  const h = String(host || '').toLowerCase();
+  return LINK_HOSTS.some(d => h === d || h.endsWith('.' + d));
+}
+
+function decodeEntities(s) {
+  return String(s)
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');
+}
+
+// 带超时 + 读取上限的取文，避免大页面把内存吃满
+async function fetchCapped(url, capBytes, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      redirect: 'follow',
+      headers: { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9' }
+    });
+    if (!res.ok || !res.body) return { status: res.status, text: '', finalUrl: res.url };
+    const reader = res.body.getReader();
+    const chunks = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.length;
+      chunks.push(Buffer.from(value));
+      if (total >= capBytes) { try { await reader.cancel(); } catch {} break; }
+    }
+    return { status: res.status, text: Buffer.concat(chunks).toString('utf8'), finalUrl: res.url };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// B 站页面给无 Cookie 的请求返回 412（风控），所以走它的公开 view 接口拿标题。
+// b23.tv 短链先跟随 302 换成带 BV 号的地址。
+async function bilibiliTitle(url) {
+  let finalUrl = url;
+  if (/^https?:\/\/b23\.tv\//i.test(url)) {
+    const r = await fetchCapped(url, 1, 6000);
+    if (r.finalUrl) finalUrl = r.finalUrl;
+  }
+  const m = finalUrl.match(/\/(BV[0-9A-Za-z]{10})/) || finalUrl.match(/[?&]bvid=(BV[0-9A-Za-z]{10})/i);
+  if (!m) return '';
+  const r = await fetchCapped(`https://api.bilibili.com/x/web-interface/view?bvid=${m[1]}`, 64 * 1024, 8000);
+  try {
+    const j = JSON.parse(r.text);
+    if (j && j.code === 0 && j.data && j.data.title) return String(j.data.title).trim();
+  } catch {}
+  return '';
+}
+
+app.get('/api/link-title', wrapAsync(async req => {
+  const raw = String(req.query.url || '').trim();
+  let u;
+  try { u = new URL(raw); } catch { return { ok: false, error: 'invalid_url' }; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false, error: 'bad_protocol' };
+  if (!linkHostAllowed(u.hostname)) return { ok: false, error: 'host_not_allowed' };
+
+  const host = u.hostname.toLowerCase();
+  if (host === 'b23.tv' || host.endsWith('bilibili.com')) {
+    try {
+      const t = await bilibiliTitle(u.href);
+      if (t) return { ok: true, title: t };
+    } catch { /* 落到下面的通用兜底 */ }
+  }
+
+  try {
+    const r = await fetchCapped(u.href, 200 * 1024, 8000);
+    let t = '';
+    const og = r.text.match(/<meta[^>]+(?:property|name)=["']og:title["'][^>]*>/i);
+    if (og) {
+      const c = og[0].match(/content=["']([^"']*)["']/i);
+      if (c) t = c[1];
+    }
+    if (!t) {
+      const mt = r.text.match(/<title[^>]*>([\s\S]{0,300}?)<\/title>/i);
+      if (mt) t = mt[1];
+    }
+    t = decodeEntities(t).replace(/\s+/g, ' ').trim();
+    return { ok: !!t, title: t };
+  } catch {
+    return { ok: false, error: 'fetch_failed' };
+  }
 }));
 
 // ===== 文件 API（灵感库的图片）=====

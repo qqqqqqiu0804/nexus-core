@@ -1058,6 +1058,18 @@ button:focus-visible { box-shadow: var(--ring); }
       </details>
     </div>
 
+    <!-- 视频收藏入口 -->
+    <div class="card" style="cursor:pointer;padding:14px;margin-bottom:16px;" onclick="openVideos()">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:1.3rem;">🎬</span>
+        <div style="flex:1;">
+          <div style="font-size:0.88rem;color:var(--text-primary);">视频收藏</div>
+          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px;" id="video-entry-count">收藏想看的视频</div>
+        </div>
+        <span style="color:var(--text-dim);font-size:0.78rem;">→</span>
+      </div>
+    </div>
+
     <!-- 灵感库入口 -->
     <div class="card" style="cursor:pointer;padding:14px;margin-bottom:16px;" onclick="openInspiration()">
       <div style="display:flex;align-items:center;gap:12px;">
@@ -1233,6 +1245,33 @@ button:focus-visible { box-shadow: var(--ring); }
   </div>
 </div>
 
+<div id="video-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:var(--bg-deep);overflow-y:auto;-webkit-overflow-scrolling:touch;">
+  <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
+    <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
+      <span style="font-size:1.1rem;">🎬</span>
+      <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">视频收藏</span>
+      <button class="btn btn-sm" onclick="videoToggleForm()">+ 添加</button>
+      <button class="btn btn-sm" onclick="closeVideos()">✕</button>
+    </div>
+
+    <div id="video-form" class="card" style="display:none;padding:14px;margin-bottom:14px;">
+      <input id="video-url" placeholder="粘贴链接（整段分享文案也行）" oninput="videoUrlInput()" style="width:100%;margin-bottom:8px;">
+      <input id="video-title" placeholder="标题（自动抓取，可改）" style="width:100%;margin-bottom:8px;">
+      <input id="video-note" placeholder="备注（可选）" style="width:100%;margin-bottom:8px;">
+      <input id="video-tags-input" placeholder="标签，空格或逗号分隔" style="width:100%;margin-bottom:10px;">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" onclick="videoSave()">保存</button>
+        <button class="btn btn-sm" onclick="videoToggleForm()">取消</button>
+        <span id="video-fetch-hint" style="font-size:0.68rem;color:var(--text-dim);"></span>
+      </div>
+    </div>
+
+    <input id="video-search" placeholder="搜索标题 / 备注 / 标签" oninput="renderVideos()" style="width:100%;margin-bottom:10px;">
+    <div id="video-tagbar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
+    <div id="video-list"></div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
 
@@ -1263,7 +1302,7 @@ const Store = {
 const SYNC_KEYS = [
   'tasks', 'wallet', 'courses', 'completionLog', 'dailyLog',
   'dailyTemplates', 'profile', 'aiReports', 'aiModel',
-  'investJournal', 'scheduleOverride', 'budget', 'inspirations'
+  'investJournal', 'scheduleOverride', 'budget', 'inspirations', 'videos'
 ];
 // 注意 journal（日记）**不在**白名单：它由日记 API + 服务器 SQLite 负责，
 // 两个通道同时写同一条数据会互相覆盖。
@@ -1934,6 +1973,192 @@ function updateInspEntryCount() {
   const n = inspData().length;
   el.textContent = n ? (n + ' 条记录') : '记下想法和素材';
 }
+
+// === 视频收藏 START ===
+// 这里只存链接，不存视频文件、不做播放器。原因：服务器出网实测只有 424 KB/s(≈3.4Mbps)，
+// 自己托管视频最多只够 480p，还会把工作台和书库的带宽一起吃掉。存链接的话视频由原平台
+// 的 CDN 分发，服务器零带宽消耗，画质也不受我们限制。
+function videoData() { return Store.get('videos', []); }
+function videoSaveData(list) { Store.set('videos', list); }
+
+const VIDEO_SITES = [
+  { label: 'B站',      icon: '📺', match: h => h === 'bilibili.com' || h.endsWith('.bilibili.com') || h === 'b23.tv' },
+  { label: 'YouTube',  icon: '▶️', match: h => h === 'youtube.com' || h.endsWith('.youtube.com') || h === 'youtu.be' },
+  { label: '抖音',     icon: '🎵', match: h => h === 'douyin.com' || h.endsWith('.douyin.com') },
+  { label: '腾讯视频', icon: '🐧', match: h => h === 'v.qq.com' },
+  { label: '优酷',     icon: '🎬', match: h => h === 'youku.com' || h.endsWith('.youku.com') },
+  { label: '爱奇艺',   icon: '🎞️', match: h => h === 'iqiyi.com' || h.endsWith('.iqiyi.com') },
+  { label: '芒果TV',   icon: '🥭', match: h => h === 'mgtv.com' || h.endsWith('.mgtv.com') },
+];
+
+function videoSiteOf(url) {
+  let h = '';
+  try { h = new URL(url).hostname.toLowerCase(); } catch (e) { return null; }
+  return VIDEO_SITES.find(s => s.match(h)) || null;
+}
+
+function videoEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// 从粘贴的一整段文字里分离链接和标题。
+// B 站分享文案形如：【标题-哔哩哔哩】 https://b23.tv/xxxxx —— 标题本来就在文案里，
+// 直接取出来就能省掉一次网络抓取。
+function videoParseInput(text) {
+  const raw = String(text || '').trim();
+  const m = raw.match(/https?:\/\/[^\s"'<>()（）【】]+/);
+  if (!m) return { url: '', title: '' };
+  const url = m[0].replace(/[.,;:!?，。；：！？）)]+$/, '');
+  const title = raw.replace(m[0], '')
+    .replace(/[【】\[\]]/g, ' ')
+    .replace(/[-—|·]\s*(哔哩哔哩|bilibili|哔哩|抖音|YouTube|youtube|腾讯视频|优酷|爱奇艺|芒果TV)\s*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return { url, title };
+}
+
+let _videoFetchTimer = null;
+let _videoFetchSeq = 0;
+
+function updateVideoEntryCount() {
+  const el = document.getElementById('video-entry-count');
+  if (!el) return;
+  const n = videoData().length;
+  el.textContent = n ? ('已收藏 ' + n + ' 个') : '收藏想看的视频';
+}
+
+function openVideos() {
+  document.getElementById('video-overlay').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  updateVideoEntryCount();
+  renderVideos();
+}
+function closeVideos() {
+  document.getElementById('video-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+  updateVideoEntryCount();
+}
+function videoToggleForm() {
+  const f = document.getElementById('video-form');
+  const closing = f.style.display !== 'none';
+  f.style.display = closing ? 'none' : 'block';
+  if (closing) {
+    ['video-url', 'video-title', 'video-note', 'video-tags-input'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('video-fetch-hint').textContent = '';
+    _videoFetchSeq++;
+  } else {
+    document.getElementById('video-url').focus();
+  }
+}
+
+// 粘贴/输入链接后：先用文案里的标题；没有就请服务器代抓（前端跨域拿不到别人页面的标题）
+function videoUrlInput() {
+  const parsed = videoParseInput(document.getElementById('video-url').value);
+  const titleEl = document.getElementById('video-title');
+  const hint = document.getElementById('video-fetch-hint');
+  if (parsed.title && !titleEl.value.trim()) titleEl.value = parsed.title;
+  if (!parsed.url || !serverConfigured()) return;
+
+  const seq = ++_videoFetchSeq;
+  hint.textContent = '抓标题中…';
+  clearTimeout(_videoFetchTimer);
+  _videoFetchTimer = setTimeout(() => {
+    const { base } = serverCfg();
+    fetch(base + '/api/link-title?url=' + encodeURIComponent(parsed.url), { headers: journalHeaders() })
+      .then(r => r.json())
+      .then(j => {
+        if (seq !== _videoFetchSeq) return; // 用户已经改了输入，丢弃这次结果
+        if (j && j.ok && j.title) {
+          if (!titleEl.value.trim()) titleEl.value = j.title;
+          hint.textContent = '';
+        } else {
+          hint.textContent = '抓不到标题，自己填一个吧';
+        }
+      })
+      .catch(() => { if (seq === _videoFetchSeq) hint.textContent = ''; });
+  }, 500);
+}
+
+function videoSave() {
+  const parsed = videoParseInput(document.getElementById('video-url').value);
+  if (!parsed.url) { showToast('先粘一个链接', 'info'); return; }
+  const site = videoSiteOf(parsed.url);
+  const title = document.getElementById('video-title').value.trim() || parsed.title;
+  const list = videoData();
+  list.unshift({
+    id: 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    url: parsed.url,
+    title: title || (site ? site.label + '视频' : '未命名'),
+    note: document.getElementById('video-note').value.trim(),
+    tags: document.getElementById('video-tags-input').value.split(/[\s,，、]+/).map(s => s.trim()).filter(Boolean),
+    ts: Date.now()
+  });
+  videoSaveData(list);
+  videoToggleForm();
+  renderVideos();
+  updateVideoEntryCount();
+  showToast('已收藏', 'success');
+}
+
+function videoDelete(id) {
+  videoSaveData(videoData().filter(v => v.id !== id));
+  renderVideos();
+  updateVideoEntryCount();
+}
+
+let _videoTagFilter = '';
+function videoSetTag(t) { _videoTagFilter = (_videoTagFilter === t) ? '' : t; renderVideos(); }
+
+function renderVideos() {
+  const listEl = document.getElementById('video-list');
+  if (!listEl) return;
+  const all = videoData();
+
+  const tags = [];
+  all.forEach(v => (v.tags || []).forEach(t => { if (tags.indexOf(t) < 0) tags.push(t); }));
+  tags.sort();
+  document.getElementById('video-tagbar').innerHTML = ['', ...tags].map(t => {
+    const on = _videoTagFilter === t;
+    return `<button class="btn btn-sm" style="font-size:0.68rem;padding:3px 10px;${on ? 'border-color:var(--accent);color:var(--accent);' : ''}" onclick="videoSetTag('${videoEsc(t)}')">${t ? videoEsc(t) : '全部'}</button>`;
+  }).join('');
+
+  const kw = document.getElementById('video-search').value.trim().toLowerCase();
+  let list = all;
+  if (_videoTagFilter) list = list.filter(v => (v.tags || []).indexOf(_videoTagFilter) >= 0);
+  if (kw) list = list.filter(v =>
+    (v.title || '').toLowerCase().indexOf(kw) >= 0 ||
+    (v.note || '').toLowerCase().indexOf(kw) >= 0 ||
+    (v.tags || []).join(' ').toLowerCase().indexOf(kw) >= 0);
+
+  if (!list.length) {
+    listEl.innerHTML = `<div style="padding:28px 14px;text-align:center;color:var(--text-dim);font-size:0.78rem;line-height:1.8;">${
+      all.length ? '没有匹配的记录' : '还没有收藏。<br>点右上角「+ 添加」，把视频链接粘进去就行。'}</div>`;
+    return;
+  }
+
+  listEl.innerHTML = list.map(v => {
+    const site = videoSiteOf(v.url);
+    return `<div class="card" style="padding:12px 14px;margin-bottom:10px;">
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        <span style="font-size:1.1rem;line-height:1.4;">${site ? site.icon : '🔗'}</span>
+        <div style="flex:1;min-width:0;">
+          <a href="${videoEsc(v.url)}" target="_blank" rel="noopener noreferrer"
+             style="color:var(--text-primary);font-size:0.86rem;text-decoration:none;display:block;line-height:1.45;">${videoEsc(v.title)}</a>
+          ${v.note ? `<div style="font-size:0.72rem;color:var(--text-secondary);margin-top:4px;line-height:1.5;">${videoEsc(v.note)}</div>` : ''}
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:0.66rem;color:var(--text-dim);">
+            ${site ? `<span>${site.label}</span>` : ''}
+            ${(v.tags || []).map(t => `<span style="color:var(--accent);">#${videoEsc(t)}</span>`).join('')}
+            <span>${fmtMD(new Date(v.ts))}</span>
+          </div>
+        </div>
+        <button class="btn btn-sm" style="padding:2px 8px;font-size:0.68rem;flex-shrink:0;" onclick="videoDelete('${videoEsc(v.id)}')">删</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+// === 视频收藏 END ===
 
 // === 灵感库 END ===
 
@@ -3619,6 +3844,9 @@ async function renderHealth() {
 function renderSettings() {
   // 灵感库条目数
   updateInspEntryCount();
+
+  // 视频收藏条目数
+  updateVideoEntryCount();
 
   // 服务器连接回填 + 状态
   syncServerFields();
