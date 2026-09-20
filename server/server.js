@@ -494,14 +494,67 @@ async function fetchGoldQuote() {
   return { name: 'Au99.99', price, priceDate: null, asOf: j.delaystr || null, source: 'intraday', trend: [] };
 }
 
+// 场内品种（股票 / ETF / LOF）走腾讯行情 —— 券商账户里那些买在交易所的东西，
+// 价格是盘中实时变动的，跟场外基金的「每天一个净值」不是一回事。
+//
+// 两个必须处理的地方：
+//   ① 只给 6 位数字是不够的，腾讯要 sh/sz 前缀 —— 按首位自己补（6/5/9 沪市，其余深市）
+//   ② 它返回的是 **GBK**，用 UTF-8 解会把名字变成乱码，得用 TextDecoder('gbk')
+//      （所以这里不走 fetchCapped，那个固定按 utf8 解）
+//
+// 返回字段用「~」分隔，实测下标：1=名称 3=现价 4=昨收 32=涨跌幅%
+function marketOf(code) {
+  const c = String(code)[0];
+  return (c === '6' || c === '5' || c === '9') ? 'sh' : 'sz';
+}
+
+async function fetchStockQuoteMap(codes) {
+  if (!codes.length) return {};
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 10000);
+  try {
+    const r = await fetch(`https://qt.gtimg.cn/q=${codes.map(c => marketOf(c) + c).join(',')}`, {
+      signal: ctrl.signal,
+      headers: { 'User-Agent': UA, Referer: 'https://gu.qq.com/' }
+    });
+    if (!r.ok) return {};
+    const txt = new TextDecoder('gbk').decode(Buffer.from(await r.arrayBuffer()));
+
+    const map = {};
+    txt.split(';').forEach(line => {
+      const m = line.match(/v_([a-z]{2})(\d{6})="([^"]*)"/i);
+      if (!m) return;
+      const f = m[3].split('~');
+      const price = Number(f[3]);
+      if (!(price > 0)) return;    // 停牌时现价可能是 0，宁可不给也不显示 0
+      map[m[2]] = {
+        name: f[1] || m[2],
+        price,
+        prevClose: Number(f[4]) || null,
+        pct: Number(f[32]) || 0,
+        market: m[1]
+      };
+    });
+    return map;
+  } catch {
+    return {};
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 app.get('/api/quotes', wrapAsync(async req => {
   const codes = String(req.query.funds || '')
     .split(',').map(s => s.trim()).filter(s => FUND_CODE_RE.test(s))
     .filter((c, i, a) => a.indexOf(c) === i)   // 去重
     .slice(0, 30);
+  const stockCodes = String(req.query.stocks || '')
+    .split(',').map(s => s.trim()).filter(s => FUND_CODE_RE.test(s))
+    .filter((c, i, a) => a.indexOf(c) === i)
+    .slice(0, 30);
   const wantGold = String(req.query.gold || '') === '1';
 
-  const out = { ok: true, funds: {}, gold: null, fetchedAt: Date.now(), errors: [] };
+  const out = { ok: true, funds: {}, stocks: {}, gold: null, fetchedAt: Date.now(), errors: [] };
 
   await Promise.all([
     ...codes.map(async c => {
@@ -511,6 +564,13 @@ app.get('/api/quotes', wrapAsync(async req => {
         else out.errors.push(c);
       } catch { out.errors.push(c); }
     }),
+    (async () => {
+      if (!stockCodes.length) return;
+      try {
+        out.stocks = await fetchStockQuoteMap(stockCodes);
+        stockCodes.forEach(c => { if (!out.stocks[c]) out.errors.push(c); });
+      } catch { stockCodes.forEach(c => out.errors.push(c)); }
+    })(),
     (async () => {
       if (!wantGold) return;
       try { out.gold = await fetchGoldQuote(); } catch { out.errors.push('gold'); }
