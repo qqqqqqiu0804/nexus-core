@@ -399,10 +399,6 @@ button:focus-visible { box-shadow: var(--ring); }
 .daily-meal-icon { font-size:1.3rem; margin-bottom: 4px; }
 .daily-meal-label { font-size:0.68rem; color: var(--text-dim); margin-bottom: 4px; }
 .daily-meal-content { font-size:0.72rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.daily-sleep-row { display: flex; gap: 12px; }
-.daily-sleep-item { flex: 1; }
-.daily-sleep-item label { display: block; font-size:0.72rem; color: var(--text-dim); margin-bottom: 4px; }
-.daily-sleep-item input { width: 100%; }
 .daily-habit-item {
   display: flex; align-items: center; gap: 10px; padding: 8px 10px;
   border-bottom: 1px solid var(--border-subtle); cursor: pointer;
@@ -736,19 +732,6 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- ⓪.6 明日预告（一行摘要，点击进课表预告视图看下周） -->
     <div id="daily-tomorrow-hint" class="card" style="display:none;padding:10px 14px;margin-bottom:12px;cursor:pointer;font-size:0.8rem;" onclick="switchTab('courses');switchCourseView('forecast')"></div>
 
-    <!-- ② Time Allocation -->
-    <div class="daily-section collapsible" id="sec-time">
-      <div class="section-header">
-        <span class="section-title">◆ 时间分配</span>
-        <button class="btn btn-sm" onclick="openTimeModal()">+ 添加</button>
-      </div>
-      <div style="display: flex; gap: 16px; align-items: center;">
-        <canvas id="daily-time-chart" width="120" height="120"></canvas>
-        <div id="daily-time-legend" style="flex: 1; font-size:0.78rem;"></div>
-      </div>
-      <div id="daily-time-tags" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;"></div>
-    </div>
-
     <!-- ③ Daily Check-in -->
     <div class="daily-section">
       <div class="section-header">
@@ -801,27 +784,6 @@ button:focus-visible { box-shadow: var(--ring); }
         <button class="btn btn-sm" onclick="addHabit()" style="padding:2px 10px;font-size:0.72rem;">+ 新增习惯</button>
       </div>
       <div id="settings-habits" style="margin-top:6px;"></div>
-    </div>
-
-    <!-- ⑥ Sleep -->
-    <div class="daily-section collapsible" id="sec-sleep">
-      <div class="section-header">
-        <span class="section-title">◆ 睡眠记录</span>
-      </div>
-      <div class="daily-sleep-row">
-        <div class="daily-sleep-item">
-          <label>入睡</label>
-          <input type="time" id="sleep-bed" onchange="saveSleep()">
-        </div>
-        <div class="daily-sleep-item">
-          <label>起床</label>
-          <input type="time" id="sleep-wake" onchange="saveSleep()">
-        </div>
-        <div class="daily-sleep-item" style="text-align: center;">
-          <label>时长</label>
-          <div id="sleep-duration" style="font-family: var(--font-mono); color: var(--accent); font-size:0.88rem;">--</div>
-        </div>
-      </div>
     </div>
 
     <!-- ⑦ Today Expense -->
@@ -1352,7 +1314,7 @@ const Store = {
 // 反向排除（哪些不同步）容易漏，正向列举才是安全的那一侧。
 const SYNC_KEYS = [
   'tasks', 'wallet', 'courses', 'habits', 'completionLog', 'dailyLog',
-  'sleep', 'dailyTemplates', 'profile', 'timeAlloc', 'aiReports', 'aiModel',
+  'dailyTemplates', 'profile', 'aiReports', 'aiModel',
   'investJournal', 'scheduleOverride', 'budget', 'inspirations'
 ];
 // 注意 journal（日记）**不在**白名单：它由日记 API + 服务器 SQLite 负责，
@@ -1623,14 +1585,12 @@ Store.onSet((key) => {
 // === 今日面板：区块折叠 ===
 // 规则：有数据默认展开、无数据默认折叠（折成一行，点标题即展开）。
 // 用户手动点过就记住他的选择 —— 存本地，且刻意不进 SYNC_KEYS（折叠是每台设备各自的偏好）。
-const COLLAPSIBLE_SECTIONS = ['time', 'meals', 'habits', 'sleep', 'expense'];
+const COLLAPSIBLE_SECTIONS = ['meals', 'habits', 'expense'];
 
 function sectionHasData(key) {
   const today = TODAY();
-  if (key === 'time')    return Object.keys(Store.get('timeAlloc', {})[today] || {}).length > 0;
   if (key === 'meals')   return (((Store.get('dailyLog', {})[today]) || {}).meals || []).length > 0;
   if (key === 'habits')  return (Store.get('habits', {}).templates || []).length > 0;
-  if (key === 'sleep') { const v = (Store.get('sleep', {})[today]) || {}; return !!(v.bed || v.wake); }
   if (key === 'expense') return (Store.get('wallet', {}).transactions || []).some(t => dateOf(t.date) === today);
   return true;
 }
@@ -2049,8 +2009,6 @@ function initData() {
       ],
       logs: {}
     });
-    Store.set('sleep', {}); // { "YYYY-MM-DD": { bed: "HH:MM", wake: "HH:MM" } }
-    Store.set('timeAlloc', {}); // { "YYYY-MM-DD": { 学习:30, 工作:60, ... } }
     Store.set('journal', {}); // { "YYYY-MM-DD": "text" }
     Store.set('investJournal', {}); // { "YYYY-MM-DD": "投资思考文本" }
     Store.set('initialized', true);
@@ -2119,8 +2077,6 @@ function renderDailyHub() {
   // ⓪.6 明日预告
   renderDailyTomorrowHint();
 
-  // ② Time Allocation
-  renderTimeAlloc();
 
   // ③ Today Tasks（周期任务 + 今天到期，聚合视图）
   renderTodayTasks();
@@ -2131,8 +2087,6 @@ function renderDailyHub() {
   // ⑤ Habits
   renderHabits();
 
-  // ⑥ Sleep
-  renderSleep();
 
   // ⑦ Today Expense
   renderDailyExpense();
@@ -2167,85 +2121,6 @@ function renderDailyHub() {
   }
   updateJournalSyncHint();
 }
-
-// --- Time Allocation ---
-const TIME_CATEGORIES = ['学习','工作','娱乐','运动','其他'];
-const TIME_COLORS = ['#6c9bff','#a78bfa','#f08aa8','#52d489','#e8b64c'];
-
-function renderTimeAlloc() {
-  const timeAlloc = Store.get('timeAlloc', {});
-  const today = timeAlloc[TODAY()] || {};
-  const total = Object.values(today).reduce((s,v)=>s+v, 0) || 1;
-
-  // Legend
-  const legend = document.getElementById('daily-time-legend');
-  legend.innerHTML = TIME_CATEGORIES.map((cat, i) => {
-    const mins = today[cat] || 0;
-    const h = Math.floor(mins/60), m = mins%60;
-    const pct = ((mins/total)*100).toFixed(0);
-    return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-      <span style="width:8px;height:8px;border-radius:50%;background:${TIME_COLORS[i]};flex-shrink:0;"></span>
-      <span style="flex:1;color:var(--text-secondary);">${cat}</span>
-      <span style="font-family:var(--font-mono);color:var(--text-dim);font-size:0.72rem;">${h>0?h+'h':''}${m}m</span>
-    </div>`;
-  }).join('');
-
-  // Tags
-  const tags = document.getElementById('daily-time-tags');
-  tags.innerHTML = TIME_CATEGORIES.map((cat, i) =>
-    `<span class="daily-time-tag" onclick="addTimeBlock('${cat}')" style="border-color:${TIME_COLORS[i]}33;color:${TIME_COLORS[i]};">+ ${cat}</span>`
-  ).join('');
-
-  // Canvas pie chart
-  drawTimePie(today, total);
-}
-
-function drawTimePie(data, total) {
-  const canvas = document.getElementById('daily-time-chart');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const size = 120, cx = 60, cy = 60, r = 45, inner = 28;
-  canvas.width = size; canvas.height = size;
-  ctx.clearRect(0, 0, size, size);
-
-  let angle = -Math.PI / 2;
-  TIME_CATEGORIES.forEach((cat, i) => {
-    const val = data[cat] || 0;
-    if (val === 0) return;
-    const slice = (val / total) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, angle, angle + slice);
-    ctx.arc(cx, cy, inner, angle + slice, angle, true);
-    ctx.closePath();
-    ctx.fillStyle = TIME_COLORS[i];
-    ctx.globalAlpha = 0.8;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    angle += slice;
-  });
-  // Center text
-  ctx.fillStyle = '#e0e0e8';
-  ctx.font = 'bold 14px monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const totalH = Math.floor(total/60), totalM = total%60;
-  ctx.fillText(`${totalH}h${totalM}m`, cx, cy);
-}
-
-function addTimeBlock(category) {
-  const mins = prompt(`添加「${category}」时长（分钟）：`, '30');
-  if (mins === null) return;
-  const val = parseInt(mins);
-  if (isNaN(val) || val <= 0) { showToast('请输入有效分钟数', 'warning'); return; }
-  const timeAlloc = Store.get('timeAlloc', {});
-  if (!timeAlloc[TODAY()]) timeAlloc[TODAY()] = {};
-  timeAlloc[TODAY()][category] = (timeAlloc[TODAY()][category] || 0) + val;
-  Store.set('timeAlloc', timeAlloc);
-  renderTimeAlloc();
-  showToast(`+${val}分钟 ${category}`, 'success');
-}
-
-function openTimeModal() { addTimeBlock('学习'); }
 
 // --- 今日任务：唯一数据源是 tasks（周期任务 + 今天到期/逾期的限时任务） ---
 function renderTodayTasks() {
@@ -2352,38 +2227,6 @@ function toggleHabit(id) {
   renderHabits();
 }
 
-// --- Sleep ---
-function renderSleep() {
-  const sleep = Store.get('sleep', {});
-  const today = sleep[TODAY()];
-  const bedEl = document.getElementById('sleep-bed');
-  const wakeEl = document.getElementById('sleep-wake');
-  const durEl = document.getElementById('sleep-duration');
-
-  if (today) {
-    if (bedEl) bedEl.value = today.bed || '';
-    if (wakeEl) wakeEl.value = today.wake || '';
-    if (durEl && today.bed && today.wake) {
-      const bedM = parseInt(today.bed.split(':')[0])*60 + parseInt(today.bed.split(':')[1]);
-      const wakeM = parseInt(today.wake.split(':')[0])*60 + parseInt(today.wake.split(':')[1]);
-      let diff = wakeM - bedM;
-      if (diff < 0) diff += 24*60;
-      const h = Math.floor(diff/60), m = diff%60;
-      durEl.textContent = `${h}h${m}m`;
-    } else if (durEl) {
-      durEl.textContent = '--';
-    }
-  }
-}
-
-function saveSleep() {
-  const sleep = Store.get('sleep', {});
-  const bed = document.getElementById('sleep-bed').value;
-  const wake = document.getElementById('sleep-wake').value;
-  sleep[TODAY()] = { bed, wake };
-  Store.set('sleep', sleep);
-  renderSleep();
-}
 
 // --- Daily Expense ---
 function renderDailyExpense() {
@@ -2741,7 +2584,6 @@ function collectWeekData(range) {
 
   const dailyLog = Store.get('dailyLog', {});
   const journal = Store.get('journal', {});
-  const sleep = Store.get('sleep', {});
   const habits = Store.get('habits', { templates: [], logs: {} });
   const habitTotal = (habits.templates || []).filter(t => t.enabled).length;
   const WD = ['日','一','二','三','四','五','六'];
@@ -2752,7 +2594,6 @@ function collectWeekData(range) {
     const expense = txns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     const incomeTx = txns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const logs = (habits.logs || {})[date] || {};
-    const sl = sleep[date] || {};
     let diary = journal[date] || '';
     if (typeof diary !== 'string') diary = diary.text || '';
     if (diary.length > 1200) diary = diary.slice(0, 1200) + '…(截断)';
@@ -2760,7 +2601,6 @@ function collectWeekData(range) {
       date, weekday: '周' + WD[new Date(date + 'T00:00:00').getDay()],
       tasksDone: (Store.get('completionLog', {})[date]) || 0,
       expense: Math.round(expense * 10) / 10, income: Math.round(incomeTx * 10) / 10,
-      sleep: sl.bed ? `${sl.bed}-${sl.wake || '?'}` : '',
       habits: habitTotal ? `${Object.values(logs).filter(v => v).length}/${habitTotal}` : '',
       diary
     };
@@ -3445,8 +3285,6 @@ function renderHistory() {
   const wallet = Store.get('wallet', { transactions: [] });
   const journal = Store.get('journal', {});
   const completionLog = Store.get('completionLog', {});
-  const sleep = Store.get('sleep', {});
-  const timeAlloc = Store.get('timeAlloc', {});
 
   // Collect all dates that have any data
   const allDates = new Set();
@@ -3454,8 +3292,6 @@ function renderHistory() {
   Object.keys(habits.logs || {}).forEach(d => allDates.add(d));
   Object.keys(journal).forEach(d => { if (journal[d]?.trim()) allDates.add(d); });
   Object.keys(completionLog).forEach(d => allDates.add(d));
-  Object.keys(sleep).forEach(d => allDates.add(d));
-  Object.keys(timeAlloc).forEach(d => allDates.add(d));
   (wallet.transactions || []).forEach(t => { const dd = dateOf(t.date); if (dd) allDates.add(dd); });
 
   // Filter
@@ -3540,22 +3376,8 @@ function showDayDetail(date) {
   const habits = Store.get('habits', { templates: [], logs: {} });
   const wallet = Store.get('wallet', { transactions: [] });
   const journal = Store.get('journal', {});
-  const sleep = Store.get('sleep', {});
-  const timeAlloc = Store.get('timeAlloc', {});
 
   let details = [`📅 ${label}\n`];
-
-  // Sleep
-  const s = sleep[date];
-  if (s && (s.bed || s.wake)) details.push(`😴 睡眠: ${s.bed || '?'} → ${s.wake || '?'}`);
-
-  // Time
-  const time = timeAlloc[date] || {};
-  const totalMins = Object.values(time).reduce((s,v) => s + v, 0);
-  if (totalMins > 0) {
-    const timeParts = Object.entries(time).filter(([,v]) => v > 0).map(([k,v]) => `${k}${v}m`).join(' · ');
-    details.push(`⏱️ 时间: ${timeParts}`);
-  }
 
   // Meals
   const meals = dailyLog[date]?.meals || [];
