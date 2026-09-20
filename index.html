@@ -806,12 +806,16 @@ button:focus-visible { box-shadow: var(--ring); }
 
   <!-- Panel: Data (Stats + Wallet + Review) -->
   <div class="panel" id="panel-data">
-    <!-- Wallet Balance -->
+    <!-- Wallet Balance —— 现金和投资分开显示（见 loadWallet 的注释） -->
     <div class="wallet-balance-card" id="wallet-balance-card">
-      <div class="wallet-balance-label">当前余额</div>
-      <div class="wallet-balance-amount" id="wallet-balance">¥ 0.00</div>
-      <div class="wallet-balance-actions">
-        <button class="btn btn-sm" onclick="openSetBalanceModal()" style="padding: 4px 12px;">设置初始余额</button>
+      <div class="wallet-balance-label">可用现金</div>
+      <div class="wallet-balance-amount" id="wallet-balance" style="cursor:pointer;" onclick="setWalletCash()" title="点一下调整">¥ 0.00</div>
+      <div style="font-size:0.66rem;color:var(--text-dim);">支付宝余额 · 余额宝 · 银行卡 · 微信零钱</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border-subtle);cursor:pointer;"
+           onclick="setWalletInvest()" title="点一下调整">
+        <span style="font-size:0.72rem;color:var(--text-dim);">投资市值</span>
+        <span id="wallet-invest" style="font-size:0.9rem;color:var(--text-secondary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;">¥ 0.00</span>
+        <span style="font-size:0.6rem;color:var(--text-dim);">✎</span>
       </div>
     </div>
 
@@ -1702,9 +1706,9 @@ function quickConfirm() {
   const amt = parseFloat(document.getElementById('quick-amount').value);
   if (!_quickCat) { showToast('先选一个分类', 'warning'); return; }
   if (!amt || amt <= 0) { showToast('请输入金额', 'warning'); return; }
-  const w = Store.get('wallet', { balance: 0, initialSet: false, transactions: [] });
+  const w = loadWallet();
   w.transactions.unshift({ type: 'expense', amount: amt, category: _quickCat, date: localStamp(), note: '' });
-  w.balance = Number(w.balance || 0) - amt;
+  w.cash = (Number(w.cash) || 0) - amt;
   Store.set('wallet', w);
   showToast('已记 ' + _quickCat + ' ¥' + amt.toFixed(2), 'success');
   quickCancel();
@@ -2183,7 +2187,7 @@ function initData() {
     });
     Store.set('tasks', []);
     Store.set('completionLog', {}); // { 'YYYY-MM-DD': count }
-    Store.set('wallet', { balance: 0, initialSet: false, transactions: [] });
+    Store.set('wallet', { cash: 0, invest: 0, initialSet: false, transactions: [] });
     Store.set('dailyLog', {}); // { "YYYY-MM-DD": { meals: [{type,name,kcal,ts}], totalKcal } }
     Store.set('journal', {}); // { "YYYY-MM-DD": "text" }
     Store.set('investJournal', {}); // { "YYYY-MM-DD": "投资思考文本" }
@@ -3466,20 +3470,12 @@ function setWalletType(type) {
 function renderWallet() {
   const whenEl = document.getElementById('wallet-when');
   if (whenEl && !whenEl.value) whenEl.value = localStamp().slice(0, 16);
-  const wallet = Store.get('wallet', { balance: 0, initialSet: false, transactions: [] });
-  if (!wallet.transactions) wallet.transactions = [];
+  const wallet = loadWallet();
 
-  // Balance
-  document.getElementById('wallet-balance').textContent = '¥ ' + (wallet.balance || 0).toFixed(2);
-
-  // Show/hide set balance button
-  const balanceCard = document.getElementById('wallet-balance-card');
-  const existingBtn = balanceCard.querySelector('.wallet-balance-actions');
-  if (wallet.initialSet) {
-    existingBtn.innerHTML = '<button class="btn btn-sm" onclick="openSetBalanceModal()" style="padding: 4px 12px;">调整余额</button>';
-  } else {
-    existingBtn.innerHTML = '<button class="btn btn-primary btn-sm" onclick="openSetBalanceModal()" style="padding: 4px 12px;">设置初始余额</button>';
-  }
+  // 现金（记账会自动加减）与投资（手动更新）分开显示 —— 点数字即可调整
+  document.getElementById('wallet-balance').textContent = '¥ ' + (Number(wallet.cash) || 0).toFixed(2);
+  const investEl = document.getElementById('wallet-invest');
+  if (investEl) investEl.textContent = '¥ ' + (Number(wallet.invest) || 0).toFixed(2);
 
   // Stats
   const now = new Date();
@@ -3768,8 +3764,7 @@ function addTransaction() {
   const note = document.getElementById('wallet-note').value.trim();
   if (!amount || amount <= 0) { showToast('请输入有效金额', 'warning'); return; }
 
-  const wallet = Store.get('wallet', { balance: 0, initialSet: false, transactions: [] });
-  if (!wallet.transactions) wallet.transactions = [];
+  const wallet = loadWallet();
 
   // 记账时间：默认当前本地时间，可选过去（补记）。存本地时间串（不带 Z = 按本地解析）
   const whenEl = document.getElementById('wallet-when');
@@ -3785,10 +3780,10 @@ function addTransaction() {
 
   wallet.transactions.push(txn);
   // Auto-set initial balance to 0 if not set
-  if (!wallet.initialSet) { wallet.balance = 0; wallet.initialSet = true; }
-  // Update balance
-  if (_walletType === 'expense') wallet.balance -= amount;
-  else wallet.balance += amount;
+  // 收支只加在【现金】上 —— 投资市值不受记账影响（基金涨跌不是记账能反映的）
+  if (!wallet.initialSet) { wallet.cash = Number(wallet.cash) || 0; wallet.initialSet = true; }
+  if (_walletType === 'expense') wallet.cash -= amount;
+  else wallet.cash += amount;
 
   Store.set('wallet', wallet);
   document.getElementById('wallet-amount').value = '';
@@ -3799,12 +3794,12 @@ function addTransaction() {
 }
 
 function deleteTransaction(id) {
-  const wallet = Store.get('wallet', { transactions: [] });
-  const txn = (wallet.transactions || []).find(t => t.id === id);
+  const wallet = loadWallet();
+  const txn = wallet.transactions.find(t => t.id === id);
   if (!txn) return;
-  // Reverse balance
-  if (txn.type === 'expense') wallet.balance += txn.amount;
-  else wallet.balance -= txn.amount;
+  // 撤销时同样只回滚【现金】
+  if (txn.type === 'expense') wallet.cash += txn.amount;
+  else wallet.cash -= txn.amount;
   wallet.transactions = (wallet.transactions || []).filter(t => t.id !== id);
   Store.set('wallet', wallet);
   renderWallet();
@@ -3812,23 +3807,56 @@ function deleteTransaction(id) {
 }
 
 function clearWalletHistory() {
-  if (!confirm('确定清空所有交易记录？余额将重置为0。')) return;
-  Store.set('wallet', { balance: 0, initialSet: false, transactions: [] });
+  if (!confirm('确定清空所有交易记录？现金会清零。')) return;
+  Store.set('wallet', { cash: 0, invest: 0, initialSet: false, transactions: [] });
   renderWallet();
   showToast('已清空所有记录', 'info');
 }
 
-function openSetBalanceModal() {
-  const wallet = Store.get('wallet', { balance: 0 });
-  const input = prompt(wallet.initialSet ? '调整当前余额（直接设置为该数值）' : '设置你的初始余额（你现在有多少钱？）', wallet.balance || '');
+// ---------- 钱包：可用现金 / 投资市值 分开（2026-09-20 拆）----------
+// 为什么拆：现金（支付宝余额/余额宝/银行卡/微信零钱）随花钱立刻变、且随时能取出来用；
+// 投资（黄金/基金/理财通）每天涨跌、变现还要时间和手续费。混成一个数字，它既回答不了
+// "我现在能花多少"（里面有基金），又会被基金涨跌搞得天天过期。
+// 规则：记账的收支只加在 cash 上；invest 靠手动更新，一周看一眼就够。
+function loadWallet() {
+  const w = Store.get('wallet', null);
+  if (!w || typeof w !== 'object') return { cash: 0, invest: 0, initialSet: false, transactions: [] };
+  // 旧结构（只有 balance、没有 cash）→ 一次性迁移：数字原样挪进 cash，投资留 0。
+  // 只在「确实存在 balance 字段」时才写回 —— 启动期渲染可能发生在服务器数据拉回来之前，
+  // 那时 Store 里是空对象，若无条件迁移就会用 {cash:0} 覆盖掉服务器上的真实数据。
+  if (w.cash === undefined && w.balance !== undefined) {
+    w.cash = Number(w.balance) || 0;
+    w.invest = 0;
+    delete w.balance;
+    Store.set('wallet', w);
+  }
+  if (!w.transactions) w.transactions = [];
+  return w;
+}
+
+function setWalletCash() {
+  const w = loadWallet();
+  const input = prompt('可用现金 —— 支付宝余额 + 余额宝 + 银行卡 + 微信零钱', w.cash || '');
   if (input === null) return;
   const val = parseFloat(input);
   if (isNaN(val)) { showToast('请输入有效数字', 'warning'); return; }
-  wallet.balance = val;
-  wallet.initialSet = true;
-  Store.set('wallet', wallet);
+  w.cash = val;
+  w.initialSet = true;
+  Store.set('wallet', w);
   renderWallet();
-  showToast('余额已设置为 ¥' + val.toFixed(2), 'success');
+  showToast('可用现金已设为 ¥' + val.toFixed(2), 'success');
+}
+
+function setWalletInvest() {
+  const w = loadWallet();
+  const input = prompt('投资市值 —— 支付宝黄金 + 支付宝基金 + 微信理财通', w.invest || '');
+  if (input === null) return;
+  const val = parseFloat(input);
+  if (isNaN(val)) { showToast('请输入有效数字', 'warning'); return; }
+  w.invest = val;
+  Store.set('wallet', w);
+  renderWallet();
+  showToast('投资市值已设为 ¥' + val.toFixed(2), 'success');
 }
 
 // === Settings Functions ===
