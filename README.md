@@ -13,7 +13,7 @@
 | 前端 | 一个 `index.html`（HTML / CSS / JS 全内联，**没有构建步骤、没有框架、没有依赖**） |
 | 后端 | `server/server.js`（Node 22 + Express + 内置 `node:sqlite`，**零原生模块**） |
 | 部署 | 阿里云 ECS（广州，2C2G）× Nginx × Let's Encrypt，pm2 守护 |
-| 体量 | `index.html` 约 4500 行 / 205 KB；`server.js` 约 500 行 |
+| 体量 | `index.html` 约 5900 行 / 285 KB；`server.js` 约 690 行 |
 
 单文件前端不是行为艺术，是刻意的：**改完直接 `git pull` 就生效**，不需要装 node_modules、不需要 build、不需要 CDN。
 
@@ -72,7 +72,7 @@
 | GET / PUT / DELETE | `/api/kv` · `/api/kv/:key` | 业务数据的双向同步 |
 | GET / PUT / DELETE | `/api/entries/:date` | 日记的读 / 写 / 删 |
 | POST | `/api/entries/import` | 批量导入 |
-| POST / GET / DELETE | `/api/files` | 图片上传 / 读取 / 删除 |
+| POST / GET / DELETE | `/api/files` | 图片上传（仅 PNG/JPG/WebP，拒绝 SVG 等可执行类型）/ 读取 / 删除 |
 | GET | `/api/health` | 备份状态（最近备份时间、份数、库体积） |
 | GET | `/api/link-title?url=` | 代抓网页标题（白名单域名，视频收藏用） |
 | POST | `/api/ai/weekly` | AI 周报（SSE，转发到 Ollama） |

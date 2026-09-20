@@ -120,6 +120,7 @@ app.get('/api/files/:id', (req, res) => {
   const p = path.join(FILES_DIR, id);
   if (!row || !fs.existsSync(p)) { res.status(404).json({ error: '文件不存在' }); return; }
   res.type(row.mime || 'application/octet-stream');
+  res.setHeader('X-Content-Type-Options', 'nosniff');                     // 阻止浏览器把图片当 HTML/脚本嗅探执行
   res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');   // id 不变，内容就不变
   res.sendFile(p);
 });
@@ -589,6 +590,8 @@ app.post('/api/files', wrap(req => {
   if (!m) throw new Error('dataUrl 格式不对（应为 data:image/png;base64,...）');
   const mime = m[1];
   if (!mime.startsWith('image/')) throw new Error('只接受图片');
+  // SVG 可在浏览器里执行 <script>，当图片存会有存储型 XSS 风险，拒绝。
+  if (/svg/i.test(mime)) throw new Error('不支持 SVG（有脚本执行风险），请改用 PNG/JPG/WebP');
   const buf = Buffer.from(m[2], 'base64');
   if (buf.length > MAX_IMG_BYTES) throw new Error('图片太大（上限 8MB）');
   const ext = (mime.split('/')[1] || 'bin').replace(/[^a-z0-9]/gi, '');

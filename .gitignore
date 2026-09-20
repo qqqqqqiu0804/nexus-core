@@ -1,0 +1,21 @@
+# 依赖（运行时由 npm install 生成）
+node_modules/
+server/node_modules/
+
+# 凭证脚本（含令牌，禁止入库）
+.ghproxy-cred.sh
+
+# 临时 / 工作产物（非源码）
+.tmp-test/
+*.bak
+*.bak-*
+
+# 截图事实提取、设计评审等过程产物（本地保留，不入库）
+_facts/
+_shots/
+
+# 运行时数据
+server/journal.db
+server/journal.db-wal
+server/journal.db-shm
+server/data/

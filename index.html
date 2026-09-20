@@ -42,9 +42,21 @@
   --radius: 12px;
   --radius-lg: 16px;
   --overlay: rgba(10, 12, 16, 0.55);
+  /* 深度：偏移 + 柔化，零偏移彩色光晕只做装饰，不做主阴影 */
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-pop: 0 4px 12px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.45);
-  --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  /* 动效：一个 authored 缓动，全程复用 */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur: 0.24s;
+  /* 字体层级（排版纪律：正文 14px，显示字最大 ~2.6rem，字距下限 -0.02em） */
+  --fs-display: 2.4rem;
+  --fs-title: 1.05rem;
+  --fs-body: 0.875rem;
+  --ls-tight: -0.02em;
+  /* 滚动条主题色（暗态更深，保证与轨道的对比） */
+  --scroll-thumb: #313846;
+  --scroll-thumb-hover: #46516180;
   /* 常用衍生 */
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --accent-line: color-mix(in srgb, var(--accent) 35%, transparent);
@@ -57,21 +69,23 @@ html.light {
   --bg-card: #ffffff;
   --bg-hover: #eef0f3;
   --border-subtle: #e3e6ea;
-  --border-accent: #3d6fe0;
+  --border-accent: #2d5ecd;
   --text-primary: #1c2230;
   --text-secondary: #565e6c;
-  --text-dim: #6f7783;
-  --accent: #3d6fe0;
+  --text-dim: #666e7a;      /* 原 #6f7783 在浅底上只有 4.37:1，压深到 ~4.8:1 */
+  --accent: #2d5ecd;        /* 原 #3d6fe0 当文字色 4.43:1（激活浅底上 3.83）→ 白底 5.8 / 同色浅底 4.8 */
   --accent-2: #7d5ce0;
-  --success: #189a53;
+  --success: #128045;       /* 原 #189a53 3.63:1 → 4.8:1（作正文金额用） */
   --warn: #a8741a;
-  --danger: #d64545;
-  --expense: #c2507a;
+  --danger: #cc3d3d;        /* 原 #d64545 4.38:1 → 4.9:1 */
+  --expense: #bd4c76;       /* 原 #c2507a 4.45:1 → 4.7:1 */
   --violet: #7c5cd6;
-  --orange: #c26a1e;
+  --orange: #a85715;        /* 原 #c26a1e 3.91:1 → 5.2:1 */
   --overlay: rgba(16, 24, 40, 0.35);
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.07);
   --shadow-pop: 0 4px 12px rgba(16, 24, 40, 0.1), 0 16px 40px rgba(16, 24, 40, 0.14);
+  --scroll-thumb: #d3d8df;
+  --scroll-thumb-hover: #b9c0c9;
 }
 
 /* === Reset & Base === */
@@ -170,7 +184,7 @@ body {
   padding: 8px 16px; border: 1px solid var(--border-subtle);
   background: var(--bg-card); color: var(--text-secondary);
   font-family: var(--font-sans); font-size:0.8rem; font-weight: 500;
-  border-radius: var(--radius-sm); cursor: pointer;
+  border-radius: var(--radius-sm); cursor: pointer; min-height: 36px;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .btn:hover { border-color: var(--accent-line); color: var(--accent); }
@@ -183,7 +197,7 @@ body {
 .btn-primary:hover { background: color-mix(in srgb, var(--accent) 85%, #fff); color: #fff; }
 .btn-danger { border-color: color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger); }
 .btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
-.btn-sm { padding: 4px 10px; font-size:0.72rem; }
+.btn-sm { padding: 4px 10px; font-size:0.72rem; min-height: 32px; }
 .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
 
 /* === Forms === */
@@ -274,6 +288,11 @@ label {
 .section-title {
   font-size:0.88rem; font-weight: 600;
   color: var(--text-primary);
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.section-title::before {
+  content: ""; width: 3px; height: 0.85em; border-radius: 2px;
+  background: var(--accent); flex: none;
 }
 .section-count {
   font-size:0.72rem;
@@ -325,18 +344,25 @@ label {
 .toast-warning { background: var(--bg-card); border-color: var(--warn); color: var(--warn); }
 @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-/* === Scrollbar / Selection / Focus === */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+/* === Scrollbar / Selection / Caret / Focus（主题化的浏览器表面）=== */
+::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
-::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: padding-box; }
+* { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+::selection { background: color-mix(in srgb, var(--accent) 32%, transparent); color: var(--text-primary); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible {
   outline: none;
 }
 input:focus-visible, select:focus-visible, textarea:focus-visible { box-shadow: var(--ring); }
-button:focus-visible { box-shadow: var(--ring); }
+button:focus-visible, a:focus-visible { box-shadow: var(--ring); }
+a { color: var(--accent); text-underline-offset: 2px; }
 
 /* === Sync Button === */
 .sync-btn {
@@ -457,9 +483,25 @@ button:focus-visible { box-shadow: var(--ring); }
      浮层顶上有吸顶的「资产台账」标题栏，留出它的高度，免得分组标题被压住 */
   scroll-margin-top: 62px;
 }
-.inv-group-sum { padding: 12px 14px; cursor: pointer; user-select: none; }
+.inv-group-sum {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 14px; cursor: pointer; user-select: none;
+  list-style: none;
+}
+/* 去掉原生三角，改用描边 chevron：收起指右、展开指下 */
+.inv-group-sum::-webkit-details-marker { display: none; }
+.inv-group-sum::before {
+  content: ''; flex: none;
+  width: 6px; height: 6px; margin-left: 2px;
+  border-right: 1.5px solid var(--text-dim);
+  border-bottom: 1.5px solid var(--text-dim);
+  transform: rotate(-45deg);
+  transition: transform 0.16s var(--ease);
+}
+.inv-group[open] > .inv-group-sum::before { transform: rotate(45deg); }
 .inv-group-sum:hover { background: var(--bg-hover); }
 .inv-group-head {
+  flex: 1;
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
 }
 .inv-group-num {
@@ -522,7 +564,7 @@ button:focus-visible { box-shadow: var(--ring); }
   position: relative;
 }
 .wallet-balance-amount {
-  font-size:2.5rem;
+  font-size: var(--fs-display);
   font-weight: 800;
   color: var(--text-primary);
   font-family: var(--font-mono);
@@ -614,6 +656,23 @@ button:focus-visible { box-shadow: var(--ring); }
   background: color-mix(in srgb, var(--success) 15%, transparent);
   color: var(--success);
 }
+/* 交易记录：按日期折叠，手机上一日一日收着看，不一次摊一长条 */
+.txn-day { border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); margin-bottom: 8px; overflow: hidden; background: var(--bg-panel); }
+.txn-day-sum {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; cursor: pointer; user-select: none; -webkit-user-select: none;
+  list-style: none;
+}
+.txn-day-sum::-webkit-details-marker { display: none; }
+.txn-day-sum::before {
+  content: ''; flex: none; width: 6px; height: 6px; margin-right: 6px;
+  border-right: 1.5px solid var(--text-dim); border-bottom: 1.5px solid var(--text-dim);
+  transform: rotate(-45deg); transition: transform 0.16s var(--ease);
+}
+.txn-day[open] > .txn-day-sum::before { transform: rotate(45deg); }
+.txn-day-sum:hover { background: var(--bg-hover); }
+.txn-day-label { flex: 1; font-family: var(--font-mono); font-size: 0.78rem; }
+.txn-day > .wallet-txn-item:not(:last-child) { border-bottom: 1px solid var(--border-subtle); }
 
 
 /* === Course Schedule === */
@@ -629,12 +688,12 @@ button:focus-visible { box-shadow: var(--ring); }
 .forecast-day-head { display:flex; align-items:center; gap:8px; font-size:0.78rem; color:var(--text-secondary); margin-bottom:6px; }
 .forecast-day-head .fd-tag { font-family:var(--font-mono); color:var(--accent); }
 .forecast-day-head .fd-none { color:var(--text-dim); font-size:0.72rem; }
-.forecast-row { display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--border-subtle); border-left:2px solid var(--accent); border-radius:var(--radius-sm); padding:8px 12px; margin-bottom:6px; font-size:0.8rem; }
+.forecast-row { display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:8px 12px; margin-bottom:6px; font-size:0.8rem; }
 .forecast-row .fr-time { font-family:var(--font-mono); font-size:0.72rem; color:var(--accent); white-space:nowrap; }
 .forecast-row .fr-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .forecast-row .fr-loc { font-size:0.72rem; color:var(--text-dim); white-space:nowrap; }
 .forecast-off { font-size:0.72rem; color:var(--text-dim); padding:8px 0; }
-.course-card { display:flex; gap:12px; align-items:center; background:var(--bg-card); border-left:2px solid var(--accent); border-radius:var(--radius-sm); padding:12px; margin-bottom:10px; }
+.course-card { display:flex; gap:12px; align-items:center; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:12px; margin-bottom:10px; }
 .course-time { font-family:var(--font-mono); font-size:0.8rem; color:var(--accent); text-align:center; min-width:48px; line-height:1.3; }
 .course-body { flex:1; min-width:0; }
 .course-name { font-size:1rem; color:var(--text-primary); font-weight:600; }
@@ -649,7 +708,7 @@ button:focus-visible { box-shadow: var(--ring); }
 .week-cell { background:var(--bg-card); border-radius:6px; min-height:46px; padding:4px; }
 .week-cell-course { background:color-mix(in srgb, var(--accent) 8%, transparent); border:1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius:4px; padding:4px; margin-bottom:3px; color:var(--text-primary); line-height:1.2; word-break:break-all; }
 .week-cell-loc { font-size:0.6rem; color:var(--text-dim); }
-.daily-next-class { background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:12px; font-size:0.8rem; color:var(--accent); }
+.daily-next-class { background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:12px; font-size:0.8rem; color:var(--accent); cursor:pointer; }
 
 /* === 假期 / 调休补课标注 === */
 .week-head-holiday { color:var(--text-dim); font-weight:500; }
@@ -657,7 +716,7 @@ button:focus-visible { box-shadow: var(--ring); }
 .week-head-hol-label { color:var(--orange); }
 .week-head-makeup-label { color:var(--accent); }
 .week-cell-holiday { background:repeating-linear-gradient(45deg, color-mix(in srgb, var(--text-dim) 7%, transparent) 0 5px, transparent 5px 10px); }
-.holiday-card { display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--border-subtle); border-left:2px solid var(--orange); border-radius:var(--radius-sm); padding:12px; font-size:0.88rem; color:var(--text-primary); }
+.holiday-card { display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:12px; font-size:0.88rem; color:var(--text-primary); }
 .holiday-card .hc-icon { font-size:1.3rem; }
 .holiday-card .hc-sub { font-size:0.72rem; color:var(--text-dim); margin-top:3px; }
 .makeup-bar { font-size:0.75rem; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:var(--radius-sm); padding:8px 10px; margin-bottom:8px; }
@@ -665,6 +724,23 @@ button:focus-visible { box-shadow: var(--ring); }
 .forecast-holiday { font-size:0.75rem; color:var(--orange); padding:6px 0; }
 .forecast-day-head .fd-hol { font-size:0.72rem; color:var(--orange); }
 .forecast-day-head .fd-makeup { font-size:0.72rem; color:var(--accent); }
+
+/* === 一个 authored 动效：面板切换时克制入场（指数缓出，从已可见默认态开始）=== */
+@keyframes panelIn {
+  from { opacity: 0.4; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.panel.active { animation: panelIn var(--dur) var(--ease); }
+
+/* === 图标系统：一致描边的内联 SVG，替代 emoji（不再用 Unicode glyph 当图标）=== */
+.icn { width: 1.25em; height: 1.25em; display: inline-block; vertical-align: -0.18em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.tab-item .tab-icon { width: 23px; height: 23px; }
+.tab-label { font-size:0.68rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  .panel.active { animation: none; }
+}
 </style>
 </head>
 <body>
@@ -676,24 +752,36 @@ button:focus-visible { box-shadow: var(--ring); }
     <div class="header-subtitle">个人工作台 · 课表 / 记账 / 随手记</div>
     <div style="display:flex;gap:8px;position:absolute;top:24px;right:0;">
       <button class="sync-btn" id="theme-toggle" onclick="toggleTheme()" title="切换主题">
-        <span id="theme-icon">☀️</span>
+        <span id="theme-icon" class="icn" style="display:inline-flex;"></span>
       </button>
     </div>
   </header>
 
   <!-- Bottom Tab Bar -->
   <nav class="bottom-tab-bar" id="nav">
-    <button class="tab-item active" data-panel="daily"><span class="tab-icon">📋</span><span class="tab-label">今日</span></button>
-    <button class="tab-item" data-panel="courses"><span class="tab-icon">📚</span><span class="tab-label">课表</span></button>
-    <button class="tab-item" data-panel="data"><span class="tab-icon">📒</span><span class="tab-label">账本</span></button>
-    <button class="tab-item" data-panel="settings"><span class="tab-icon">⚙️</span><span class="tab-label">我的</span></button>
+    <button class="tab-item active" data-panel="daily">
+      <svg class="tab-icon icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M3.5 9.5h17M8.5 4.5v5M15.5 4.5v5"/></svg>
+      <span class="tab-label">今日</span>
+    </button>
+    <button class="tab-item" data-panel="courses">
+      <svg class="tab-icon icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c-2.5-1.5-5.5-1.5-8 0v11c2.5-1.5 5.5-1.5 8 0 2.5-1.5 5.5-1.5 8 0V5c-2.5-1.5-5.5-1.5-8 0Z"/><path d="M12 5v11"/></svg>
+      <span class="tab-label">课表</span>
+    </button>
+    <button class="tab-item" data-panel="data">
+      <svg class="tab-icon icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h11l3 3V19a1.5 1.5 0 0 1-1.5 1.5h-12A1.5 1.5 0 0 1 4 19V6a1.5 1.5 0 0 1 1-1.5Z"/><path d="M16 4.5V8h3.5M8 13h8M8 16.5h5"/></svg>
+      <span class="tab-label">账本</span>
+    </button>
+    <button class="tab-item" data-panel="settings">
+      <svg class="tab-icon icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.2 5.2l1.8 1.8M17 17l1.8 1.8M18.8 5.2 17 7M7 17l-1.8 1.8"/></svg>
+      <span class="tab-label">我的</span>
+    </button>
   </nav>
 
   <!-- Panel: Daily Hub (首页) -->
   <div class="panel active" id="panel-daily">
     <!-- 新容器引导（只在「本机没数据 + 没连服务器」时出现）-->
     <div id="first-run-banner" class="card" style="display:none;padding:14px;margin-bottom:14px;border-color:var(--accent);">
-      <div style="font-size:0.85rem;color:var(--text-primary);margin-bottom:6px;">📱 这台设备上还没有数据</div>
+      <div style="font-size:0.85rem;color:var(--text-primary);margin-bottom:6px;"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><rect x="6.5" y="3" width="11" height="18" rx="2.4"/><path d="M10.5 18.5h3"/></svg> 这台设备上还没有数据</div>
       <div style="font-size:0.72rem;color:var(--text-secondary);line-height:1.6;margin-bottom:10px;">
         如果你是从主屏幕图标打开的，那是 iPhone 的正常行为——每个「应用」有自己的独立存储空间，
         和 Safari 里的数据互不相通。这不代表数据丢了：填一次访问令牌，云端数据会全部拉回来。
@@ -713,28 +801,16 @@ button:focus-visible { box-shadow: var(--ring); }
           <div id="daily-weekday" style="color: var(--text-dim); font-size:0.78rem;"></div>
         </div>
       </div>
-      <div class="daily-streak-badge" id="daily-streak-badge">🔥 连续 0 天</div>
+      <div class="daily-streak-badge" id="daily-streak-badge"></div>
     </div>
 
-    <!-- ⓪ Next Class Banner -->
-    <div class="daily-next-class" id="daily-next-class" style="display:none;"></div>
-
-    <!-- ⓪.5 Today's Courses (linked from timetable) -->
-    <div class="daily-section" id="daily-courses-section" style="display:none;">
-      <div class="section-header">
-        <span class="section-title">◆ 今日课程</span>
-        <button class="btn btn-sm" onclick="switchTab('courses')">课表 →</button>
-      </div>
-      <div id="daily-courses-list"></div>
-    </div>
-
-    <!-- ⓪.6 明日预告（一行摘要，点击进课表预告视图看下周） -->
-    <div id="daily-tomorrow-hint" class="card" style="display:none;padding:10px 14px;margin-bottom:12px;cursor:pointer;font-size:0.8rem;" onclick="switchTab('courses');switchCourseView('forecast')"></div>
+    <!-- ⓪ Next Class Banner（单行速览，点一下进「课表」看完整安排） -->
+    <div class="daily-next-class" id="daily-next-class" style="display:none;" onclick="switchTab('courses')"></div>
 
     <!-- ③ Daily Check-in -->
     <div class="daily-section">
       <div class="section-header">
-        <span class="section-title">◆ 今日任务</span>
+        <span class="section-title">今日任务</span>
         <span class="section-count" id="today-tasks-count"></span>
         <button class="btn btn-sm" onclick="openTasks()">全部 →</button>
       </div>
@@ -744,7 +820,7 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- ④ Meals -->
     <div class="daily-section collapsible" id="sec-meals">
       <div class="section-header">
-        <span class="section-title">◆ 饮食记录</span>
+        <span class="section-title">饮食记录</span>
         <span id="daily-kcal-total" style="font-family: var(--font-mono); font-size:0.78rem; color: var(--orange);"></span>
       </div>
       <div id="meal-list" style="font-size:0.8rem;color:var(--text-secondary);line-height:1.9;"></div>
@@ -762,7 +838,7 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- ⑦ Today Expense -->
     <div class="daily-section collapsible" id="sec-expense" style="cursor: pointer;" onclick="switchTab('data')">
       <div class="section-header">
-        <span class="section-title">◆ 今日支出</span>
+        <span class="section-title">今日支出</span>
         <span style="font-size:0.72rem; color: var(--text-dim);">查看全部 →</span>
       </div>
       <div style="display: flex; gap: 16px;">
@@ -780,10 +856,10 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- ⑧ Journal（随手记：一天可多条，Ctrl/⌘+Enter 或点按钮即存）-->
     <div class="daily-section">
       <div class="section-header">
-        <span class="section-title">◆ 随手记</span>
+        <span class="section-title">随手记</span>
         <span id="journal-today-count" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-dim);"></span>
       </div>
-      <textarea id="daily-journal" placeholder="记一句…（Ctrl/⌘+Enter 保存）" style="min-height: 56px;" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter')addJournalItem()"></textarea>
+      <textarea id="daily-journal" placeholder="记一句…" style="min-height: 56px;" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter')addJournalItem()"></textarea>
       <div style="display:flex;justify-content:flex-end;margin-top:6px;">
         <button class="btn btn-sm btn-primary" onclick="addJournalItem()">记下</button>
       </div>
@@ -798,14 +874,13 @@ button:focus-visible { box-shadow: var(--ring); }
   <div class="panel" id="panel-courses">
     <div class="daily-date-header" style="margin-bottom:12px;">
       <div>
-        <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-dim);letter-spacing:2px;">COURSE SCHEDULE</div>
         <div style="font-size:1.5rem;font-weight:bold;color:var(--accent);margin:4px 0;" id="course-week-label">第 1 周</div>
         <div style="font-size:0.8rem;color:var(--orange);margin-top:2px;" id="course-season-label"></div>
       </div>
       <div class="course-view-toggle">
-        <button class="course-view-btn active" data-view="day" onclick="switchCourseView('day')">📅 日</button>
-        <button class="course-view-btn" data-view="week" onclick="switchCourseView('week')">🗓 周</button>
-        <button class="course-view-btn" data-view="forecast" onclick="switchCourseView('forecast')">⏭ 预告</button>
+        <button class="course-view-btn active" data-view="day" onclick="switchCourseView('day')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><rect x="3.5" y="5" width="17" height="15.5" rx="2.2"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/></svg> 日</button>
+        <button class="course-view-btn" data-view="week" onclick="switchCourseView('week')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><rect x="3.5" y="5" width="17" height="15.5" rx="2.2"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3M12 12.5v3M9.5 14h5"/></svg> 周</button>
+        <button class="course-view-btn" data-view="forecast" onclick="switchCourseView('forecast')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><path d="M5 19V8l7-4 7 4v11"/><path d="M9 19v-5h6v5"/></svg> 预告</button>
       </div>
     </div>
     <div id="course-day-view"></div>
@@ -813,12 +888,12 @@ button:focus-visible { box-shadow: var(--ring); }
     <div id="course-forecast-view" style="display:none;"></div>
 <!-- 课表数据 / 调课更新 -->
     <details style="margin-top:16px;">
-      <summary style="cursor:pointer;font-size:0.72rem;color:var(--text-dim);padding:8px 0;list-style:none;user-select:none;">⚙ 课表数据 · 调课更新</summary>
+      <summary style="cursor:pointer;font-size:0.72rem;color:var(--text-dim);padding:8px 0;list-style:none;user-select:none;"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.2 5.2l1.8 1.8M17 17l1.8 1.8M18.8 5.2 17 7M7 17l-1.8 1.8"/></svg> 课表数据 · 调课更新</summary>
       <div class="card" style="padding:12px;margin-top:6px;">
         <div style="font-size:0.72rem;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">
           课表已嵌入本地（来自湖南科技学院教务系统，2026-2027-1 学期）。调课时点此覆盖更新。
         </div>
-        <button class="btn btn-primary btn-sm" onclick="importCourses()" style="padding:4px 12px;">📥 导入/更新课表</button>
+        <button class="btn btn-primary btn-sm" onclick="importCourses()" style="padding:4px 12px;"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><path d="M12 4v10M8.5 10.5 12 14l3.5-3.5M5 19h14"/></svg> 导入/更新课表</button>
       </div>
     </details>
 
@@ -826,7 +901,7 @@ button:focus-visible { box-shadow: var(--ring); }
 
 
   <!-- 原「任务」面板已改为浮层（#task-overlay，见文件末尾），底部导航不再单列一格。
-       入口在今日面板「◆ 今日任务」标题右侧的「全部 →」 -->
+       入口在今日面板「今日任务」标题右侧的「全部 →」 -->
 
 
 
@@ -851,6 +926,11 @@ button:focus-visible { box-shadow: var(--ring); }
           <span style="font-size:0.7rem;color:var(--text-dim);">›</span>
         </div>
         <div id="wallet-invest-sub" style="font-size:0.68rem;color:var(--text-dim);margin-top:5px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;"></div>
+      </div>
+      <!-- 现金 + 投资市值 的总和 -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px dashed var(--border-subtle);">
+        <span style="font-size:0.72rem;color:var(--text-dim);">总资产</span>
+        <span id="wallet-total" style="font-size:1.15rem;font-weight:700;color:var(--text-primary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;">¥ 0.00</span>
       </div>
     </div>
 
@@ -893,7 +973,7 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- 快速记账：常用分类一键 -->
     <div style="margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <span class="section-title">◆ 快速记账</span>
+        <span class="section-title">快速记账</span>
         <span style="font-size:0.68rem;color:var(--text-dim);">点分类 → 输金额</span>
       </div>
       <div class="quick-add" id="quick-cats"></div>
@@ -907,7 +987,7 @@ button:focus-visible { box-shadow: var(--ring); }
 
         <!-- Add Transaction -->
     <div class="section-header" style="margin-top: 16px;">
-      <span class="section-title">◆ 记一笔</span>
+      <span class="section-title">记一笔</span>
     </div>
     <div class="wallet-add-form">
       <div class="wallet-type-toggle">
@@ -925,15 +1005,16 @@ button:focus-visible { box-shadow: var(--ring); }
           <option value="生活">生活</option>
           <option value="其他">其他</option>
         </select>
+        <select id="wallet-account" style="width:auto;" title="这笔从哪个账户出/进（让账户余额跟着波动）"></select>
         <input type="datetime-local" id="wallet-when" style="width: 190px;" title="可以选择过去的日期时间补记">
         <input type="text" id="wallet-note" placeholder="备注（可选）" style="flex: 1; min-width: 150px;">
-        <button class="btn btn-primary" onclick="addTransaction()">记一笔</button>
+        <button class="btn btn-primary" id="wallet-add-btn" onclick="addTransaction()">记一笔</button>
       </div>
     </div>
 
     <!-- 交易复盘 (投资思考日记) -->
     <div class="section-header" style="margin-top: 16px;">
-      <span class="section-title">◆ 交易复盘</span>
+      <span class="section-title">交易复盘</span>
       <span style="font-size:0.72rem;color:var(--text-dim);">记录你的投资思考</span>
     </div>
     <div class="card">
@@ -941,14 +1022,14 @@ button:focus-visible { box-shadow: var(--ring); }
     </div>
     <!-- 历史复盘 -->
     <div class="section-header" style="margin-top:12px;">
-      <span class="section-title" style="font-size:0.78rem;">◆ 历史复盘</span>
+      <span class="section-title" style="font-size:0.78rem;">历史复盘</span>
     </div>
     <div id="invest-history-list"></div>
 
     <!-- 本月去向（分类占比）-->
     <div style="margin-bottom:16px;">
       <div class="section-header" style="margin-bottom:10px;">
-        <span class="section-title">◆ 本月去向</span>
+        <span class="section-title">本月去向</span>
       </div>
       <div class="card" style="padding:14px;">
         <div id="cat-breakdown"></div>
@@ -958,7 +1039,7 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- 收支趋势 -->
     <div style="margin-bottom:16px;">
       <div class="section-header" style="margin-bottom:10px;">
-        <span class="section-title">◆ 近 6 个月趋势</span>
+        <span class="section-title">近 6 个月趋势</span>
         <div style="display:flex;gap:10px;font-size:0.68rem;">
           <span style="color:var(--expense);">■ 支出</span>
           <span style="color:var(--success);">■ 收入</span>
@@ -971,7 +1052,7 @@ button:focus-visible { box-shadow: var(--ring); }
 
         <!-- Transaction History -->
     <div class="section-header" style="margin-top: 16px;">
-      <span class="section-title">◆ 交易记录</span>
+      <span class="section-title">交易记录</span>
       <div style="display: flex; gap: 8px; align-items: center;">
         <select id="wallet-filter" style="width: auto; font-size:0.78rem;" onchange="renderWalletHistory()">
           <option value="all">全部</option>
@@ -987,7 +1068,6 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- 每日打卡档案 (原 history 面板内容) -->
     <div class="daily-date-header" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:20px;margin:16px 0;">
       <div>
-        <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-dim);letter-spacing:2px;">DAILY LOG COLLECTION</div>
         <div style="font-size:1.5rem;font-weight:bold;color:var(--text-primary);margin:4px 0;">每日统计</div>
         <div style="font-size:0.8rem;color:var(--text-dim);">打卡合集 · <span id="history-year"></span></div>
       </div>
@@ -1006,14 +1086,13 @@ button:focus-visible { box-shadow: var(--ring); }
 
     <!-- Entries List -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-dim);letter-spacing:1px;">ENTRIES</span>
       <span id="history-entry-count" style="font-size:0.72rem;color:var(--text-dim);"></span>
     </div>
     <div id="history-entries-list"></div>
 
     <!-- 日记回顾 -->
     <div class="section-header" style="margin-top:20px;">
-      <span class="section-title">◆ 日记回顾</span>
+      <span class="section-title">日记回顾</span>
       <span id="journal-arch-stats" style="font-size:0.72rem;color:var(--text-dim);"></span>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
@@ -1026,7 +1105,7 @@ button:focus-visible { box-shadow: var(--ring); }
 
     <!-- AI 周报（本地 Ollama，经后端 SSE 代理） -->
     <div class="section-header" style="margin-top:20px;">
-      <span class="section-title">◆ AI 周报</span>
+      <span class="section-title">AI 周报</span>
       <span id="ai-week-status" style="font-size:0.72rem;color:var(--text-dim);"></span>
     </div>
     <div class="card" style="padding:12px;">
@@ -1036,7 +1115,7 @@ button:focus-visible { box-shadow: var(--ring); }
         <button class="btn btn-sm" onclick="aiWeekShift(1)">›</button>
         <span style="flex:1;"></span>
         <input type="text" id="ai-model" placeholder="模型名，如 qwen2.5:7b" style="width:170px;font-size:0.78rem;" onchange="saveAiModel()">
-        <button class="btn btn-primary btn-sm" id="ai-gen-btn" onclick="generateWeeklyReport()">✦ 生成周报</button>
+        <button class="btn btn-primary btn-sm" id="ai-gen-btn" onclick="generateWeeklyReport()"><i data-ic="report" data-size="0.95"></i> 生成周报</button>
       </div>
       <div id="ai-week-output" style="display:none;white-space:pre-wrap;font-size:0.8rem;line-height:1.8;color:var(--text-primary);background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:12px;max-height:420px;overflow-y:auto;"></div>
     </div>
@@ -1049,14 +1128,14 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- 服务器同步 -->
     <div style="margin-top:16px;">
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:1rem;">☁️</span>
+        <i data-ic="cloud" data-size="1"></i>
         <span style="font-size:0.88rem;color:var(--text-primary);flex:1;">服务器同步</span>
         <span id="srv-dot" class="srv-dot"></span>
         <span id="srv-status-text" style="font-size:0.68rem;color:var(--text-dim);">未连接</span>
       </div>
       <div id="health-bar" style="margin-top:8px;font-size:0.7rem;color:var(--text-dim);line-height:1.7;"></div>
       <details style="margin-top:8px;">
-        <summary style="cursor:pointer;font-size:0.72rem;color:var(--text-dim);padding:6px 0;list-style:none;user-select:none;">⚙ 高级设置</summary>
+        <summary style="cursor:pointer;font-size:0.72rem;color:var(--text-dim);padding:6px 0;list-style:none;user-select:none;">高级设置</summary>
         <div class="card" style="padding:12px;margin-top:6px;">
           <div class="form-group" style="margin-bottom:8px;">
             <label style="font-size:0.72rem;">服务器地址（留空 = 当前网址）</label>
@@ -1084,7 +1163,7 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- 视频收藏入口 -->
     <div class="card" style="cursor:pointer;padding:14px;margin-bottom:16px;" onclick="openVideos()">
       <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:1.3rem;">🎬</span>
+        <i data-ic="film" data-size="1.3"></i>
         <div style="flex:1;">
           <div style="font-size:0.88rem;color:var(--text-primary);">视频收藏</div>
           <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px;" id="video-entry-count">收藏想看的视频</div>
@@ -1096,7 +1175,7 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- 灵感库入口 -->
     <div class="card" style="cursor:pointer;padding:14px;margin-bottom:16px;" onclick="openInspiration()">
       <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:1.3rem;">💡</span>
+        <span class="icn" style="width:1.4rem;height:1.4rem;color:var(--accent);"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/></svg></span>
         <div style="flex:1;">
           <div style="font-size:0.88rem;color:var(--text-primary);">灵感库</div>
           <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px;" id="insp-entry-count">记下想法和素材</div>
@@ -1109,7 +1188,7 @@ button:focus-visible { box-shadow: var(--ring); }
     <a class="card" href="https://kotete.xyz/guide/" target="_blank" rel="noopener noreferrer"
        style="cursor:pointer;padding:14px;margin-bottom:16px;display:block;text-decoration:none;">
       <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:1.3rem;">📖</span>
+        <i data-ic="book" data-size="1.3"></i>
         <div style="flex:1;">
           <div style="font-size:0.88rem;color:var(--text-primary);">高性价比人生指南</div>
           <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px;">花掉什么、换回什么 —— 可筛选的生活决策库</div>
@@ -1122,7 +1201,7 @@ button:focus-visible { box-shadow: var(--ring); }
     <a class="card" href="https://kotete.xyz/reader/" target="_blank" rel="noopener noreferrer"
        style="cursor:pointer;padding:14px;margin-bottom:16px;display:block;text-decoration:none;">
       <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:1.3rem;">📚</span>
+        <i data-ic="library" data-size="1.3"></i>
         <div style="flex:1;">
           <div style="font-size:0.88rem;color:var(--text-primary);">私人书库</div>
           <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px;">自己放书，干净排版的阅读器</div>
@@ -1134,26 +1213,26 @@ button:focus-visible { box-shadow: var(--ring); }
     <!-- 数据管理 -->
     <div style="margin-top:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-        <span style="font-size:1rem;">💾</span>
+        <i data-ic="disk" data-size="1"></i>
         <span style="font-size:0.88rem;color:var(--text-primary);">数据管理</span>
       </div>
       <div class="card" style="cursor:pointer;padding:12px;" onclick="exportAllData()">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:1rem;">📤</span>
+          <i data-ic="upload" data-size="1"></i>
           <span style="flex:1;font-size:0.88rem;">导出数据</span>
           <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
         </div>
       </div>
       <div class="card" style="cursor:pointer;padding:12px;margin-top:8px;" onclick="importDataPrompt()">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:1rem;">📥</span>
+          <span class="icn" style="width:1.1rem;height:1.1rem;color:var(--accent);"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><path d="M12 4v10M8.5 10.5 12 14l3.5-3.5M5 19h14"/></svg></span>
           <span style="flex:1;font-size:0.88rem;">导入数据</span>
           <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
         </div>
       </div>
       <div class="card" style="cursor:pointer;padding:12px;margin-top:8px;" onclick="copyDataToClipboard()">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:1rem;">📋</span>
+          <span class="icn" style="width:1.1rem;height:1.1rem;color:var(--accent);"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M5.5 15.5V5.5a2 2 0 0 1 2-2h10"/></svg></span>
           <span style="flex:1;font-size:0.88rem;">复制数据（手机推荐）</span>
           <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
         </div>
@@ -1162,8 +1241,8 @@ button:focus-visible { box-shadow: var(--ring); }
 
     <!-- 关于 -->
     <div style="margin-top:20px;text-align:center;padding:12px;">
-      <div style="font-family:var(--font-mono);font-size:0.78rem;color:var(--text-dim);letter-spacing:2px;">NEXUS CORE v2.0</div>
-      <div style="font-size:0.68rem;color:var(--text-dim);margin-top:4px;">赛博朋克个人管理面板</div>
+      <div style="font-size:0.72rem;color:var(--text-dim);">Nexus Core · v2.0</div>
+      <div style="font-size:0.68rem;color:var(--text-dim);margin-top:4px;">个人管理面板</div>
     </div>
   </div>
 </div>
@@ -1234,22 +1313,22 @@ button:focus-visible { box-shadow: var(--ring); }
 <div id="insp-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:var(--bg-deep);overflow-y:auto;-webkit-overflow-scrolling:touch;">
   <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
     <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
-      <span style="font-size:1.1rem;">💡</span>
+      <span class="icn" style="width:1.3rem;height:1.3rem;color:var(--accent);"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/></svg></span>
       <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">灵感库</span>
       <button class="btn btn-sm" onclick="inspToggleForm()">+ 新建</button>
-      <button class="btn btn-sm" onclick="closeInspiration()">✕</button>
+      <button class="btn btn-sm" onclick="closeInspiration()" aria-label="关闭"><i data-ic="close" data-size="0.9"></i></button>
     </div>
 
     <div id="insp-form" class="card" style="display:none;padding:14px;margin-bottom:14px;">
       <div style="display:flex;gap:6px;margin-bottom:10px;">
-        <button class="insp-kind active" data-kind="thought" onclick="inspSetKind('thought')">💭 想法</button>
-        <button class="insp-kind" data-kind="material" onclick="inspSetKind('material')">🖼 素材</button>
+        <button class="insp-kind active" data-kind="thought" onclick="inspSetKind('thought')"><i data-ic="thought" data-size="0.9"></i> 想法</button>
+        <button class="insp-kind" data-kind="material" onclick="inspSetKind('material')"><i data-ic="image" data-size="0.9"></i> 素材</button>
       </div>
       <input id="insp-title" placeholder="标题（可选）" style="width:100%;margin-bottom:8px;">
       <textarea id="insp-content" placeholder="写点什么…" style="width:100%;min-height:80px;margin-bottom:8px;"></textarea>
       <div id="insp-material-fields" style="display:none;">
         <label style="display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border:1px dashed var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:0.78rem;cursor:pointer;margin-bottom:8px;">
-          🖼 从相册选图
+          <i data-ic="image" data-size="0.95"></i> 从相册选图
           <input type="file" accept="image/*" onchange="inspPickImage(this)" style="display:none;">
         </label>
         <div id="insp-preview" style="margin-bottom:8px;"></div>
@@ -1271,10 +1350,10 @@ button:focus-visible { box-shadow: var(--ring); }
 <div id="video-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:var(--bg-deep);overflow-y:auto;-webkit-overflow-scrolling:touch;">
   <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
     <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
-      <span style="font-size:1.1rem;">🎬</span>
+      <i data-ic="film" data-size="1.1"></i>
       <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">视频收藏</span>
       <button class="btn btn-sm" onclick="videoToggleForm()">+ 添加</button>
-      <button class="btn btn-sm" onclick="closeVideos()">✕</button>
+      <button class="btn btn-sm" onclick="closeVideos()" aria-label="关闭"><i data-ic="close" data-size="0.9"></i></button>
     </div>
 
     <div id="video-form" class="card" style="display:none;padding:14px;margin-bottom:14px;">
@@ -1301,10 +1380,10 @@ button:focus-visible { box-shadow: var(--ring); }
 <div id="task-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:var(--bg-deep);overflow-y:auto;-webkit-overflow-scrolling:touch;">
   <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
     <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
-      <span style="font-size:1.1rem;">⚡</span>
+      <i data-ic="bolt" data-size="1.1"></i>
       <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">全部任务</span>
       <button class="btn btn-sm" onclick="openTaskModal()">+ 新增</button>
-      <button class="btn btn-sm" onclick="closeTasks()">✕</button>
+      <button class="btn btn-sm" onclick="closeTasks()" aria-label="关闭"><i data-ic="close" data-size="0.9"></i></button>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
       <select id="task-filter" style="width:auto;">
@@ -1328,22 +1407,22 @@ button:focus-visible { box-shadow: var(--ring); }
 <div id="invest-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:var(--bg-deep);overflow-y:auto;-webkit-overflow-scrolling:touch;">
   <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
     <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
-      <span style="font-size:1.1rem;">📈</span>
+      <i data-ic="trend" data-size="1.1"></i>
       <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">资产台账</span>
       <button class="btn btn-sm" id="invest-refresh-btn" onclick="refreshQuotes(true)">刷新行情</button>
-      <button class="btn btn-sm" onclick="closeInvest()">✕</button>
+      <button class="btn btn-sm" onclick="closeInvest()" aria-label="关闭"><i data-ic="close" data-size="0.9"></i></button>
     </div>
     <div id="invest-summary"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px;">
-      <span class="section-title">◆ 持仓明细</span>
+      <span class="section-title">持仓明细</span>
       <button class="btn btn-sm btn-primary" onclick="openInvestEdit(null)">+ 添加持仓</button>
     </div>
     <div id="invest-list"></div>
 
     <!-- 持仓截图：手机相册里的持仓页面直接传上来，不用手敲那些数字 -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px;">
-      <span class="section-title">◆ 持仓截图</span>
-      <button class="btn btn-sm" onclick="document.getElementById('invest-shot-input').click()">📷 传截图</button>
+      <span class="section-title">持仓截图</span>
+      <button class="btn btn-sm" onclick="document.getElementById('invest-shot-input').click()"><i data-ic="camera" data-size="0.95"></i> 传截图</button>
     </div>
     <input type="file" id="invest-shot-input" accept="image/*" multiple style="display:none;" onchange="investPickShots(this)">
     <div id="invest-shot-list"></div>
@@ -1863,8 +1942,23 @@ function quickConfirm() {
   if (!_quickCat) { showToast('先选一个分类', 'warning'); return; }
   if (!amt || amt <= 0) { showToast('请输入金额', 'warning'); return; }
   const w = loadWallet();
-  w.transactions.unshift({ type: 'expense', amount: amt, category: _quickCat, date: localStamp(), note: '' });
-  w.cash = (Number(w.cash) || 0) - amt;
+  const txn = {
+    id: 'w' + Date.now(),
+    type: 'expense',
+    amount: amt,
+    category: _quickCat,
+    note: '',
+    date: localStamp().slice(0, 16) + ':00'
+  };
+  // 与 addTransaction 一致：支出落到「现金（不分账户）」池账户，余额跟着波动，
+  // 再用 _recalcCashOnly 重算总额 —— 否则只动 w.cash 不联动账户，且缺 account 的交易
+  // 会在下次加载时再次触发迁移，把现金成倍算错。
+  const acctId = CASH_POOL_ID;
+  txn.account = acctId;
+  w.transactions.unshift(txn);
+  const a = _getAcct(w, acctId);
+  a.amount = Math.round((Number(a.amount) - amt) * 100) / 100;
+  _recalcCashOnly(w);
   Store.set('wallet', w);
   showToast('已记 ' + _quickCat + ' ¥' + amt.toFixed(2), 'success');
   quickCancel();
@@ -1917,7 +2011,7 @@ function renderTrendChart() {
   ctx.clearRect(0, 0, W, H);
   const max = Math.max.apply(null, months.map(m => Math.max(m.exp, m.inc)).concat([1]));
   const padB = 20, padT = 8, chartH = H - padB - padT;
-  const slot = W / months.length;
+  const slot = W / (months.length || 1);
   const barW = Math.min(14, slot / 3.2);
   const cExp = (typeof cssColor === 'function' ? cssColor('--expense') : '') || '#f08aa8';
   const cInc = (typeof cssColor === 'function' ? cssColor('--success') : '') || '#52d489';
@@ -2118,15 +2212,16 @@ function renderInspirations() {
 
   const base = serverCfg().base;
   listEl.innerHTML = items.map(function (it) {
-    const img = it.fileUrl ? '<img class="insp-thumb" src="' + base + it.fileUrl + '" loading="lazy" onclick="inspViewImage(&quot;' + base + it.fileUrl + '&quot;)">' : '';
-    const link = it.link ? '<div style="margin-top:6px;"><a href="' + it.link + '" target="_blank" rel="noopener" style="font-size:0.72rem;color:var(--accent);word-break:break-all;">' + it.link + '</a></div>' : '';
-    const tagsHtml = (it.tags || []).map(function (t) { return '<span class="insp-tag">#' + t + '</span>'; }).join(' ');
-    const icon = it.kind === 'material' ? '🖼' : '💭';
+    const safeLink = safeUrl(it.link);
+    const img = it.fileUrl ? '<img class="insp-thumb" src="' + base + escAttr(it.fileUrl) + '" loading="lazy" onclick="inspViewImage(&quot;' + base + escAttr(it.fileUrl) + '&quot;)">' : '';
+    const link = safeLink ? '<div style="margin-top:6px;"><a href="' + safeLink + '" target="_blank" rel="noopener noreferrer" style="font-size:0.72rem;color:var(--accent);word-break:break-all;">' + escHtml(it.link) + '</a></div>' : '';
+    const tagsHtml = (it.tags || []).map(function (t) { return '<span class="insp-tag">#' + escHtml(t) + '</span>'; }).join(' ');
+    const kindIco = it.kind === 'material' ? icon('image', 0.85) : icon('thought', 0.85);
     return '<div class="insp-card">' +
-      '<div class="insp-card-head"><span style="font-size:0.85rem;">' + icon + '</span>' +
-      '<span class="insp-card-title">' + (it.title || (it.content || '').slice(0, 24) || '(无标题)') + '</span>' +
+      '<div class="insp-card-head"><span style="font-size:0.85rem;line-height:1;">' + kindIco + '</span>' +
+      '<span class="insp-card-title">' + escHtml(it.title || (it.content || '').slice(0, 24) || '(无标题)') + '</span>' +
       '<span class="insp-card-time">' + String(it.createdAt || '').slice(5, 16).replace('T', ' ') + '</span>' +
-      '<button class="btn btn-sm" style="padding:2px 8px;font-size:0.68rem;" onclick="inspDelete(&quot;' + it.id + '&quot;)">✕</button></div>' +
+      '<button class="btn btn-sm" style="padding:2px 8px;font-size:0.68rem;" onclick="inspDelete(&quot;' + it.id + '&quot;)" aria-label="删除">' + ICON_CLOSE + '</button></div>' +
       img +
       (it.content ? '<div class="insp-card-body">' + escHtml(it.content) + '</div>' : '') +
       link +
@@ -2137,6 +2232,15 @@ function renderInspirations() {
 
 function escHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+// 给 HTML 属性值（如 input 的 value="..."）用，多转义双引号，避免名字里带 " 破坏结构。
+function escAttr(str) {
+  return escHtml(str).replace(/"/g, '&quot;');
+}
+// 只放行 http(s)/mailto，拦掉 javascript:/data: 等可执行协议，防存储型 XSS。
+function safeUrl(u) {
+  const s = String(u == null ? '' : u).trim();
+  return /^(https?:\/\/|mailto:)/i.test(s) ? s : '';
 }
 
 function updateInspEntryCount() {
@@ -2154,13 +2258,13 @@ function videoData() { return Store.get('videos', []); }
 function videoSaveData(list) { Store.set('videos', list); }
 
 const VIDEO_SITES = [
-  { label: 'B站',      icon: '📺', match: h => h === 'bilibili.com' || h.endsWith('.bilibili.com') || h === 'b23.tv' },
-  { label: 'YouTube',  icon: '▶️', match: h => h === 'youtube.com' || h.endsWith('.youtube.com') || h === 'youtu.be' },
-  { label: '抖音',     icon: '🎵', match: h => h === 'douyin.com' || h.endsWith('.douyin.com') },
-  { label: '腾讯视频', icon: '🐧', match: h => h === 'v.qq.com' },
-  { label: '优酷',     icon: '🎬', match: h => h === 'youku.com' || h.endsWith('.youku.com') },
-  { label: '爱奇艺',   icon: '🎞️', match: h => h === 'iqiyi.com' || h.endsWith('.iqiyi.com') },
-  { label: '芒果TV',   icon: '🥭', match: h => h === 'mgtv.com' || h.endsWith('.mgtv.com') },
+  { label: 'B站',      ic: 'play',  match: h => h === 'bilibili.com' || h.endsWith('.bilibili.com') || h === 'b23.tv' },
+  { label: 'YouTube',  ic: 'play',  match: h => h === 'youtube.com' || h.endsWith('.youtube.com') || h === 'youtu.be' },
+  { label: '抖音',     ic: 'music', match: h => h === 'douyin.com' || h.endsWith('.douyin.com') },
+  { label: '腾讯视频', ic: 'chat',  match: h => h === 'v.qq.com' },
+  { label: '优酷',     ic: 'film',  match: h => h === 'youku.com' || h.endsWith('.youku.com') },
+  { label: '爱奇艺',   ic: 'play',  match: h => h === 'iqiyi.com' || h.endsWith('.iqiyi.com') },
+  { label: '芒果TV',   ic: 'music', match: h => h === 'mgtv.com' || h.endsWith('.mgtv.com') },
 ];
 
 function videoSiteOf(url) {
@@ -2312,22 +2416,28 @@ function renderVideos() {
 
   listEl.innerHTML = list.map(v => {
     const site = videoSiteOf(v.url);
-    return `<div class="card" style="padding:12px 14px;margin-bottom:10px;">
-      <div style="display:flex;gap:10px;align-items:flex-start;">
-        <span style="font-size:1.1rem;line-height:1.4;">${site ? site.icon : '🔗'}</span>
+    return `<details class="card" style="padding:12px 14px;margin-bottom:10px;">
+      <summary style="cursor:pointer;list-style:none;display:flex;gap:10px;align-items:flex-start;">
+        ${site ? icon(site.ic, 1.1) : icon('link', 1.1)}
         <div style="flex:1;min-width:0;">
-          <a href="${videoEsc(v.url)}" target="_blank" rel="noopener noreferrer"
+          <a href="${videoEsc(safeUrl(v.url))}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
              style="color:var(--text-primary);font-size:0.86rem;text-decoration:none;display:block;line-height:1.45;">${videoEsc(v.title)}</a>
-          ${v.note ? `<div style="font-size:0.72rem;color:var(--text-secondary);margin-top:4px;line-height:1.5;">${videoEsc(v.note)}</div>` : ''}
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:0.66rem;color:var(--text-dim);">
             ${site ? `<span>${site.label}</span>` : ''}
             ${(v.tags || []).map(t => `<span style="color:var(--accent);">#${videoEsc(t)}</span>`).join('')}
             <span>${fmtMD(new Date(v.ts))}</span>
           </div>
         </div>
-        <button class="btn btn-sm" style="padding:2px 8px;font-size:0.68rem;flex-shrink:0;" onclick="videoDelete('${videoEsc(v.id)}')">删</button>
+        <span style="font-size:0.72rem;color:var(--text-dim);flex-shrink:0;align-self:center;">›</span>
+      </summary>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle);">
+        ${v.note ? `<div style="font-size:0.72rem;color:var(--text-secondary);line-height:1.5;margin-bottom:8px;">${videoEsc(v.note)}</div>` : ''}
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <a href="${videoEsc(safeUrl(v.url))}" target="_blank" rel="noopener noreferrer" class="btn btn-sm">打开链接</a>
+          <button class="btn btn-sm" style="padding:2px 8px;font-size:0.68rem;" onclick="videoDelete('${videoEsc(v.id)}')">删</button>
+        </div>
       </div>
-    </div>`;
+    </details>`;
   }).join('');
 }
 // === 视频收藏 END ===
@@ -2402,17 +2512,10 @@ function renderDailyHub() {
   const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
   document.getElementById('daily-weekday').textContent = weekdays[now.getDay()];
   const profile = Store.get('profile', {});
-  document.getElementById('daily-streak-badge').textContent = `🔥 连续 ${(profile.streak||0)} 天`;
+  document.getElementById('daily-streak-badge').innerHTML = `<svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:0.95em;height:0.95em;vertical-align:-0.12em;stroke:currentColor;"><path d="M12 3.2c1.4 2.4 3.8 3.2 3.8 5.8a3.8 3.8 0 0 1-7.6 0c0-.9.3-1.6.8-2.3.3 1 .9 1.4 1.6 1.3-.7-.9-.6-2.4.4-3.3.6-.9 1.6-1.6 1.6-1.5Z"/></svg> 连续 ${(profile.streak||0)} 天`;
 
-  // ⓪ Next Class Banner
+  // ⓪ Next Class Banner（单行速览；完整课表见「课表」面板）
   renderNextClassBanner();
-
-  // ⓪.5 Today's Courses
-  renderTodayCourses();
-
-  // ⓪.6 明日预告
-  renderDailyTomorrowHint();
-
 
   // ③ Today Tasks（周期任务 + 今天到期，聚合视图）
   renderTodayTasks();
@@ -2475,8 +2578,8 @@ function renderTodayTasks() {
       <div class="task-info">
         <div class="task-title">${t.title}</div>
         <div class="task-meta">
-          ${t.recurrence && t.recurrence !== 'none' ? `<span>🔁 ${REC[t.recurrence] || ''}</span>` : ''}
-          ${t.deadline ? `<span>📅 ${t.deadline}${t.deadline < today ? ' · 已逾期' : ''}</span>` : ''}
+          ${t.recurrence && t.recurrence !== 'none' ? `<span>${REC[t.recurrence] || ''}循环</span>` : ''}
+          ${t.deadline ? `<span>截止 ${t.deadline}${t.deadline < today ? ' · 已逾期' : ''}</span>` : ''}
         </div>
       </div>
     </div>
@@ -2486,7 +2589,7 @@ function renderTodayTasks() {
 // --- Meals ---
 // 记录的门槛必须足够低：卡路里选填、一餐可多条、常吃的点一下就能记。
 // （2026-09-20 重做：原来用 prompt() 弹窗还要手打「食物名,卡路里」，实际用了两天就没人用了）
-const MEAL_TYPES = [['breakfast', '🌅 早餐'], ['lunch', '☀️ 午餐'], ['dinner', '🌙 晚餐'], ['snack', '🍿 零食']];
+const MEAL_TYPES = [['breakfast', '早餐'], ['lunch', '午餐'], ['dinner', '晚餐'], ['snack', '零食']];
 let _mealType = null;
 
 // 按当前时段猜餐次：早上记的就是早餐，不用每次手选
@@ -2650,6 +2753,16 @@ function journalPayload(date) {
 }
 // 纯文本视图：历史归档、导出用它
 function journalPlainText(date) { return journalItems(date).map(x => x.text).join('\n'); }
+
+// 服务端 / 本地来的「一条日记」内容统一转成纯文本。
+// 关键：服务端存的 content 是 JSON.stringify([{ts,text}]) 字符串（见 journalPayload），
+// 若直接塞进 innerHTML 会把 [{"ts":...}] 那串 JSON 当成正文显示 = 乱码。
+// 本地 entries 已经是纯文本，parseJournalContent 对非 [ 开头会原样返回，安全。
+function entryToText(content) {
+  if (Array.isArray(content)) return content.map(x => (x && x.text) || '').filter(Boolean).join('\n');
+  if (typeof content !== 'string') return '';
+  return parseJournalContent(content).map(x => x.text).join('\n');
+}
 
 function setJournalItems(date, items) {
   const j = Store.get('journal', {});
@@ -2951,7 +3064,7 @@ async function renderJournalArchive() {
   const q = (document.getElementById('journal-arch-search')?.value || '').trim().toLowerCase();
   const monthEl = document.getElementById('journal-arch-month');
   const statsEl = document.getElementById('journal-arch-stats');
-  const totalChars = entries.reduce((s, e) => s + e.content.length, 0);
+  const totalChars = entries.reduce((s, e) => s + entryToText(e.content).length, 0);
   if (statsEl) statsEl.textContent = `${entries.length} 篇 · 共 ${totalChars} 字`;
   if (monthEl && !_journalMonth) { const n = new Date(); _journalMonth = `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; }
 
@@ -2972,15 +3085,17 @@ function renderJournalArchiveList(el, entries) {
   if (!entries.length) { el.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:8px;">这个月还没有日记，去「今日」写一篇吧</div>'; return; }
   el.innerHTML = entries.map(e => {
     const [y, m, d] = e.date.split('-');
-    const preview = e.content.length > 40 ? e.content.slice(0, 40) + '…' : e.content;
+    const text = entryToText(e.content);
+    const escaped = escJournalText(text);
+    const preview = text.length > 40 ? text.slice(0, 40) + '…' : text;
     return `
     <details class="card" style="padding:10px;margin-bottom:8px;">
       <summary style="cursor:pointer;list-style:none;display:flex;gap:8px;align-items:baseline;">
         <span style="font-family:var(--font-mono);color:var(--accent);font-size:0.8rem;white-space:nowrap;">${m}-${d}</span>
-        <span style="flex:1;font-size:0.78rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${preview}</span>
-        <span style="font-size:0.68rem;color:var(--text-dim);white-space:nowrap;">${e.content.length}字</span>
+        <span style="flex:1;font-size:0.78rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escJournalText(preview)}</span>
+        <span style="font-size:0.68rem;color:var(--text-dim);white-space:nowrap;">${text.length}字</span>
       </summary>
-      <div style="white-space:pre-wrap;font-size:0.8rem;color:var(--text-primary);line-height:1.7;padding:10px 2px 2px;border-top:1px solid var(--border-subtle);margin-top:8px;">${e.content}</div>
+      <div style="white-space:pre-wrap;font-size:0.8rem;color:var(--text-primary);line-height:1.7;padding:10px 2px 2px;border-top:1px solid var(--border-subtle);margin-top:8px;">${escaped}</div>
     </details>`;
   }).join('');
 }
@@ -3131,9 +3246,9 @@ function renderAiReports() {
       <summary style="cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center;">
         <span style="font-family:var(--font-mono);color:var(--accent);font-size:0.78rem;white-space:nowrap;">${r.range}</span>
         <span style="flex:1;font-size:0.72rem;color:var(--text-dim);">${r.model} · ${r.createdAt}</span>
-        <button class="btn btn-sm btn-danger" onclick="event.preventDefault();deleteAiReport('${r.id}')" style="padding:2px 8px;font-size:0.68rem;">✕</button>
+        <button class="btn btn-sm btn-danger" onclick="event.preventDefault();deleteAiReport('${r.id}')" style="padding:2px 8px;font-size:0.68rem;" aria-label="删除">${ICON_CLOSE}</button>
       </summary>
-      <div style="white-space:pre-wrap;font-size:0.8rem;color:var(--text-primary);line-height:1.7;padding:10px 2px 2px;border-top:1px solid var(--border-subtle);margin-top:8px;">${r.content}</div>
+      <div style="white-space:pre-wrap;font-size:0.8rem;color:var(--text-primary);line-height:1.7;padding:10px 2px 2px;border-top:1px solid var(--border-subtle);margin-top:8px;">${escHtml(r.content)}</div>
     </details>`).join('');
 }
 function deleteAiReport(id) {
@@ -3507,9 +3622,9 @@ function renderTasks() {
         <div class="task-meta">
           <span class="badge badge-${getTypeColor(t.type)}">${getTypeLabel(t.type)}</span>
           <span class="badge badge-${getPriorityColor(t.priority)}">${getPriorityLabel(t.priority)}</span>
-          ${t.course ? `<span class="badge" style="background:color-mix(in srgb, var(--accent) 12%, transparent);border:1px solid color-mix(in srgb, var(--accent) 40%, transparent);color:var(--accent);">📚 ${t.course}</span>` : ''}
-          ${t.recurrence && t.recurrence !== 'none' ? `<span class="badge" style="background:rgba(255,200,0,0.1);border:1px solid rgba(255,200,0,0.35);color:var(--warn);">🔁 ${{daily:'每天',weekly:'每周',monthly:'每月'}[t.recurrence] || ''}</span>` : ''}
-          ${t.deadline ? `<span>📅 ${t.deadline}</span>` : ''}
+          ${t.course ? `<span class="badge" style="background:color-mix(in srgb, var(--accent) 12%, transparent);border:1px solid color-mix(in srgb, var(--accent) 40%, transparent);color:var(--accent);">${t.course}</span>` : ''}
+          ${t.recurrence && t.recurrence !== 'none' ? `<span class="badge" style="background:rgba(255,200,0,0.1);border:1px solid rgba(255,200,0,0.35);color:var(--warn);">${{daily:'每天',weekly:'每周',monthly:'每月'}[t.recurrence] || ''}循环</span>` : ''}
+          ${t.deadline ? `<span>截止 ${t.deadline}</span>` : ''}
           ${progressHtml}
         </div>
       </div>
@@ -3533,7 +3648,7 @@ function toggleSubtask(taskId, idx) {
   if (!t || !t.subtasks || !t.subtasks[idx]) return;
   t.subtasks[idx].done = !t.subtasks[idx].done;
   const done = t.subtasks.filter(s => s.done).length;
-  t.progress = Math.round(done / t.subtasks.length * 100);
+  t.progress = Math.round(done / (t.subtasks.length || 1) * 100);
   saveTasks(tasks);
   renderTasks();
   // 子任务全部完成时提示（不自动完成任务）
@@ -3545,7 +3660,7 @@ function populateTaskCourseSelect(selected) {
   const sel = document.getElementById('task-course');
   if (!sel) return;
   const names = [...new Set(getCourses().map(c => c.name))];
-  sel.innerHTML = '<option value="">不关联</option>' + names.map(n => `<option value="${n}" ${n === selected ? 'selected' : ''}>${n}</option>`).join('');
+  sel.innerHTML = '<option value="">不关联</option>' + names.map(n => `<option value="${escAttr(n)}" ${n === selected ? 'selected' : ''}>${escHtml(n)}</option>`).join('');
 }
 
 // 周期任务：下一次出现日期（重生实例在该日期之后才进入「今日任务」）
@@ -3627,6 +3742,7 @@ function renderWallet() {
   const whenEl = document.getElementById('wallet-when');
   if (whenEl && !whenEl.value) whenEl.value = localStamp().slice(0, 16);
   const wallet = loadWallet();
+  renderWalletAccountOptions();
 
   // 现金（记账会自动加减）与投资（台账汇总）分开显示
   document.getElementById('wallet-balance').textContent = '¥ ' + (Number(wallet.cash) || 0).toFixed(2);
@@ -3638,6 +3754,9 @@ function renderWallet() {
       : '点进去记下钱分别在哪 ›';
   }
   renderWalletInvest();
+
+  // 总资产 = 可用现金 + 投资市值（主页面不暴露投资盈亏，所以只汇总市值）
+  updateWalletTotal();
 
   // Stats
   const now = new Date();
@@ -3661,7 +3780,23 @@ function renderWallet() {
 
   renderWalletHistory();
 
-  renderFinanceInsights();}
+  renderFinanceInsights();
+}
+
+// 把现金账户填进「记一笔」的账户下拉框；默认选中第一个真实账户，没有则落到「不分账户」池。
+function renderWalletAccountOptions() {
+  const sel = document.getElementById('wallet-account');
+  if (!sel) return;
+  const w = loadWallet();
+  const list = _cashList(w);
+  const real = list.filter(a => a.id !== CASH_POOL_ID);
+  const cur = sel.value;
+  let html = `<option value="${CASH_POOL_ID}">现金（不分账户）</option>`;
+  html += real.map(a => `<option value="${a.id}">${escHtml(a.name)}</option>`).join('');
+  sel.innerHTML = html;
+  if (cur && (cur === CASH_POOL_ID || real.some(a => a.id === cur))) sel.value = cur;
+  else sel.value = real.length ? real[0].id : CASH_POOL_ID;
+}
 
 // === Investment Journal (交易复盘) ===
 function renderInvestJournal() {
@@ -3695,22 +3830,14 @@ function renderInvestHistory() {
     const weekdays = ['日','一','二','三','四','五','六'];
     const label = `${d.getMonth()+1}/${d.getDate()} 周${weekdays[d.getDay()]}`;
     const preview = text.length > 60 ? text.slice(0, 60) + '...' : text;
-    return `<div class="card" style="padding:10px;margin-bottom:8px;cursor:pointer;" onclick="showInvestEntry('${date}')">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+    return `<details class="card" style="padding:10px;margin-bottom:8px;">
+      <summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;">
         <span style="font-family:var(--font-mono);font-size:0.78rem;color:var(--accent);">${label}</span>
-      </div>
-      <div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.4;">${preview}</div>
-    </div>`;
+        <span style="font-size:0.72rem;color:var(--text-dim);">›</span>
+      </summary>
+      <div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.5;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-subtle);white-space:pre-wrap;">${escHtml(text)}</div>
+    </details>`;
   }).join('');
-}
-
-function showInvestEntry(date) {
-  const journal = Store.get('investJournal', {});
-  const text = journal[date] || '';
-  const d = new Date(date);
-  const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
-  const label = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 ${weekdays[d.getDay()]}`;
-  prompt(`${label}的复盘记录：`, text);
 }
 
 // === History (每日统计合集) ===
@@ -3775,75 +3902,118 @@ function renderHistory() {
     const journalText = journalPlainText(date);
     const journalPreview = journalText.length > 30 ? journalText.slice(0, 30) + '...' : journalText;
 
-    return `<div class="card" style="padding:12px;margin-bottom:10px;cursor:pointer;" onclick="showDayDetail('${date}')">
-      <div style="display:flex;gap:12px;align-items:flex-start;">
+    const badges = [
+      tasksDone > 0 ? `<span>${icon('check', 0.85)} ${tasksDone}项任务</span>` : '',
+      kcal > 0 ? `<span>${icon('food', 0.85)} ${kcal}kcal</span>` : '',
+      dayExp > 0 ? `<span style="color:var(--expense);">${icon('coin', 0.85)} ¥${dayExp.toFixed(0)}</span>` : ''
+    ].join('');
+
+    return `<details class="card" style="padding:12px;margin-bottom:10px;">
+      <summary style="cursor:pointer;list-style:none;display:flex;gap:12px;align-items:flex-start;">
         <div style="text-align:center;min-width:44px;">
           <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:bold;color:${isToday ? 'var(--accent)' : 'var(--text-primary)'};">${month} / ${day}</div>
           <div style="font-size:0.68rem;color:var(--text-dim);">${weekday}</div>
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:0.78rem;color:var(--text-secondary);margin-bottom:4px;">
-            ${tasksDone > 0 ? `<span>✅ ${tasksDone}项任务</span>` : ''}
-            ${kcal > 0 ? `<span>🍽️ ${kcal}kcal</span>` : ''}
-            ${dayExp > 0 ? `<span style="color:var(--expense);">💰 ¥${dayExp.toFixed(0)}</span>` : ''}
-          </div>
-          ${journalPreview ? `<div style="font-size:0.8rem;color:var(--text-dim);line-height:1.4;margin-top:4px;">${journalPreview}</div>` : ''}
+          ${badges ? `<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:0.78rem;color:var(--text-secondary);margin-bottom:4px;">${badges}</div>` : ''}
+          ${journalPreview ? `<div style="font-size:0.8rem;color:var(--text-dim);line-height:1.4;margin-top:4px;">${escJournalText(journalPreview)}</div>` : ''}
         </div>
-        <div style="font-size:0.72rem;color:var(--text-dim);flex-shrink:0;">→</div>
-      </div>
-    </div>`;
+        <div style="font-size:0.72rem;color:var(--text-dim);flex-shrink:0;">›</div>
+      </summary>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle);font-size:0.8rem;line-height:1.7;color:var(--text-secondary);white-space:pre-wrap;">${escJournalText(buildDayDetail(date))}</div>
+    </details>`;
   }).join('');
 }
 
-function showDayDetail(date) {
-  const d = new Date(date + 'T00:00:00');
-  const weekdays = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
-  const label = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 ${weekdays[d.getDay()]}`;
-
+// 一天打卡的明细（饮食 / 支出 / 日记），给「每日统计」折叠卡片的展开区用
+function buildDayDetail(date) {
   const dailyLog = Store.get('dailyLog', {});
   const wallet = Store.get('wallet', { transactions: [] });
-  const journal = Store.get('journal', {});
 
-  let details = [`📅 ${label}\n`];
-
-  // Meals
+  let out = [];
   const meals = dailyLog[date]?.meals || [];
   if (meals.length > 0) {
     const mealStr = meals.map(m => m.kcal ? `${m.name}(${m.kcal}kcal)` : m.name).join(', ');
-    details.push(`🍽️ 饮食: ${mealStr}`);
-    details.push(`   合计: ${dailyLog[date].totalKcal}kcal`);
+    out.push(`饮食: ${mealStr}\n   合计: ${dailyLog[date].totalKcal}kcal`);
   }
-
-  // Expense
   const dayTxns = (wallet.transactions||[]).filter(t => dateOf(t.date) === date);
   if (dayTxns.length > 0) {
     const exp = dayTxns.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0);
     const inc = dayTxns.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
-    if (exp > 0) details.push(`💸 支出: ¥${exp.toFixed(2)}`);
-    if (inc > 0) details.push(`💰 收入: ¥${inc.toFixed(2)}`);
+    if (exp > 0) out.push(`支出: ¥${exp.toFixed(2)}`);
+    if (inc > 0) out.push(`收入: ¥${inc.toFixed(2)}`);
   }
-
-  // Journal
   const j = journalPlainText(date);
-  if (j.trim()) details.push(`📝 日记: ${j}`);
-
-  prompt(label, details.join('\n'));
+  if (j.trim()) out.push(`日记: ${j}`);
+  return out.length ? out.join('\n') : '这一天没有打卡记录';
 }
 
 // === Theme Toggle ===
+const ICON_SUN = '<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.4M12 19v2.4M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2.6 12h2.4M19 12h2.4M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/></svg>';
+const ICON_MOON = '<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 6.8 6.8 0 1 0 20 14.5Z"/></svg>';
+
+// 统一图标集：内联描边 SVG，替代所有 emoji 图标（保持与导航/主题切换一致）
+const ICONSET = {
+  cloud:   '<path d="M7 18a4 4 0 0 1 .5-8 5 5 0 0 1 9.6-1A3.5 3.5 0 0 1 17.5 18Z"/>',
+  film:    '<rect x="3.5" y="5" width="17" height="14" rx="2.2"/><path d="M3.5 9.5h17M3.5 14.5h17M8 5v14M16 5v14"/>',
+  book:    '<path d="M12 5.2C9.5 4.4 6 4.5 4 5.3v13c2-.8 5.5-.7 8 .3 2.5-1 6-1 8-.3v-13c-2-.8-5.5-.7-8 .4Z"/><path d="M12 5.2v13"/>',
+  library: '<path d="M5 4h3.4v16H5zM9.6 4H13v16H9.6zM14.5 4H18v16h-3.5z"/>',
+  disk:    '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7M8 13h8v8H8z"/>',
+  upload:  '<path d="M12 15V4M8 8l4-4 4 4M5 20h14"/>',
+  bolt:    '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  trend:   '<path d="M3 17l6-6 4 4 8-8M21 7h-4M21 7v4"/>',
+  camera:  '<path d="M4 8h3l2-2h6l2 2h3v11H4z"/><path d="M12 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/>',
+  thought: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/>',
+  image:   '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 15l4-4 4 4 3-3 5 5M9 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/>',
+  doc:     '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 13h6M9 17h6"/>',
+  report:  '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 13h6M9 17h6"/>',
+  check:   '<path d="M4 12l5 5L20 6"/>',
+  food:    '<path d="M7 3v8a2 2 0 0 0 4 0V3M9 11v10M17 3c-1.6 0-2.5 2-2.5 4s1 3 2.5 3v9"/>',
+  coin:    '<circle cx="12" cy="12" r="8.5"/><path d="M8.5 9h7M8.5 12h7M8.5 15h7"/>',
+  mic:     '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  chat:    '<path d="M5 5h14v10H9l-4 4z"/>',
+  msg:     '<path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12h5"/>',
+  music:   '<path d="M9 18V5l10-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',
+  play:    '<circle cx="12" cy="12" r="8.5"/><path d="M10 8.5l5 3.5-5 3.5z"/>',
+  link:    '<path d="M9 15l6-6M10 7.5 11.5 6a4 4 0 0 1 5.7 5.7L15.7 13M14 16.5 12.5 18a4 4 0 0 1-5.7-5.7L8.3 11"/>',
+  pin:     '<path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/>',
+  close:   '<path d="M6 6l12 12M18 6L6 18"/>'
+};
+const ICON_CLOSE = mkIcon('close', 0.9);
+function mkIcon(name, size, accent) {
+  const inner = ICONSET[name] || '';
+  return '<span class="icn" style="width:' + (size || 1.1) + 'rem;height:' + (size || 1.1) + 'rem;' +
+    (accent ? 'color:var(--accent);' : '') + 'vertical-align:-0.2em;">' +
+    '<svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;">' +
+    inner + '</svg></span>';
+}
+function icon(name, size, accent) { return mkIcon(name, size, accent); }
+// 把静态 HTML 里的 <i data-ic="name"> 占位符水合成 SVG 图标
+function hydrateIcons(root) {
+  (root || document).querySelectorAll('i[data-ic]').forEach(el => {
+    el.outerHTML = mkIcon(el.dataset.ic, el.dataset.size ? parseFloat(el.dataset.size) : 1.1, el.dataset.accent !== undefined);
+  });
+}
+
+function setThemeIcon(isLight) {
+  const icon = document.getElementById('theme-icon');
+  if (icon) icon.innerHTML = isLight ? ICON_MOON : ICON_SUN;
+}
+
 function toggleTheme() {
   const html = document.documentElement;
   const isLight = html.classList.toggle('light');
   localStorage.setItem('nexus_theme', isLight ? 'light' : 'dark');
-  document.getElementById('theme-icon').textContent = isLight ? '🌙' : '☀️';
+  setThemeIcon(isLight);
 }
 
 function loadTheme() {
   const saved = localStorage.getItem('nexus_theme');
   if (saved === 'light') {
     document.documentElement.classList.add('light');
-    const icon = document.getElementById('theme-icon');
-    if (icon) icon.textContent = '🌙';
+    setThemeIcon(true);
+  } else {
+    setThemeIcon(false);
   }
 }
 
@@ -3893,13 +4063,13 @@ function renderWalletHistory() {
     const dayInc = items.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
 
     return `
-      <div style="margin-bottom: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border-subtle); margin-bottom: 6px;">
-          <span style="font-size:0.78rem; color: ${isToday ? 'var(--accent)' : 'var(--text-dim)'}; font-family: var(--font-mono);">${dayLabel} ${dateLabel}</span>
-          <span style="font-size:0.72rem; color: var(--text-dim); font-family: var(--font-mono);">
-            ${dayExp > 0 ? `支 ¥${dayExp.toFixed(1)}` : ''} ${dayInc > 0 ? ` 收 ¥${dayInc.toFixed(1)}` : ''}
+      <details class="txn-day" ${isToday ? 'open' : ''}>
+        <summary class="txn-day-sum">
+          <span class="txn-day-label" style="color:${isToday ? 'var(--accent)' : 'var(--text-secondary)'};">${dayLabel} ${dateLabel}</span>
+          <span style="font-size:0.72rem;color:var(--text-dim);font-family:var(--font-mono);">
+            ${dayExp > 0 ? `支 ¥${dayExp.toFixed(1)}` : ''} ${dayInc > 0 ? `收 ¥${dayInc.toFixed(1)}` : ''}
           </span>
-        </div>
+        </summary>
         ${items.map(t => `
           <div class="wallet-txn-item">
             <div class="wallet-txn-icon ${t.type}">
@@ -3912,15 +4082,17 @@ function renderWalletHistory() {
             <div style="font-size:0.88rem; font-weight: bold; color: ${t.type === 'expense' ? 'var(--expense)' : 'var(--success)'}; font-family: var(--font-mono);">
               ${t.type === 'expense' ? '-' : '+'}¥${t.amount.toFixed(2)}
             </div>
-            <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${t.id}')" style="padding: 2px 6px; font-size:0.68rem; flex-shrink: 0;">✕</button>
+            <button class="btn btn-sm" onclick="editTransaction('${t.id}')" style="padding: 2px 6px; font-size:0.68rem; flex-shrink: 0;" title="改这笔">改</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${t.id}')" style="padding: 2px 6px; font-size:0.68rem; flex-shrink: 0;" title="删这笔" aria-label="删除">${ICON_CLOSE}</button>
           </div>
         `).join('')}
-      </div>
+      </details>
     `;
   }).join('');
 }
 
 function addTransaction() {
+  if (_editingTxnId) { saveEditTransaction(); return; }
   const amount = parseFloat(document.getElementById('wallet-amount').value);
   const category = document.getElementById('wallet-category').value;
   const note = document.getElementById('wallet-note').value.trim();
@@ -3940,12 +4112,14 @@ function addTransaction() {
     date: whenVal.length === 16 ? whenVal + ':00' : whenVal
   };
 
+  const acctId = (document.getElementById('wallet-account') || {}).value || CASH_POOL_ID;
+  txn.account = acctId;
   wallet.transactions.push(txn);
-  // Auto-set initial balance to 0 if not set
-  // 收支只加在【现金】上 —— 投资市值不受记账影响（基金涨跌不是记账能反映的）
-  if (!wallet.initialSet) { wallet.cash = Number(wallet.cash) || 0; wallet.initialSet = true; }
-  if (_walletType === 'expense') wallet.cash -= amount;
-  else wallet.cash += amount;
+  // 收支落到具体账户，让该账户余额跟着波动；投资市值不受记账影响（基金涨跌不是记账能反映的）。
+  const a = _getAcct(wallet, acctId);
+  const delta = _walletType === 'expense' ? -amount : amount;
+  a.amount = Math.round((Number(a.amount) + delta) * 100) / 100;
+  _recalcCashOnly(wallet);
 
   Store.set('wallet', wallet);
   document.getElementById('wallet-amount').value = '';
@@ -3959,13 +4133,75 @@ function deleteTransaction(id) {
   const wallet = loadWallet();
   const txn = wallet.transactions.find(t => t.id === id);
   if (!txn) return;
-  // 撤销时同样只回滚【现金】
-  if (txn.type === 'expense') wallet.cash += txn.amount;
-  else wallet.cash -= txn.amount;
+  // 撤销时回滚对应账户：支出加回、收入减掉
+  const a = _getAcct(wallet, txn.account || CASH_POOL_ID);
+  const delta = txn.type === 'expense' ? txn.amount : -txn.amount;
+  a.amount = Math.round((Number(a.amount) + delta) * 100) / 100;
+  _recalcCashOnly(wallet);
   wallet.transactions = (wallet.transactions || []).filter(t => t.id !== id);
   Store.set('wallet', wallet);
   renderWallet();
   showToast('已删除该记录', 'info');
+}
+
+// 记账记录可编辑：把某笔填回「记一笔」表单，改完点「保存修改」就地更新。
+// 现金要同步回滚旧影响再算新影响，免得数字对不上。
+let _editingTxnId = null;
+function editTransaction(id) {
+  const wallet = loadWallet();
+  const t = wallet.transactions.find(x => x.id === id);
+  if (!t) return;
+  _editingTxnId = id;
+  setWalletType(t.type);
+  document.getElementById('wallet-amount').value = t.amount;
+  document.getElementById('wallet-category').value = t.category || '其他';
+  const acctSel = document.getElementById('wallet-account');
+  if (acctSel) { renderWalletAccountOptions(); acctSel.value = t.account || CASH_POOL_ID; }
+  document.getElementById('wallet-when').value = (t.date || '').slice(0, 16);
+  document.getElementById('wallet-note').value = t.note || '';
+  const btn = document.getElementById('wallet-add-btn');
+  if (btn) btn.textContent = '保存修改';
+  const form = document.getElementById('wallet-add-form') || document.querySelector('.wallet-add-form');
+  if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  showToast('修改中：改完点「保存修改」', 'info');
+}
+
+function saveEditTransaction() {
+  const amount = parseFloat(document.getElementById('wallet-amount').value);
+  const category = document.getElementById('wallet-category').value;
+  const note = document.getElementById('wallet-note').value.trim();
+  if (!amount || amount <= 0) { showToast('请输入有效金额', 'warning'); return; }
+  const wallet = loadWallet();
+  const t = wallet.transactions.find(x => x.id === _editingTxnId);
+  if (!t) { _editingTxnId = null; return; }
+  // 回滚旧影响（落回旧账户）
+  const oa = _getAcct(wallet, t.account || CASH_POOL_ID);
+  const oldDelta = t.type === 'expense' ? t.amount : -t.amount;
+  oa.amount = Math.round((Number(oa.amount) + oldDelta) * 100) / 100;
+  // 套用新值
+  const whenEl = document.getElementById('wallet-when');
+  const whenVal = (whenEl && whenEl.value) ? whenEl.value : localStamp().slice(0, 16);
+  t.type = _walletType;
+  t.amount = amount;
+  t.category = category;
+  t.note = note;
+  t.date = whenVal.length === 16 ? whenVal + ':00' : whenVal;
+  const acctId = (document.getElementById('wallet-account') || {}).value || CASH_POOL_ID;
+  t.account = acctId;
+  const na = _getAcct(wallet, acctId);
+  const newDelta = _walletType === 'expense' ? -amount : amount;
+  na.amount = Math.round((Number(na.amount) + newDelta) * 100) / 100;
+  _recalcCashOnly(wallet);
+  Store.set('wallet', wallet);
+  // 复位编辑态
+  _editingTxnId = null;
+  document.getElementById('wallet-amount').value = '';
+  document.getElementById('wallet-note').value = '';
+  if (whenEl) whenEl.value = localStamp().slice(0, 16);
+  const btn = document.getElementById('wallet-add-btn');
+  if (btn) btn.textContent = '记一笔';
+  renderWallet();
+  showToast('已保存修改', 'success');
 }
 
 function clearWalletHistory() {
@@ -3993,17 +4229,44 @@ function loadWallet() {
     Store.set('wallet', w);
   }
   if (!w.transactions) w.transactions = [];
+
+  // 一次性迁移：历史交易（没有 account 字段）的净影响，折进「现金（不分账户）」池账户，
+  // 让「现金总额 = Σ账户」重新成立 —— 这样以后记账才会真的让对应账户波动，而不是只动一个总数字。
+  if (w.transactions.length && w.transactions.some(t => t.account === undefined)) {
+    const POOL = '__pool__';
+    if (!Array.isArray(w.cashAccounts)) w.cashAccounts = [];
+    let pool = w.cashAccounts.find(a => a.id === POOL);
+    if (!pool) { pool = { id: POOL, name: '现金（不分账户）' }; w.cashAccounts.push(pool); }
+    const othersSum = w.cashAccounts.filter(a => a.id !== POOL).reduce((s, a) => s + (Number(a.amount) || 0), 0);
+    const net = Math.round((Number(w.cash) - othersSum) * 100) / 100;
+    // 让「现金（不分账户）」池吸收残差 = 总额 − 其它真实账户之和。
+    // 用「=」而不是「+=」：若历史数据已被旧 bug 污染（池里金额算错），这样能自愈；
+    // 用「+=」会在池已存在时把残差重复累加，越迁越错。
+    pool.amount = net;
+    w.transactions.forEach(t => { if (t.account === undefined) t.account = POOL; });
+    w.cash = Math.round(w.cashAccounts.reduce((s, a) => s + (Number(a.amount) || 0), 0) * 100) / 100;
+    w.initialSet = true;
+    Store.set('wallet', w);
+  }
+
   return w;
 }
 
 function setWalletCash() {
   const w = loadWallet();
-  const input = prompt('可用现金 —— 支付宝余额 + 余额宝 + 银行卡 + 微信零钱', w.cash || '');
+  const input = prompt('可用现金总额（= 各账户余额之和）', w.cash || '');
   if (input === null) return;
   const val = parseFloat(input);
   if (isNaN(val)) { showToast('请输入有效数字', 'warning'); return; }
-  w.cash = val;
-  w.initialSet = true;
+  // 总额 = 各账户之和：把差额落到「现金（不分账户）」池账户，
+  // 这样台账里的「可用现金」标题（取 w.cash）才等于下方各账户行求和。
+  if (!Array.isArray(w.cashAccounts)) w.cashAccounts = [];
+  let pool = w.cashAccounts.find(a => a.id === CASH_POOL_ID);
+  if (!pool) { pool = { id: CASH_POOL_ID, name: '现金（不分账户）' }; w.cashAccounts.push(pool); }
+  const othersSum = w.cashAccounts.filter(a => a.id !== CASH_POOL_ID).reduce((s, a) => s + (Number(a.amount) || 0), 0);
+  pool.amount = Math.round((val - othersSum) * 100) / 100;
+  _recalcCashOnly(w);          // 重算 w.cash = Σ账户 = val
+  w.cashCheckedAt = Date.now();
   Store.set('wallet', w);
   renderWallet();
   showToast('可用现金已设为 ¥' + val.toFixed(2), 'success');
@@ -4206,14 +4469,21 @@ function renderWalletInvest() {
   el.textContent = '¥ ' + fmtAmount(s.value);
   if (!sub) return;
 
-  if (s.cost <= 0) { sub.textContent = items.length + ' 笔持仓 · 点开看明细'; return; }
+  // 主视图只看市值，不暴露盈亏 —— 点进台账浮层才显示总亏损（看亏了影响心情）。
+  sub.innerHTML = `<span style="color:var(--text-dim);">${items.length} 笔持仓 · 点开看明细</span>`;
+  updateWalletTotal();
+}
 
-  const tone = profitTone(s.profit);
-  let txt = `<span style="color:${tone.color};">${tone.sign}¥${fmtAmount(Math.abs(s.profit))}（${tone.sign}${fmtPct(Math.abs(s.rate))}）</span>`;
-  if (s.need > 0 && s.value > 0) {
-    txt += ` <span style="color:var(--expense);">· 还差 ¥${fmtAmount(s.need)} 回本</span>`;
-  }
-  sub.innerHTML = txt + `<br><span style="color:var(--text-dim);">${items.length} 笔持仓 · 点开看明细</span>`;
+// 总资产 = 可用现金 + 投资市值（汇总一个，点开台账才看明细/盈亏）
+function updateWalletTotal() {
+  const el = document.getElementById('wallet-total');
+  if (!el) return;
+  const cash = Number(loadWallet().cash) || 0;
+  const investItems = loadInvestments();
+  let investVal = 0;
+  if (investItems.length) investVal = investSummary(investItems, loadQuotes()).value;
+  else investVal = Number(loadWallet().invest) || 0;
+  el.textContent = '¥ ' + (cash + investVal).toFixed(2);
 }
 
 // ---------- 台账浮层 ----------
@@ -4464,22 +4734,34 @@ function investItemHtml(it, quotes) {
 }
 
 // ---------- 流动资金 ----------
-// 平时记账加减的就是这个数（wallet.cash）。
-// 明细不参与自动加减，它是「上次核对时的快照」—— 用来解释这个总数是怎么来的、
-// 钱分别躺在哪张卡上。所以明细改了会顺手把总数一起重算，但记账不会去动明细。
+// 平时记账按【账户】加减，对应账户余额会跟着波动，现金总额(= Σ账户)始终成立。
+// 账户明细本身也是「上次核对时的快照」—— 解释钱分别躺在哪张卡上；手动改/删账户会重算总数。
 function cashGroupHtml() {
   const w = loadWallet();
   const accts = Array.isArray(w.cashAccounts) ? w.cashAccounts : [];
   const total = Number(w.cash) || 0;
 
   const rows = accts.length
-    ? accts.map(a => `<div class="cash-row">
-        <span style="font-size:0.78rem;color:var(--text-secondary);word-break:break-all;">${escHtml(a.name)}</span>
-        <span style="display:flex;align-items:center;gap:8px;flex:0 0 auto;">
-          <span style="font-size:0.84rem;color:var(--text-primary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;cursor:pointer;" onclick="setCashAccount('${a.id}')" title="点一下改金额">¥${fmtAmount(a.amount)}</span>
-          <button class="btn btn-sm" style="padding:1px 7px;font-size:0.68rem;" onclick="deleteCashAccount('${a.id}')">×</button>
-        </span>
-      </div>`).join('')
+    ? accts.map(a => {
+        if (_editingCashId === a.id) {
+          return `<div class="cash-row" style="flex-direction:column;align-items:stretch;gap:8px;padding:8px 14px;">
+            <input id="cash-edit-name" value="${escAttr(a.name)}" placeholder="账户名" style="padding:6px 8px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--bg-card);color:var(--text-primary);font-family:var(--font-sans);font-size:0.82rem;">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input id="cash-edit-amount" type="number" step="0.01" min="0" value="${a.amount}" style="width:120px;padding:6px 8px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--bg-card);color:var(--text-primary);font-family:var(--font-mono);font-size:0.82rem;">
+              <button class="btn btn-sm btn-primary" onclick="saveCashAccount('${a.id}')">保存</button>
+              <button class="btn btn-sm" onclick="cancelCashAccount()">取消</button>
+            </div>
+          </div>`;
+        }
+        return `<div class="cash-row">
+          <span style="font-size:0.78rem;color:var(--text-secondary);word-break:break-all;">${escHtml(a.name)}</span>
+          <span style="display:flex;align-items:center;gap:8px;flex:0 0 auto;">
+            <span style="font-size:0.84rem;color:var(--text-primary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;">¥${fmtAmount(a.amount)}</span>
+            <button class="btn btn-sm" style="padding:2px 8px;font-size:0.68rem;" onclick="editCashAccount('${a.id}')">改</button>
+            <button class="btn btn-sm" style="padding:2px 8px;font-size:0.68rem;" onclick="deleteCashAccount('${a.id}')" aria-label="删除账户">删</button>
+          </span>
+        </div>`;
+      }).join('')
     : `<div style="font-size:0.72rem;color:var(--text-dim);padding:8px 14px;line-height:1.8;">
         还没有明细。点下面的「+ 加一项」，把每张卡、每个钱包记进来，以后就知道钱在哪。
       </div>`;
@@ -4493,7 +4775,7 @@ function cashGroupHtml() {
     </summary>
     <div class="inv-group-body">
       <div class="inv-group-hint">
-        ${accts.length ? accts.length + ' 个账户' : '还没有明细'} · 平时记账加减的就是这个数${w.cashCheckedAt ? ` · 上次核对 ${fmtAgo(w.cashCheckedAt)}` : ''}
+        ${accts.length ? accts.length + ' 个账户' : '还没有明细'} · 记账会按账户加减，余额跟着波动${w.cashCheckedAt ? ` · 上次核对 ${fmtAgo(w.cashCheckedAt)}` : ''}
       </div>
       ${rows}
       <div style="padding:8px 14px 4px;display:flex;gap:8px;">
@@ -4512,19 +4794,45 @@ function _recalcCash(w) {
   return w;
 }
 
-function setCashAccount(id) {
+// 记账（收入/支出）走的池账户：没指定具体账户时，钱就进这里，保证「现金总额 = Σ账户」恒成立。
+const CASH_POOL_ID = '__pool__';
+function _cashList(w) { return Array.isArray(w.cashAccounts) ? w.cashAccounts : []; }
+// 取记账要落到的账户；账户被删了则回退到池，池不存在就现建一个。
+function _getAcct(w, id) {
+  const list = _cashList(w);
+  let a = list.find(x => x.id === id);
+  if (!a) {
+    a = list.find(x => x.id === CASH_POOL_ID);
+    if (!a) { a = { id: CASH_POOL_ID, name: '现金（不分账户）' }; list.push(a); }
+  }
+  return a;
+}
+// 只重算现金总额（= Σ账户），不动「上次核对」时间戳——记账/改删账户不算「核对」。
+function _recalcCashOnly(w) {
+  const list = _cashList(w);
+  w.cash = Math.round(list.reduce((s, x) => s + (Number(x.amount) || 0), 0) * 100) / 100;
+  w.initialSet = true;
+  return w;
+}
+
+let _editingCashId = null;
+function editCashAccount(id) { _editingCashId = id; renderInvest(); }
+function cancelCashAccount() { _editingCashId = null; renderInvest(); }
+function saveCashAccount(id) {
   const w = loadWallet();
-  const list = Array.isArray(w.cashAccounts) ? w.cashAccounts : [];
-  const a = list.find(x => x.id === id);
+  const a = _cashList(w).find(x => x.id === id);
   if (!a) return;
-  const v = prompt(a.name + ' 现在有多少钱？', a.amount);
-  if (v === null) return;
-  const n = parseFloat(v);
-  if (isNaN(n)) { showToast('请输入数字', 'warning'); return; }
-  a.amount = Math.round(n * 100) / 100;
-  Store.set('wallet', _recalcCash(w));
+  const nm = (document.getElementById('cash-edit-name') || {}).value;
+  const am = parseFloat((document.getElementById('cash-edit-amount') || {}).value);
+  if (!nm || !nm.trim()) { showToast('账户名不能为空', 'warning'); return; }
+  if (isNaN(am)) { showToast('金额填不对', 'warning'); return; }
+  a.name = nm.trim();
+  a.amount = Math.round(am * 100) / 100;
+  _recalcCashOnly(w);
+  Store.set('wallet', w);
+  _editingCashId = null;
   renderInvest(); renderWallet();
-  showToast('已更新', 'success');
+  showToast('已保存', 'success');
 }
 
 function addCashAccount() {
@@ -4541,19 +4849,21 @@ function addCashAccount() {
     name: name.trim(),
     amount: Math.round(n * 100) / 100
   });
-  Store.set('wallet', _recalcCash(w));
+  Store.set('wallet', _recalcCashOnly(w));
   renderInvest(); renderWallet();
   showToast('已添加', 'success');
 }
 
 function deleteCashAccount(id) {
   const w = loadWallet();
-  const list = Array.isArray(w.cashAccounts) ? w.cashAccounts : [];
+  const list = _cashList(w);
   const a = list.find(x => x.id === id);
   if (!a) return;
-  if (!confirm(`删掉「${a.name}」这一项？\n流动资金总数会跟着减掉它的金额。`)) return;
+  if (a.id === CASH_POOL_ID) {
+    if (!confirm('删掉「现金（不分账户）」？\n以后没指定账户的交易会再自动建一个同样的池子。')) return;
+  } else if (!confirm(`删掉「${a.name}」这一项？\n流动资金总数会跟着减掉它的金额。`)) return;
   w.cashAccounts = list.filter(x => x.id !== id);
-  Store.set('wallet', _recalcCash(w));
+  Store.set('wallet', _recalcCashOnly(w));
   renderInvest(); renderWallet();
   showToast('已删除', 'success');
 }
@@ -4875,7 +5185,7 @@ function renderShots() {
 
   if (!list.length) {
     el.innerHTML = '<div style="font-size:0.72rem;color:var(--text-dim);padding:8px 0;">还没有截图。' +
-      '点上面的「📷 传截图」，从相册选持仓页面就行。</div>';
+      '点上面的「传截图」按钮，从相册选持仓页面就行。</div>';
     return;
   }
 
@@ -5345,7 +5655,7 @@ function renderCourseDay(week) {
       <div class="course-time">${t.start}<br>${t.end}</div>
       <div class="course-body">
         <div class="course-name">${c.name}</div>
-        <div class="course-meta">📍 ${c.location || '地点待定'} · ${wtxt}</div>
+        <div class="course-meta">${icon('pin', 0.8)} ${c.location || '地点待定'} · ${wtxt}</div>
       </div>
       ${status}
     </div>`;
@@ -5404,75 +5714,11 @@ function renderNextClassBanner() {
   const txt = diff > 0
     ? `下一节：${next.name} · ${getCurrentSchedule()[next.section].start} @ ${next.location}（${diff} 分钟后）`
     : `正在上课：${next.name} @ ${next.location}`;
-  el.innerHTML = `📚 ${txt}`;
+  el.innerHTML = icon('book', 0.9) + ' ' + txt;
   el.style.display = '';
 }
 
-// 今日面板：今日课程时间轴（只读，复用课表数据与样式）
-function renderTodayCourses() {
-  const section = document.getElementById('daily-courses-section');
-  const list = document.getElementById('daily-courses-list');
-  if (!section || !list) return;
-  const now = new Date();
-  const hol = holidayForDate(now);
-  if (hol) {
-    section.style.display = '';
-    list.innerHTML = `<div class="holiday-card"><span class="hc-icon">${hol.icon}</span>
-      <div><div>${hol.name}假期</div><div class="hc-sub">${hol.note} 不上课</div></div></div>`;
-    return;
-  }
-  const courses = coursesForDate(now);
-  if (!courses.length) { section.style.display = 'none'; return; }
-  section.style.display = '';
-  const makeup = MAKEUP_DAYS[localDate(now)];
-  const makeupBar = makeup ? `<div class="makeup-bar">📌 今天为调休上课日（${makeup}）</div>` : '';
-  list.innerHTML = makeupBar + courses.map(c => {
-    const t = getCurrentSchedule()[c.section];
-    const [h, m] = t.start.split(':').map(Number);
-    const startDt = new Date(); startDt.setHours(h, m, 0, 0);
-    const [eh, em] = t.end.split(':').map(Number);
-    const endDt = new Date(); endDt.setHours(eh, em, 0, 0);
-    let status;
-    if (now < startDt) status = `<span class="course-countdown">${Math.round((startDt - now) / 60000)} 分钟后</span>`;
-    else if (now <= endDt) status = `<span class="course-countdown" style="color:var(--orange)">上课中</span>`;
-    else status = `<span class="course-countdown" style="color:var(--text-dim)">已结束</span>`;
-    return `<div class="course-card">
-      <div class="course-time">${t.start}<br>${t.end}</div>
-      <div class="course-body">
-        <div class="course-name">${c.name}</div>
-        <div class="course-meta">📍 ${c.location || '地点待定'} · 第${SEC_CN[c.section - 1]}大节</div>
-      </div>
-      ${status}
-    </div>`;
-  }).join('');
-}
-
-// 今日面板的「明日预告」一行（点击进课表预告视图）
-function renderDailyTomorrowHint() {
-  const el = document.getElementById('daily-tomorrow-hint');
-  if (!el) return;
-  const tm = new Date(); tm.setDate(tm.getDate() + 1);
-  const name = DAY_NAMES[tm.getDay()];
-  const hol = holidayForDate(tm);
-  const makeup = MAKEUP_DAYS[localDate(tm)];
-  const list = coursesForDate(tm);
-  const head = `<span style="font-family:var(--font-mono);color:var(--accent);">${fmtMD(tm)} ${name}</span>`;
-  if (hol) {
-    el.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><span style="color:var(--text-secondary);">明天</span>${head}<span style="color:var(--orange);">${hol.icon} ${hol.name}假期 · 不上课</span></div>`;
-  } else if (!list.length) {
-    el.innerHTML = `<div style="display:flex;gap:8px;align-items:center;"><span style="color:var(--text-secondary);">明天</span>${head}<span style="color:var(--text-dim);">没有课</span></div>`;
-  } else {
-    const t = getCurrentSchedule()[list[0].section];
-    el.innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      <span style="color:var(--text-secondary);">明天</span>${head}
-      <span style="color:var(--text-primary);">${list.length} 节课</span>
-      <span style="color:var(--text-dim);">首节 ${t.start} ${list[0].name}</span>
-      ${makeup ? `<span style="color:var(--accent);">📌 ${makeup}</span>` : ''}
-      <span style="color:var(--text-dim);margin-left:auto;white-space:nowrap;">查看下周 →</span>
-    </div>`;
-  }
-  el.style.display = '';
-}
+// 今日面板的「下一节课」速览见 renderNextClassBanner；完整课表在「课表」面板，不再于今日重复渲染。
 
 function importCourses() {
   const input = prompt('粘贴课表 JSON 数组以覆盖现有课表：\n格式：[{"day":"星期一","section":1,"name":"课程名","location":"地点","weeks":[1,2,3]}]');
@@ -5625,6 +5871,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   boot('默认数据', initData);
   boot('模板迁移', migrateDailyTemplatesToTasks);
   boot('渲染', renderAll);
+  safe('图标水合', hydrateIcons);
   boot('仪表盘', updateDashboard);
 
   safe('同步初始化', () => KVSync.init());      // 内部会在短暂延迟后自动拉取一次
@@ -5647,7 +5894,7 @@ setInterval(() => {
   }
 }, 60000);
 
-console.log('%c NEXUS CORE v1.0 %c 任务核心系统已就绪 ',
+console.log('%c NEXUS CORE v2.0 %c 任务核心系统已就绪 ',
   'background:#0d0f13;color:#6c9bff;font-size:16px;padding:8px;',
   'background:#0a0a0f;color:#e0e0e8;font-size:12px;padding:8px;');
 </script>
