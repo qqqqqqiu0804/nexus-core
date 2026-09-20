@@ -389,35 +389,6 @@ button:focus-visible { box-shadow: var(--ring); }
   border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
   box-shadow: var(--shadow-card);
 }
-.daily-meals-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.daily-meal-card {
-  background: var(--bg-deep); border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm); padding: 10px 6px; text-align: center;
-  cursor: pointer; transition: border-color 0.15s;
-}
-.daily-meal-card:hover { border-color: var(--accent-line); }
-.daily-meal-icon { font-size:1.3rem; margin-bottom: 4px; }
-.daily-meal-label { font-size:0.68rem; color: var(--text-dim); margin-bottom: 4px; }
-.daily-meal-content { font-size:0.72rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.daily-habit-item {
-  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
-  border-bottom: 1px solid var(--border-subtle); cursor: pointer;
-}
-.daily-habit-item:last-child { border-bottom: none; }
-.daily-habit-icon { font-size:1.3rem; width: 28px; text-align: center; }
-.daily-habit-name { flex: 1; font-size:0.88rem; }
-.daily-habit-check {
-  width: 22px; height: 22px; border: 2px solid var(--border-subtle);
-  border-radius: 4px; display: flex; align-items: center; justify-content: center;
-  transition: all 0.2s; font-size:0.72rem; flex-shrink: 0;
-}
-.daily-habit-check.checked { background: var(--success); border-color: var(--success); color: #fff; }
-.daily-time-tag {
-  padding: 4px 10px; border-radius: 12px; font-size:0.72rem;
-  background: var(--bg-deep); border: 1px solid var(--border-subtle);
-  color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
-}
-.daily-time-tag:hover { border-color: var(--accent); color: var(--accent); }
 .history-filter.active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 
 /* === Bottom Tab Bar === */
@@ -450,7 +421,6 @@ button:focus-visible { box-shadow: var(--ring); }
   .sync-btn { position: static; margin-top: 12px; }
   .app-container { padding: 12px 12px 76px; }
   .panel { padding:12px; min-height: auto; }
-  .daily-meals-grid { grid-template-columns: repeat(2, 1fr); }
   .task-item { min-height: 52px; }
   .tab-item { min-height: 52px; }
   .btn { min-height: 40px; }
@@ -747,27 +717,15 @@ button:focus-visible { box-shadow: var(--ring); }
         <span class="section-title">◆ 饮食记录</span>
         <span id="daily-kcal-total" style="font-family: var(--font-mono); font-size:0.78rem; color: var(--orange);"></span>
       </div>
-      <div class="daily-meals-grid">
-        <div class="daily-meal-card" onclick="addMeal('breakfast')">
-          <div class="daily-meal-icon">🌅</div>
-          <div class="daily-meal-label">早餐</div>
-          <div class="daily-meal-content" id="meal-breakfast">点击记录</div>
+      <div id="meal-list" style="font-size:0.8rem;color:var(--text-secondary);line-height:1.9;"></div>
+      <div style="margin-top:10px;">
+        <div id="meal-type-row" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;"></div>
+        <div style="display:flex;gap:6px;">
+          <input id="meal-name" placeholder="吃了什么…" onkeydown="if(event.key==='Enter')addMeal()" style="flex:1;min-width:0;">
+          <input id="meal-kcal" placeholder="kcal" inputmode="numeric" style="width:64px;flex:none;">
+          <button class="btn btn-sm btn-primary" onclick="addMeal()" style="flex:none;">记下</button>
         </div>
-        <div class="daily-meal-card" onclick="addMeal('lunch')">
-          <div class="daily-meal-icon">☀️</div>
-          <div class="daily-meal-label">午餐</div>
-          <div class="daily-meal-content" id="meal-lunch">点击记录</div>
-        </div>
-        <div class="daily-meal-card" onclick="addMeal('dinner')">
-          <div class="daily-meal-icon">🌙</div>
-          <div class="daily-meal-label">晚餐</div>
-          <div class="daily-meal-content" id="meal-dinner">点击记录</div>
-        </div>
-        <div class="daily-meal-card" onclick="addMeal('snack')">
-          <div class="daily-meal-icon">🍿</div>
-          <div class="daily-meal-label">零食</div>
-          <div class="daily-meal-content" id="meal-snack">点击记录</div>
-        </div>
+        <div id="meal-suggest" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"></div>
       </div>
     </div>
 
@@ -789,12 +747,17 @@ button:focus-visible { box-shadow: var(--ring); }
       </div>
     </div>
 
-    <!-- ⑧ Journal -->
+    <!-- ⑧ Journal（随手记：一天可多条，Ctrl/⌘+Enter 或点按钮即存）-->
     <div class="daily-section">
       <div class="section-header">
-        <span class="section-title">◆ 今日记</span>
+        <span class="section-title">◆ 随手记</span>
+        <span id="journal-today-count" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-dim);"></span>
       </div>
-      <textarea id="daily-journal" placeholder="写下今天的心情和想法..." style="min-height: 80px;" oninput="saveJournal()"></textarea>
+      <textarea id="daily-journal" placeholder="记一句…（Ctrl/⌘+Enter 保存）" style="min-height: 56px;" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter')addJournalItem()"></textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:6px;">
+        <button class="btn btn-sm btn-primary" onclick="addJournalItem()">记下</button>
+      </div>
+      <div id="journal-today-list" style="margin-top:10px;font-size:0.8rem;color:var(--text-secondary);line-height:1.9;"></div>
       <div id="journal-sync-hint" style="display:none;font-size:0.68rem;color:var(--warn);margin-top:6px;line-height:1.5;"></div>
     </div>
 
@@ -1984,7 +1947,7 @@ function initData() {
     Store.set('tasks', []);
     Store.set('completionLog', {}); // { 'YYYY-MM-DD': count }
     Store.set('wallet', { balance: 0, initialSet: false, transactions: [] });
-    Store.set('dailyLog', {}); // { "YYYY-MM-DD": { meals: [{type,name,kcal}], totalKcal } }
+    Store.set('dailyLog', {}); // { "YYYY-MM-DD": { meals: [{type,name,kcal,ts}], totalKcal } }
     Store.set('journal', {}); // { "YYYY-MM-DD": "text" }
     Store.set('investJournal', {}); // { "YYYY-MM-DD": "投资思考文本" }
     Store.set('initialized', true);
@@ -2064,30 +2027,24 @@ function renderDailyHub() {
   renderDailyExpense();
   updateSectionCollapse();
 
-  // ⑧ Journal
-  const journal = Store.get('journal', {});
-  const journalEl = document.getElementById('daily-journal');
-  if (journalEl && journal[today] !== undefined) journalEl.value = journal[today];
-  else if (journalEl) journalEl.value = '';
-  // 配置了后端时，只有「服务端版本确实更新过」且「用户还没在这页输入」才覆盖本地显示。
-  // 两个条件缺一不可：只比字符串会让本机较新的内容被服务端旧版盖掉（本地副本还在，
-  // 但界面上显示旧内容，用户一输入就把新内容真写没了）。
-  if (journalApiOn() && journalEl) {
-    const cached = journal[today] || '';
+  // ⑧ Journal（随手记）
+  renderJournalToday();
+  // 谁的改动更新就用谁的：服务端更新 → 采纳；本机更新（或服务端还没有这天）→ 推上去。
+  // 这里比的是时间戳而不是字符串，否则本机较新的内容会被服务端旧版盖掉。
+  if (journalApiOn()) {
     const localTs = Number(journalMeta()[today]) || 0;
+    const localContent = journalPayload(today);
     const { base } = journalApiCfg();
     fetch(`${base}/api/entries/${today}`, { headers: journalHeaders() })
       .then(r => r.ok ? r.json() : null)
       .then(e => {
         const serverContent = (e && typeof e.content === 'string') ? e.content : null;
         const serverTs = serverContent !== null ? (Number(e.client_ts) || 0) : 0;
-        // 服务端更新 → 采用服务端版本
-        if (serverContent !== null && serverTs > localTs && journalEl.value === cached) {
+        if (serverContent !== null && serverTs > localTs) {
           adoptServerEntry(today, { content: serverContent, updatedAt: serverTs });
           return;
         }
-        // 本机更新（或服务端还没有这天）→ 把本机版本推上去，别让服务端停在旧版
-        if (localTs > serverTs && cached.trim()) pushJournalEntry(today, cached);
+        if (localTs > serverTs && localContent) pushJournalEntry(today, localContent);
       })
       .catch(() => {});
   }
@@ -2130,46 +2087,112 @@ function renderTodayTasks() {
 }
 
 // --- Meals ---
+// 记录的门槛必须足够低：卡路里选填、一餐可多条、常吃的点一下就能记。
+// （2026-09-20 重做：原来用 prompt() 弹窗还要手打「食物名,卡路里」，实际用了两天就没人用了）
+const MEAL_TYPES = [['breakfast', '🌅 早餐'], ['lunch', '☀️ 午餐'], ['dinner', '🌙 晚餐'], ['snack', '🍿 零食']];
+let _mealType = null;
+
+// 按当前时段猜餐次：早上记的就是早餐，不用每次手选
+function defaultMealType() {
+  const h = new Date().getHours();
+  if (h < 10) return 'breakfast';
+  if (h < 15) return 'lunch';
+  if (h < 21) return 'dinner';
+  return 'snack';
+}
+function currentMealType() { return _mealType || defaultMealType(); }
+function mealTypeLabel(t) {
+  const hit = MEAL_TYPES.find(x => x[0] === t);
+  return hit ? hit[1] : t;
+}
+
+// 「常吃」从历史里自己长出来：按出现次数排序取前 8，不需要用户维护任何清单
+function mealSuggestions() {
+  const logs = Store.get('dailyLog', {});
+  const freq = {};
+  Object.keys(logs).forEach(d => {
+    const meals = logs[d] && logs[d].meals;
+    if (!Array.isArray(meals)) return;
+    meals.forEach(m => { if (m && m.name) freq[m.name] = (freq[m.name] || 0) + 1; });
+  });
+  return Object.keys(freq).sort((a, b) => freq[b] - freq[a]).slice(0, 8);
+}
+
 function renderMeals() {
   const logs = Store.get('dailyLog', {});
   const todayLog = logs[TODAY()] || { meals: [], totalKcal: 0 };
-  const types = ['breakfast','lunch','dinner','snack'];
-  const names = {breakfast:'早餐',lunch:'午餐',dinner:'晚餐',snack:'零食'};
+  const meals = Array.isArray(todayLog.meals) ? todayLog.meals : [];
 
-  types.forEach(type => {
-    const meal = todayLog.meals.find(m => m.type === type);
-    const el = document.getElementById('meal-' + type);
-    if (el) {
-      el.textContent = meal ? `${meal.name} ${meal.kcal}kcal` : '点击记录';
-      el.style.color = meal ? 'var(--text-primary)' : 'var(--text-dim)';
-    }
-  });
-  document.getElementById('daily-kcal-total').textContent = todayLog.totalKcal > 0 ? `合计 ${todayLog.totalKcal} kcal` : '';
+  const row = document.getElementById('meal-type-row');
+  if (row) {
+    const cur = currentMealType();
+    row.innerHTML = MEAL_TYPES.map(t =>
+      '<button class="chip" data-type="' + t[0] + '" aria-pressed="' + (t[0] === cur) +
+      '" onclick="pickMealType(this.dataset.type)">' + t[1] + '</button>').join('');
+  }
+
+  const sug = document.getElementById('meal-suggest');
+  if (sug) {
+    const list = mealSuggestions();
+    sug.innerHTML = list.length
+      ? '<span style="font-size:0.68rem;color:var(--text-dim);align-self:center;">常吃：</span>' +
+        list.map(n => '<button class="chip" onclick="quickAddMeal(this.textContent)">' + n + '</button>').join('')
+      : '';
+  }
+
+  const listEl = document.getElementById('meal-list');
+  if (listEl) {
+    listEl.innerHTML = meals.length
+      ? meals.map((m, i) => {
+          const kcal = m.kcal ? ' <span style="color:var(--text-dim);font-size:0.72rem;">' + m.kcal + 'kcal</span>' : '';
+          return '<div style="display:flex;gap:8px;align-items:baseline;">' +
+            '<span style="color:var(--text-dim);font-size:0.72rem;flex:none;">' + mealTypeLabel(m.type) + '</span>' +
+            '<span style="flex:1;min-width:0;word-break:break-all;">' + m.name + kcal + '</span>' +
+            '<button class="btn btn-sm" onclick="removeMeal(' + i + ')" style="padding:0 7px;font-size:0.7rem;flex:none;">×</button>' +
+            '</div>';
+        }).join('')
+      : '<span style="color:var(--text-dim);font-size:0.75rem;">今天还没记</span>';
+  }
+
+  const total = document.getElementById('daily-kcal-total');
+  if (total) total.textContent = todayLog.totalKcal > 0 ? '合计 ' + todayLog.totalKcal + ' kcal' : '';
 }
 
-function addMeal(type) {
+function pickMealType(t) { _mealType = t; renderMeals(); }
+
+function addMeal() {
+  const nameEl = document.getElementById('meal-name');
+  const kcalEl = document.getElementById('meal-kcal');
+  const name = ((nameEl && nameEl.value) || '').trim();
+  if (!name) { if (nameEl) nameEl.focus(); return; }
+  saveMeal(currentMealType(), name, parseInt((kcalEl && kcalEl.value) || '') || 0);
+  if (kcalEl) kcalEl.value = '';
+  if (nameEl) { nameEl.value = ''; nameEl.focus(); }
+}
+
+// 点「常吃」直接记：不弹窗、不问卡路里
+function quickAddMeal(name) { saveMeal(currentMealType(), name, 0); }
+
+function saveMeal(type, name, kcal) {
   const logs = Store.get('dailyLog', {});
   if (!logs[TODAY()]) logs[TODAY()] = { meals: [], totalKcal: 0 };
-  const todayLog = logs[TODAY()];
-  const existing = todayLog.meals.findIndex(m => m.type === type);
-
-  const names = {breakfast:'早餐',lunch:'午餐',dinner:'晚餐',snack:'零食'};
-  const input = prompt(`记录${names[type]}（格式：食物名,卡路里，如：辣椒炒肉饭,680）`, '');
-  if (input === null || !input.trim()) return;
-  const parts = input.split(',');
-  const name = parts[0].trim();
-  const kcal = parseInt(parts[1]) || 0;
-  if (!name) return;
-
-  const meal = { type, name, kcal };
-  if (existing >= 0) todayLog.meals[existing] = meal;
-  else todayLog.meals.push(meal);
-  todayLog.totalKcal = todayLog.meals.reduce((s,m) => s + (m.kcal||0), 0);
-
-  logs[TODAY()] = todayLog;
+  const day = logs[TODAY()];
+  if (!Array.isArray(day.meals)) day.meals = [];
+  day.meals.push({ type: type, name: name, kcal: kcal, ts: Date.now() });
+  day.totalKcal = day.meals.reduce((s, m) => s + (m.kcal || 0), 0);
   Store.set('dailyLog', logs);
   renderMeals();
-  showToast(`${names[type]}已记录`, 'success');
+  showToast(mealTypeLabel(type) + ' 已记', 'success');
+}
+
+function removeMeal(i) {
+  const logs = Store.get('dailyLog', {});
+  const day = logs[TODAY()];
+  if (!day || !Array.isArray(day.meals)) return;
+  day.meals.splice(i, 1);
+  day.totalKcal = day.meals.reduce((s, m) => s + (m.kcal || 0), 0);
+  Store.set('dailyLog', logs);
+  renderMeals();
 }
 
 // --- Daily Expense ---
@@ -2198,14 +2221,89 @@ function stampJournalMeta(date, ts) {
   m[date] = ts;
   Store.set('journalMeta', m);
 }
-function saveJournal() {
-  const journal = Store.get('journal', {});
-  const date = TODAY();
-  const val = document.getElementById('daily-journal').value;
-  journal[date] = val;
-  Store.set('journal', journal);
+// ---------- 日记：一天可以记多条（随手记）----------
+// 本地那份是数组（Store 会做 JSON 序列化），推给服务器时序列化成 JSON 字符串
+// （服务器仍是 PUT 一个 content 字段，后端零改动）。旧的纯文本日记照样能读出来。
+// 2026-09-20 重做：原来是一天一篇大文本框，「要写一段」的门槛太高，实际没写几篇。
+function parseJournalContent(content) {
+  // 两种形态都要认：本地是数组，服务器回来的是字符串
+  if (Array.isArray(content)) {
+    return content
+      .filter(x => x && typeof x.text === 'string' && x.text.trim())
+      .map(x => ({ ts: Number(x.ts) || 0, text: x.text }));
+  }
+  if (typeof content !== 'string' || !content.trim()) return [];
+  const t = content.trim();
+  if (t.charAt(0) === '[') {
+    try {
+      const arr = JSON.parse(t);
+      if (Array.isArray(arr)) {
+        return arr
+          .filter(x => x && typeof x.text === 'string' && x.text.trim())
+          .map(x => ({ ts: Number(x.ts) || 0, text: x.text }));
+      }
+    } catch (e) { /* 不是 JSON → 按纯文本处理 */ }
+  }
+  return [{ ts: 0, text: t }];
+}
+function journalItems(date) { return parseJournalContent(Store.get('journal', {})[date]); }
+function journalPayload(date) {
+  const items = journalItems(date);
+  return items.length ? JSON.stringify(items) : '';
+}
+// 纯文本视图：历史归档、导出用它
+function journalPlainText(date) { return journalItems(date).map(x => x.text).join('\n'); }
+
+function setJournalItems(date, items) {
+  const j = Store.get('journal', {});
+  j[date] = items;
+  Store.set('journal', j);
   stampJournalMeta(date, Date.now());
-  scheduleJournalSync(date, val); // 配置了后端则 1s 防抖后同步
+  scheduleJournalSync(date, JSON.stringify(items));
+}
+
+function journalTimeLabel(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function escJournalText(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function addJournalItem() {
+  const el = document.getElementById('daily-journal');
+  const text = ((el && el.value) || '').trim();
+  if (!text) { if (el) el.focus(); return; }
+  const date = TODAY();
+  const items = journalItems(date);
+  items.push({ ts: Date.now(), text: text });
+  setJournalItems(date, items);
+  if (el) { el.value = ''; el.focus(); }
+  renderJournalToday();
+  showToast('记下了', 'success');
+}
+
+function removeJournalItem(i) {
+  const date = TODAY();
+  const items = journalItems(date);
+  items.splice(i, 1);
+  setJournalItems(date, items);
+  renderJournalToday();
+}
+
+function renderJournalToday() {
+  const items = journalItems(TODAY());
+  const cnt = document.getElementById('journal-today-count');
+  if (cnt) cnt.textContent = items.length ? items.length + ' 条' : '';
+  const list = document.getElementById('journal-today-list');
+  if (!list) return;
+  list.innerHTML = items.map((it, i) =>
+    '<div style="display:flex;gap:8px;align-items:baseline;">' +
+      '<span style="color:var(--text-dim);font-size:0.7rem;flex:none;font-family:var(--font-mono);">' + journalTimeLabel(it.ts) + '</span>' +
+      '<span style="flex:1;min-width:0;white-space:pre-wrap;word-break:break-word;">' + escJournalText(it.text) + '</span>' +
+      '<button class="btn btn-sm" onclick="removeJournalItem(' + i + ')" style="padding:0 7px;font-size:0.7rem;flex:none;">×</button>' +
+    '</div>').join('');
 }
 
 // === 日记后端（server/ 目录，Express + SQLite）===
@@ -2259,14 +2357,13 @@ function scheduleJournalSync(date, content) {
   _journalSyncTimer = setTimeout(() => pushJournalEntry(date, content), 1000);
 }
 
-// 采用服务端版本（冲突时服务端更新）：写回本地 + 更新 meta + 刷新输入框
+// 采用服务端版本（冲突时服务端更新）：写回本地 + 更新 meta + 刷新今日列表
 function adoptServerEntry(date, entry) {
   const journal = Store.get('journal', {});
-  journal[date] = entry.content;
+  journal[date] = parseJournalContent(entry.content);
   Store.set('journal', journal);
   stampJournalMeta(date, Number(entry.updatedAt) || Date.now());
-  const el = document.getElementById('daily-journal');
-  if (el && date === TODAY()) el.value = entry.content;
+  if (date === TODAY()) renderJournalToday();
 }
 
 async function pushJournalEntry(date, content) {
@@ -2337,7 +2434,7 @@ async function syncJournalAll() {
       const s = server[d];
       const serverTs = s ? (Number(s.client_ts) || 0) : 0;
       const localTs = Number(meta[d]) || 0;
-      const localContent = typeof local[d] === 'string' ? local[d] : '';
+      const localContent = journalPayload(d);
       if (s && serverTs > localTs) { adoptServerEntry(d, { content: s.content, updatedAt: serverTs }); pulled++; }
       else if (localTs > serverTs && localContent.trim()) { await pushJournalEntry(d, localContent); pushed++; }
     }
@@ -2417,7 +2514,7 @@ async function importJournalToServer() {
   const entries = Object.entries(j)
     .map(([date, v]) => ({
       date,
-      content: typeof v === 'string' ? v : (v && v.text) || '',
+      content: journalPayload(date),
       updatedAt: Number(meta[date]) || Date.now()
     }))
     .filter(e => e.content.trim());
@@ -2472,7 +2569,7 @@ async function renderJournalArchive() {
 }
 function localJournalEntries() {
   const j = Store.get('journal', {});
-  return Object.entries(j).map(([date, v]) => ({ date, content: typeof v === 'string' ? v : (v && v.text) || '' }));
+  return Object.entries(j).map(([date, v]) => ({ date: date, content: journalPlainText(date) }));
 }
 function renderJournalArchiveList(el, entries) {
   if (!entries.length) { el.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:8px;">这个月还没有日记，去「今日」写一篇吧</div>'; return; }
@@ -2527,7 +2624,6 @@ function collectWeekData(range) {
   while (d <= end) { dates.push(localDate(d)); d.setDate(d.getDate() + 1); }
 
   const dailyLog = Store.get('dailyLog', {});
-  const journal = Store.get('journal', {});
   const WD = ['日','一','二','三','四','五','六'];
 
   const days = dates.map(date => {
@@ -2535,8 +2631,7 @@ function collectWeekData(range) {
     const txns = (Store.get('wallet', { transactions: [] }).transactions || []).filter(t => dateOf(t.date) === date);
     const expense = txns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     const incomeTx = txns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-    let diary = journal[date] || '';
-    if (typeof diary !== 'string') diary = diary.text || '';
+    let diary = journalPlainText(date);
     if (diary.length > 1200) diary = diary.slice(0, 1200) + '…(截断)';
     return {
       date, weekday: '周' + WD[new Date(date + 'T00:00:00').getDay()],
@@ -3222,13 +3317,12 @@ function filterHistory(filter) {
 function renderHistory() {
   const dailyLog = Store.get('dailyLog', {});
   const wallet = Store.get('wallet', { transactions: [] });
-  const journal = Store.get('journal', {});
   const completionLog = Store.get('completionLog', {});
 
   // Collect all dates that have any data
   const allDates = new Set();
   Object.keys(dailyLog).forEach(d => allDates.add(d));
-  Object.keys(journal).forEach(d => { if (journal[d]?.trim()) allDates.add(d); });
+  Object.keys(Store.get('journal', {})).forEach(d => { if (journalPlainText(d)) allDates.add(d); });
   Object.keys(completionLog).forEach(d => allDates.add(d));
   (wallet.transactions || []).forEach(t => { const dd = dateOf(t.date); if (dd) allDates.add(dd); });
 
@@ -3237,7 +3331,7 @@ function renderHistory() {
 
   if (_historyFilter === 'calories') dates = dates.filter(d => dailyLog[d]?.meals?.length > 0);
   else if (_historyFilter === 'expense') dates = dates.filter(d => (wallet.transactions||[]).some(t => dateOf(t.date) === d && t.type === 'expense'));
-  else if (_historyFilter === 'journal') dates = dates.filter(d => journal[d]?.trim());
+  else if (_historyFilter === 'journal') dates = dates.filter(d => journalPlainText(d));
 
   // Update header
   document.getElementById('history-year').textContent = new Date().getFullYear();
@@ -3269,13 +3363,8 @@ function renderHistory() {
     const dayExp = (wallet.transactions||[]).filter(t => dateOf(t.date) === date && t.type === 'expense').reduce((s,t) => s + t.amount, 0);
 
     // Journal preview
-    const journalText = journal[date] || '';
+    const journalText = journalPlainText(date);
     const journalPreview = journalText.length > 30 ? journalText.slice(0, 30) + '...' : journalText;
-
-    // Time alloc summary
-    const time = timeAlloc[date] || {};
-    const totalMins = Object.values(time).reduce((s,v) => s + v, 0);
-    const timeStr = totalMins > 0 ? `${Math.floor(totalMins/60)}h${totalMins%60}m` : '';
 
     return `<div class="card" style="padding:12px;margin-bottom:10px;cursor:pointer;" onclick="showDayDetail('${date}')">
       <div style="display:flex;gap:12px;align-items:flex-start;">
@@ -3286,10 +3375,8 @@ function renderHistory() {
         <div style="flex:1;min-width:0;">
           <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:0.78rem;color:var(--text-secondary);margin-bottom:4px;">
             ${tasksDone > 0 ? `<span>✅ ${tasksDone}项任务</span>` : ''}
-            ${habitDone > 0 ? `<span>🎯 ${habitDone}/${habitTotal}习惯</span>` : ''}
             ${kcal > 0 ? `<span>🍽️ ${kcal}kcal</span>` : ''}
             ${dayExp > 0 ? `<span style="color:var(--expense);">💰 ¥${dayExp.toFixed(0)}</span>` : ''}
-            ${timeStr ? `<span>⏱️ ${timeStr}</span>` : ''}
           </div>
           ${journalPreview ? `<div style="font-size:0.8rem;color:var(--text-dim);line-height:1.4;margin-top:4px;">${journalPreview}</div>` : ''}
         </div>
@@ -3313,7 +3400,7 @@ function showDayDetail(date) {
   // Meals
   const meals = dailyLog[date]?.meals || [];
   if (meals.length > 0) {
-    const mealStr = meals.map(m => `${m.name}(${m.kcal}kcal)`).join(', ');
+    const mealStr = meals.map(m => m.kcal ? `${m.name}(${m.kcal}kcal)` : m.name).join(', ');
     details.push(`🍽️ 饮食: ${mealStr}`);
     details.push(`   合计: ${dailyLog[date].totalKcal}kcal`);
   }
@@ -3328,8 +3415,8 @@ function showDayDetail(date) {
   }
 
   // Journal
-  const j = journal[date];
-  if (j?.trim()) details.push(`📝 日记: ${j}`);
+  const j = journalPlainText(date);
+  if (j.trim()) details.push(`📝 日记: ${j}`);
 
   prompt(label, details.join('\n'));
 }
