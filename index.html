@@ -2529,25 +2529,9 @@ function renderDailyHub() {
 
   // ⑧ Journal（随手记）
   renderJournalToday();
-  // 谁的改动更新就用谁的：服务端更新 → 采纳；本机更新（或服务端还没有这天）→ 推上去。
-  // 这里比的是时间戳而不是字符串，否则本机较新的内容会被服务端旧版盖掉。
-  if (journalApiOn()) {
-    const localTs = Number(journalMeta()[today]) || 0;
-    const localContent = journalPayload(today);
-    const { base } = journalApiCfg();
-    fetch(`${base}/api/entries/${today}`, { headers: journalHeaders() })
-      .then(r => r.ok ? r.json() : null)
-      .then(e => {
-        const serverContent = (e && typeof e.content === 'string') ? e.content : null;
-        const serverTs = serverContent !== null ? (Number(e.client_ts) || 0) : 0;
-        if (serverContent !== null && serverTs > localTs) {
-          adoptServerEntry(today, { content: serverContent, updatedAt: serverTs });
-          return;
-        }
-        if (localTs > serverTs && localContent) pushJournalEntry(today, localContent);
-      })
-      .catch(() => {});
-  }
+  // 日记与服务端对账交给 syncJournalToday()（带节流）：
+  // 不再每次 renderDailyHub（也就是每次 renderAll）都打服务器，避免冗余请求与竞态。
+  if (journalApiOn()) syncJournalToday();
   updateJournalSyncHint();
 }
 
@@ -2953,6 +2937,33 @@ async function syncJournalAll() {
   } catch (e) { return { ok: false, error: e.message }; }
 }
 
+// 今日日记与服务端的轻量对账：带 30s 节流，避免每次 renderAll 都发请求（也避免快速操作下的竞态）。
+// 首次全量对齐仍由 syncJournalAll() 负责（启动 + 手动同步时各调一次）。
+let _journalSyncLock = 0;
+async function syncJournalToday() {
+  const now = Date.now();
+  if (now - _journalSyncLock < 30000) return;   // 30s 内不重复请求
+  _journalSyncLock = now;
+  if (!journalApiOn()) return;
+  const today = TODAY();
+  const localTs = Number(journalMeta()[today]) || 0;
+  const localContent = journalPayload(today);
+  const { base } = journalApiCfg();
+  try {
+    const r = await fetch(`${base}/api/entries/${today}`, { headers: journalHeaders() });
+    if (!r.ok) return;
+    const e = await r.json();
+    const serverContent = (e && typeof e.content === 'string') ? e.content : null;
+    const serverTs = serverContent !== null ? (Number(e.client_ts) || 0) : 0;
+    if (serverContent !== null && serverTs > localTs) {
+      adoptServerEntry(today, { content: serverContent, updatedAt: serverTs });
+      renderJournalToday();
+      return;
+    }
+    if (localTs > serverTs && localContent) pushJournalEntry(today, localContent);
+  } catch (e) { /* 离线/失败静默，下次再试 */ }
+}
+
 // 日记同步状态提示（常驻一行，不靠一闪而过的 toast）
 function updateJournalSyncHint() {
   const el = document.getElementById('journal-sync-hint');
@@ -3153,7 +3164,11 @@ function collectWeekData(range) {
     };
   });
 
-  const tasks = getTasks().filter(t => t.status === 'completed' && (t.completedAt || '').slice(0, 10) >= range.start && (t.completedAt || '').slice(0, 10) <= range.end);
+  // 已完成任务标题：从 completedArchive（按天归档）取，而非当前 tasks 数组——
+  // completeTask 会清掉更早的已完成周期实例，直接读 tasks 会漏掉本周早几天的。
+  const arch = Store.get('completedArchive', {});
+  const completedTitles = [];
+  dates.forEach(date => { (arch[date] || []).forEach(t => completedTitles.push(t)); });
   const cat = {};
   (Store.get('wallet', { transactions: [] }).transactions || []).forEach(t => {
     const dd = dateOf(t.date);
@@ -3163,7 +3178,7 @@ function collectWeekData(range) {
   });
   const incomeTotal = days.reduce((s, x) => s + x.income, 0);
   const expenseTotal = days.reduce((s, x) => s + x.expense, 0);
-  return { range: `${range.start} ~ ${range.end}`, days, completedTasks: tasks.map(t => t.title).slice(0, 40), expenseByCategory: cat, incomeTotal: Math.round(incomeTotal * 10) / 10, expenseTotal: Math.round(expenseTotal * 10) / 10 };
+  return { range: `${range.start} ~ ${range.end}`, days, completedTasks: completedTitles.slice(0, 40), expenseByCategory: cat, incomeTotal: Math.round(incomeTotal * 10) / 10, expenseTotal: Math.round(expenseTotal * 10) / 10 };
 }
 
 async function generateWeeklyReport() {
@@ -3257,6 +3272,15 @@ function deleteAiReport(id) {
 }
 
 // --- Tab Switch Helper ---
+// 导航只渲染目标面板（启动时的 renderAll 已把所有面板渲染过一次，数据变更路径也都各自
+// 触发 renderAll / 具体 render，所以切 tab 不必每次全量重渲——避免移动端卡顿与冗余服务端请求）。
+function renderPanel(name) {
+  if (name === 'daily') { renderDailyHub(); }
+  else if (name === 'courses') { renderCourses(); renderNextClassBanner(); renderScheduleModeButtons(); }
+  else if (name === 'data') { renderWallet(); renderInvestJournal(); renderHistory(); renderJournalArchive(); }
+  else if (name === 'settings') { renderSettings(); renderAiWeek(); }
+}
+
 function switchTab(panel) {
   document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
   const btn = document.querySelector(`.tab-item[data-panel="${panel}"]`);
@@ -3264,7 +3288,7 @@ function switchTab(panel) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   const target = document.getElementById('panel-' + panel);
   if (target) target.classList.add('active');
-  renderAll();
+  renderPanel(panel);
 }
 
 function showPanel(id) {
@@ -3346,6 +3370,14 @@ function completeTask(id) {
   log[today] = (log[today] || 0) + 1;
   Store.set('completionLog', log);
 
+  // 完成标题归档：周期任务完成后只会保留「今天」那条实例（更早的同系列实例会被
+  // completeTask 清掉），直接读 tasks 数组会漏掉本周早几天的周期任务。这里按天记下标题，
+  // 让 AI 周报的「完成情况」能完整反映整周，且不改现有 tasks/completionLog 结构。
+  const arch = Store.get('completedArchive', {});
+  arch[today] = arch[today] || [];
+  arch[today].push(task.title);
+  Store.set('completedArchive', arch);
+
   // Update profile
   const profile = Store.get('profile');
   profile.totalCompleted = (profile.totalCompleted || 0) + 1;
@@ -3381,6 +3413,7 @@ function completeTask(id) {
     recurringMsg = '，下一期已排到 ' + next.availableFrom;
   }
 
+  updateStreak();   // 完成当天首个任务后立即刷新连续天数，不必等刷新页面
   showToast('✓ 任务完成' + recurringMsg, 'success');  renderAll();
 }
 
@@ -5500,7 +5533,13 @@ const SCHEDULE_OVERRIDES = [
   { day:'星期六', section:3, name:'操作系统', location:'知行楼309', weeks:[5] }
 ];
 
-function getCourses() { return Store.get('courses', DEFAULT_COURSES).concat(SCHEDULE_OVERRIDES); }
+let _coursesCache = null, _coursesCacheKey = '';
+function getCourses() {
+  const src = Store.get('courses', DEFAULT_COURSES);
+  const key = JSON.stringify(src);
+  if (key !== _coursesCacheKey) { _coursesCacheKey = key; _coursesCache = src.concat(SCHEDULE_OVERRIDES); }
+  return _coursesCache;
+}
 
 // 按任意日期算学期周次（明天/下周可能跨周，必须带日期参数）
 function weekForDate(date) {
@@ -5715,13 +5754,24 @@ function renderNextClassBanner() {
 function importCourses() {
   const input = prompt('粘贴课表 JSON 数组以覆盖现有课表：\n格式：[{"day":"星期一","section":1,"name":"课程名","location":"地点","weeks":[1,2,3]}]');
   if (!input) return;
+  let arr;
   try {
-    const arr = JSON.parse(input);
-    if (!Array.isArray(arr)) throw 0;
-    Store.set('courses', arr);
-    renderCourses(); renderNextClassBanner();
-    showToast('课表已更新，共 ' + arr.length + ' 条', 'success');
-  } catch (e) { showToast('JSON 解析失败，请检查格式', 'error'); }
+    arr = JSON.parse(input);
+    if (!Array.isArray(arr)) throw new Error('not array');
+  } catch (e) { showToast('JSON 解析失败，请检查格式', 'error'); return; }
+  // 逐条校验必填字段，缺字段整体拒绝（避免坏数据让课表渲染异常或消失）
+  const VALID_DAYS = ['星期一','星期二','星期三','星期四','星期五','星期六','星期日'];
+  for (const [i, c] of arr.entries()) {
+    if (!c || typeof c !== 'object') { showToast('第 ' + (i + 1) + ' 条不是对象', 'error'); return; }
+    if (!VALID_DAYS.includes(c.day)) { showToast('第 ' + (i + 1) + ' 条 day 非法：' + JSON.stringify(c.day), 'error'); return; }
+    if (!(Number.isInteger(c.section) && c.section >= 1 && c.section <= 12)) { showToast('第 ' + (i + 1) + ' 条 section 需为 1-12 整数', 'error'); return; }
+    if (typeof c.name !== 'string' || !c.name.trim()) { showToast('第 ' + (i + 1) + ' 条 name 不能为空', 'error'); return; }
+    if (!Array.isArray(c.weeks) || !c.weeks.length) { showToast('第 ' + (i + 1) + ' 条 weeks 需为非空数组', 'error'); return; }
+  }
+  if (!confirm('将用这 ' + arr.length + ' 条课表覆盖现有课表，确定？（可先备份）')) return;
+  Store.set('courses', arr);
+  renderCourses(); renderNextClassBanner(); renderScheduleModeButtons();
+  showToast('课表已更新，共 ' + arr.length + ' 条', 'success');
 }
 
 // 设置作息季节：'auto' 跟随日期，'summer'/'standard' 手动锁定
@@ -5877,14 +5927,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   safe('新容器引导', updateFirstRunBanner);
 });
 
-// Auto-refresh daily at midnight
+// 跨日自动刷新：用「上次渲染日期」判跨日，而非死等 00:00 这一分钟
+// （标签页后台节流时可能错过该分钟 → 当日不刷新）。跨日才触发一次。
+let _lastRenderedDate = localDate();
 setInterval(() => {
-  const now = new Date();
-  if (now.getHours() === 0 && now.getMinutes() === 0) {
+  const today = TODAY();
+  if (today !== _lastRenderedDate) {
+    _lastRenderedDate = today;
     updateStreak();
     renderAll();
   }
 }, 60000);
+
+// 日记空闲时定时对账（60s），覆盖「页面开着但没触发 renderAll」的场景
+setInterval(() => { if (journalApiOn()) syncJournalToday(); }, 60000);
 
 console.log('%c NEXUS CORE v2.0 %c 任务核心系统已就绪 ',
   'background:#0d0f13;color:#6c9bff;font-size:16px;padding:8px;',

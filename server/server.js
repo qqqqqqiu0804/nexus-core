@@ -166,15 +166,21 @@ app.put('/api/entries/:date', wrap(req => {
   if (!DATE_RE.test(date)) throw new Error('日期格式应为 YYYY-MM-DD');
   const content = String(req.body?.content ?? '');
   const clientTs = Number(req.body?.updatedAt) || Date.now();
-  const cur = stmts.get.get(date);
-  if (cur && cur.client_ts > clientTs) {
-    return {
-      ok: true, conflict: true,
-      entry: { date: cur.date, content: cur.content, chars: cur.chars, updatedAt: cur.client_ts }
-    };
-  }
-  const info = stmts.upsert.run(date, content, content.length, clientTs);
-  return { ok: true, changes: Number(info.changes), updatedAt: clientTs };
+  // 读-改-写在事务内完成：同一天并发写入时不会再出现「读到旧值→覆盖掉另一端的更新」。
+  db.exec('BEGIN');
+  try {
+    const cur = stmts.get.get(date);
+    if (cur && cur.client_ts > clientTs) {
+      db.exec('COMMIT');
+      return {
+        ok: true, conflict: true,
+        entry: { date: cur.date, content: cur.content, chars: cur.chars, updatedAt: cur.client_ts }
+      };
+    }
+    const info = stmts.upsert.run(date, content, content.length, clientTs);
+    db.exec('COMMIT');
+    return { ok: true, changes: Number(info.changes), updatedAt: clientTs };
+  } catch (e) { db.exec('ROLLBACK'); throw e; }
 }));
 
 // DELETE /api/entries/:date

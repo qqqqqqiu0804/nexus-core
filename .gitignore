@@ -19,3 +19,6 @@ server/journal.db
 server/journal.db-wal
 server/journal.db-shm
 server/data/
+
+# 本地数据库 / 文件备份（修复前快照，不入库）
+.backup-db/
