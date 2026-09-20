@@ -811,11 +811,16 @@ button:focus-visible { box-shadow: var(--ring); }
       <div class="wallet-balance-label">可用现金</div>
       <div class="wallet-balance-amount" id="wallet-balance" style="cursor:pointer;" onclick="setWalletCash()" title="点一下调整">¥ 0.00</div>
       <div style="font-size:0.66rem;color:var(--text-dim);">支付宝余额 · 余额宝 · 银行卡 · 微信零钱</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border-subtle);cursor:pointer;"
-           onclick="setWalletInvest()" title="点一下调整">
-        <span style="font-size:0.72rem;color:var(--text-dim);">投资市值</span>
-        <span id="wallet-invest" style="font-size:0.9rem;color:var(--text-secondary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;">¥ 0.00</span>
-        <span style="font-size:0.6rem;color:var(--text-dim);">✎</span>
+      <!-- 投资市值 = 台账里所有持仓的市值之和（点进去看明细 / 收益率 / 回本还差多少）。
+           以前这里是个手填的数字，回答不了"赚了还是亏了"；现在改成台账汇总。 -->
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-subtle);cursor:pointer;"
+           onclick="openInvest()" title="看明细 · 收益率 · 还差多少回本">
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
+          <span style="font-size:0.72rem;color:var(--text-dim);">投资市值</span>
+          <span id="wallet-invest" style="font-size:0.9rem;color:var(--text-secondary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;">¥ 0.00</span>
+          <span style="font-size:0.7rem;color:var(--text-dim);">›</span>
+        </div>
+        <div id="wallet-invest-sub" style="font-size:0.68rem;color:var(--text-dim);margin-top:5px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;"></div>
       </div>
     </div>
 
@@ -1288,6 +1293,76 @@ button:focus-visible { box-shadow: var(--ring); }
   </div>
 </div>
 
+<!-- 投资台账（浮层）：回答三个问题 —— 赚了多少 / 亏了多少 / 还差多少回本。
+     和 task-overlay 一样必须在 .panel 外面（.panel 是 display:none）。 -->
+<div id="invest-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:var(--bg-deep);overflow-y:auto;-webkit-overflow-scrolling:touch;">
+  <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
+    <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
+      <span style="font-size:1.1rem;">📈</span>
+      <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">投资台账</span>
+      <button class="btn btn-sm" id="invest-refresh-btn" onclick="refreshQuotes(true)">刷新行情</button>
+      <button class="btn btn-sm" onclick="closeInvest()">✕</button>
+    </div>
+    <div id="invest-summary"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px;">
+      <span class="section-title">◆ 持仓明细</span>
+      <button class="btn btn-sm btn-primary" onclick="openInvestEdit(null)">+ 添加持仓</button>
+    </div>
+    <div id="invest-list"></div>
+    <div id="invest-quote-note" style="font-size:0.66rem;color:var(--text-dim);margin-top:16px;line-height:1.8;"></div>
+  </div>
+</div>
+
+<!-- 持仓编辑弹窗。z-index 300 > 浮层 200，否则从浮层里打开会被浮层盖住 -->
+<div class="modal-overlay" id="invest-edit-modal">
+  <div class="modal">
+    <div class="modal-title" id="invest-edit-title">添加持仓</div>
+
+    <div style="margin-bottom:12px;">
+      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">名称</label>
+      <input id="inv-name" placeholder="例：华安黄金ETF联接C" style="width:100%;">
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">类型</label>
+      <select id="inv-type" onchange="investFormTypeChanged()" style="width:100%;">
+        <option value="fund">场外基金（支付宝 / 理财通里买的基金）</option>
+        <option value="gold">黄金 / 积存金（按克算）</option>
+        <option value="money">货币基金 / 零钱通（净值恒为 1）</option>
+        <option value="other">银行理财 / 其他（没有公开行情）</option>
+      </select>
+    </div>
+
+    <div id="inv-code-row" style="margin-bottom:12px;">
+      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">基金代码（6 位数字）</label>
+      <input id="inv-code" placeholder="例：000217" inputmode="numeric" maxlength="6" style="width:100%;">
+      <div style="font-size:0.66rem;color:var(--text-dim);margin-top:4px;">填了代码才能每天自动更新市值</div>
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">现在值多少钱（持有金额）</label>
+      <input type="number" id="inv-value" placeholder="例：4120.30" inputmode="decimal" step="0.01" style="width:100%;">
+      <div style="font-size:0.66rem;color:var(--text-dim);margin-top:4px;">就是产品页面上那个「持有金额」，照抄</div>
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">持仓收益（可选）</label>
+      <input type="number" id="inv-profit" placeholder="例：-379.70（亏了就填负数）" inputmode="decimal" step="0.01" style="width:100%;">
+      <div id="inv-profit-hint" style="font-size:0.66rem;color:var(--text-dim);margin-top:4px;line-height:1.6;"></div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">备注（可选）</label>
+      <input id="inv-note" placeholder="例：2025 年 3 月开始定投" style="width:100%;">
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="closeInvestEdit()">取消</button>
+      <button class="btn btn-primary" onclick="submitInvestEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toast-container"></div>
 
@@ -1318,10 +1393,13 @@ const Store = {
 const SYNC_KEYS = [
   'tasks', 'wallet', 'courses', 'completionLog', 'dailyLog',
   'dailyTemplates', 'profile', 'aiReports', 'aiModel',
-  'investJournal', 'scheduleOverride', 'budget', 'inspirations', 'videos'
+  'investJournal', 'scheduleOverride', 'budget', 'inspirations', 'videos',
+  'investments'
 ];
 // 注意 journal（日记）**不在**白名单：它由日记 API + 服务器 SQLite 负责，
 // 两个通道同时写同一条数据会互相覆盖。
+// investQuotes（行情缓存）也不在白名单：它是随时可重新拉取的公共数据，
+// 同步过去只会让两台设备互相覆盖，还会把日志表撑大。
 
 // 导出/导入时跳过的键（连接配置与内部标记，不属于「数据」）
 const SYNC_SKIP_KEYS = [
@@ -3472,10 +3550,9 @@ function renderWallet() {
   if (whenEl && !whenEl.value) whenEl.value = localStamp().slice(0, 16);
   const wallet = loadWallet();
 
-  // 现金（记账会自动加减）与投资（手动更新）分开显示 —— 点数字即可调整
+  // 现金（记账会自动加减）与投资（台账汇总）分开显示
   document.getElementById('wallet-balance').textContent = '¥ ' + (Number(wallet.cash) || 0).toFixed(2);
-  const investEl = document.getElementById('wallet-invest');
-  if (investEl) investEl.textContent = '¥ ' + (Number(wallet.invest) || 0).toFixed(2);
+  renderWalletInvest();
 
   // Stats
   const now = new Date();
@@ -3847,16 +3924,500 @@ function setWalletCash() {
   showToast('可用现金已设为 ¥' + val.toFixed(2), 'success');
 }
 
-function setWalletInvest() {
-  const w = loadWallet();
-  const input = prompt('投资市值 —— 支付宝黄金 + 支付宝基金 + 微信理财通', w.invest || '');
-  if (input === null) return;
-  const val = parseFloat(input);
-  if (isNaN(val)) { showToast('请输入有效数字', 'warning'); return; }
-  w.invest = val;
-  Store.set('wallet', w);
-  renderWallet();
-  showToast('投资市值已设为 ¥' + val.toFixed(2), 'success');
+// ===== 投资台账 =====
+// 起因：理财 App 大多只给一个「持有金额」，看不到份额，于是"我到底赚了还是亏了、
+// 还差多少回本"只能靠感觉。这个台账专门回答这三个问题。
+//
+// 关键认知：算收益率和回本**不需要份额**，只要两个数 ——
+//   现在值多少（持有金额） ＋ 这钱里投入了多少（成本）
+//   成本 = 持有金额 − 持仓收益        ← 产品页面上两个数字一减就有
+// 份额只用来「以后自动更新市值」：份额 = 持有金额 ÷ 当日净值，反推就行，不用自己算。
+//
+// 市值怎么来：
+//   fund  场外基金      份额 × 最新净值（东方财富，收盘后更新）
+//   gold  黄金 / 积存金  克数 × 上金所 Au99.99 收盘价
+//   money 货币基金       净值恒为 1，直接记金额
+//   other 银行理财等     手动填的金额
+//
+// 「还要几天回本」是**数学外推**，不是预测 —— 拿近 30 个交易日的日均涨跌往前推。
+// 过去涨不代表以后还涨，所以这一行永远带「外推」两个字，不能写成承诺。
+
+function loadInvestments() {
+  const v = Store.get('investments', null);
+  return Array.isArray(v) ? v : [];
+}
+function saveInvestments(items) { Store.set('investments', items); }
+
+// 行情缓存只存本机（不进 SYNC_KEYS）：它是随时能重拉的公共数据，
+// 同步过去只会让两台设备互相覆盖。
+function loadQuotes() {
+  const q = Store.get('investQuotes', null);
+  if (!q || typeof q !== 'object') return { funds: {}, gold: null, fetchedAt: 0 };
+  return { funds: q.funds || {}, gold: q.gold || null, fetchedAt: q.fetchedAt || 0 };
+}
+function saveQuotes(q) { Store.set('investQuotes', q); }
+
+const QUOTE_TTL = 30 * 60 * 1000;   // 半小时内不重复拉，避免每次点开都打接口
+function quotesStale() { return Date.now() - (loadQuotes().fetchedAt || 0) > QUOTE_TTL; }
+
+function fmtAmount(n) {
+  const v = Number(n) || 0;
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtPct(r) { return (r * 100).toFixed(2) + '%'; }
+
+// 盈亏的上色和正负号。不赚不亏（货币基金那种）用中性灰、不带符号 ——
+// 否则「+¥0.00」显示成绿色，看着像赚了。
+function profitTone(profit) {
+  if (!(Math.abs(profit) >= 0.005)) return { color: 'var(--text-dim)', sign: '' };
+  return profit > 0
+    ? { color: 'var(--success)', sign: '+' }
+    : { color: 'var(--expense)', sign: '−' };
+}
+
+// 拉行情。extraCodes 给「正在新增、还没入库」的基金代码用 ——
+// 不然刚填的代码不在台账里，就拉不到净值、也就反推不出份额。
+async function fetchQuotes(manual, extraCodes) {
+  const items = loadInvestments();
+  const codes = [...new Set(
+    items.filter(i => i.type === 'fund' && /^\d{6}$/.test(i.code || '')).map(i => i.code)
+      .concat(extraCodes || [])
+  )];
+  const wantGold = items.some(i => i.type === 'gold') || (extraCodes || []).indexOf('gold') >= 0;
+  const btn = document.getElementById('invest-refresh-btn');
+
+  if (!codes.length && !wantGold) {
+    if (manual) showToast('没有需要联网更新的持仓（只有基金和黄金能自动更新）', 'info');
+    return;
+  }
+  if (!serverConfigured()) {
+    if (manual) showToast('先到「我的」里填服务器地址和 token', 'warning');
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = '刷新中…'; }
+  try {
+    const url = `${serverCfg().base}/api/quotes?funds=${codes.join(',')}&gold=${wantGold ? 1 : 0}`;
+    const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + serverCfg().token } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+
+    // 合并而不是覆盖：某个代码这次没取到（数据源偶发抽风）时，保留上一次的值继续用，
+    // 总比整块变空白强。
+    const prev = loadQuotes();
+    const funds = Object.assign({}, prev.funds);
+    Object.keys(j.funds || {}).forEach(k => { funds[k] = j.funds[k]; });
+    saveQuotes({
+      funds,
+      gold: (j.gold && j.gold.price) ? j.gold : prev.gold,
+      fetchedAt: Date.now()
+    });
+
+    if (manual) {
+      const bad = (j.errors || []).length;
+      if (bad) showToast(`已更新，但有 ${bad} 个代码没取到`, 'warning');
+      else showToast('行情已更新', 'success');
+    }
+  } catch (e) {
+    if (manual) showToast('行情没取到：' + e.message, 'warning');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '刷新行情'; }
+    renderWalletInvest();
+    const ov = document.getElementById('invest-overlay');
+    if (ov && ov.style.display === 'block') renderInvest();
+  }
+}
+
+// 单个持仓的当前状况。这是整个模块的心脏，所有页面都从它拿数。
+function computeHolding(it, quotes) {
+  const cost = Number(it.cost) || 0;
+  let value = Number(it.marketValue) || 0;     // 兜底：建档时抄下来的持有金额
+  let priceNow = null, priceDate = null, live = false;
+
+  if (it.type === 'fund' && it.code) {
+    const q = quotes.funds && quotes.funds[it.code];
+    if (q && q.nav > 0) { priceNow = q.nav; priceDate = q.navDate; live = true; }
+  } else if (it.type === 'gold') {
+    const g = quotes.gold;
+    if (g && g.price > 0) { priceNow = g.price; priceDate = g.priceDate || g.asOf; live = true; }
+  }
+
+  // 有行情、也有份额 → 用份额 × 现价；否则退回建档时的金额
+  if (live && it.shares > 0) value = it.shares * priceNow;
+
+  const profit = value - cost;
+  const rate = cost > 0 ? profit / cost : null;
+  const need = cost - value;                    // > 0 说明还亏着
+  const needPct = value > 0 ? need / value : null;
+
+  let days = null;
+  if (need > 0 && live) {
+    const trend = it.type === 'gold'
+      ? ((quotes.gold && quotes.gold.trend) || [])
+      : (((quotes.funds && quotes.funds[it.code]) || {}).trend || []);
+    days = estDaysToBreakeven(trend, needPct);
+  }
+
+  return { value, cost, profit, rate, need, needPct, days, priceNow, priceDate, live };
+}
+
+// 「照这个速度还要几天回本」—— 纯数学外推。
+// 做法：拿近 30 个交易日的价格算日均涨跌幅（按复利），再解出涨够 needPct 要多少天。
+// 返回：null = 数据不够，这行不显示；-1 = 近期是跌的，谈不上"还有几天"；正数 = 交易日数。
+function estDaysToBreakeven(trend, needPct) {
+  if (!Array.isArray(trend) || trend.length < 10) return null;
+  if (!(needPct > 0)) return 0;
+
+  const win = Math.min(30, trend.length - 1);
+  const a = Number(trend[trend.length - 1 - win][1]);
+  const b = Number(trend[trend.length - 1][1]);
+  if (!(a > 0) || !(b > 0)) return null;
+
+  const dailyRate = Math.pow(b / a, 1 / win) - 1;
+  if (!(dailyRate > 0)) return -1;
+
+  const n = Math.log(1 + needPct) / Math.log(1 + dailyRate);
+  if (!isFinite(n) || n <= 0) return null;
+  return Math.ceil(n);
+}
+
+function investSummary(items, quotes) {
+  let value = 0, cost = 0;
+  items.forEach(it => { const c = computeHolding(it, quotes); value += c.value; cost += c.cost; });
+  const profit = value - cost;
+  return { value, cost, profit, rate: cost > 0 ? profit / cost : null, need: cost - value };
+}
+
+// 钱包卡片上那一行「投资市值」+ 下面那行小字（盈亏 / 还差多少回本）
+function renderWalletInvest() {
+  const el = document.getElementById('wallet-invest');
+  if (!el) return;
+  const sub = document.getElementById('wallet-invest-sub');
+  const items = loadInvestments();
+
+  if (!items.length) {
+    // 还没建台账：退回旧的手填值，别让卡片空着
+    const w = loadWallet();
+    el.textContent = '¥ ' + fmtAmount(w.invest);
+    if (sub) sub.textContent = '点这里建立投资台账，看收益率和回本';
+    return;
+  }
+
+  const s = investSummary(items, loadQuotes());
+  el.textContent = '¥ ' + fmtAmount(s.value);
+  if (!sub) return;
+
+  if (s.cost <= 0) { sub.textContent = items.length + ' 笔持仓 · 点开看明细'; return; }
+
+  const tone = profitTone(s.profit);
+  let txt = `<span style="color:${tone.color};">${tone.sign}¥${fmtAmount(Math.abs(s.profit))}（${tone.sign}${fmtPct(Math.abs(s.rate))}）</span>`;
+  if (s.need > 0 && s.value > 0) {
+    txt += ` <span style="color:var(--expense);">· 还差 ¥${fmtAmount(s.need)} 回本</span>`;
+  }
+  sub.innerHTML = txt + `<br><span style="color:var(--text-dim);">${items.length} 笔持仓 · 点开看明细</span>`;
+}
+
+// ---------- 台账浮层 ----------
+
+function openInvest() {
+  migrateLegacyInvest();
+
+  document.getElementById('invest-overlay').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  renderInvest();
+  if (quotesStale()) fetchQuotes(false);
+}
+
+function closeInvest() {
+  document.getElementById('invest-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+  renderWalletInvest();
+}
+
+// 旧结构迁移：早先「投资市值」是一个手填的数字，没有任何明细。
+// 这里把它转成一条「未分类投资」，用户点「改」就能拆成具体持仓。
+// 只在台账为空时做，所以是幂等的；金额为 0 就不建占位记录。
+function migrateLegacyInvest() {
+  if (loadInvestments().length) return;
+  const v = Number(loadWallet().invest) || 0;
+  if (!(v > 0)) return;
+  saveInvestments([{
+    id: 'inv' + Date.now().toString(36),
+    name: '未分类投资',
+    type: 'other',
+    code: '',
+    marketValue: v,
+    cost: v,          // 旧数据没有成本信息，先当成不赚不亏，等用户填
+    shares: null,
+    openNav: null,
+    openDate: localDate(new Date()),
+    note: '从旧的手填「投资市值」迁来的，点「改」拆成具体持仓',
+    updatedAt: Date.now()
+  }]);
+  showToast('原来的投资市值已转成一条记录，点「改」可以拆开', 'info');
+}
+
+function renderInvest() {
+  const sumEl = document.getElementById('invest-summary');
+  const listEl = document.getElementById('invest-list');
+  const noteEl = document.getElementById('invest-quote-note');
+  if (!sumEl || !listEl) return;
+
+  const items = loadInvestments();
+  const quotes = loadQuotes();
+
+  if (!items.length) {
+    sumEl.innerHTML = '';
+    listEl.innerHTML = `<div class="card" style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.8rem;line-height:1.9;">
+      还没有持仓。<br>
+      点右上角「+ 添加持仓」，把产品页面上的<b style="color:var(--text-secondary);">持有金额</b>和
+      <b style="color:var(--text-secondary);">持仓收益</b>抄进来，<br>收益率和回本缺口就自动算出来了。
+    </div>`;
+    if (noteEl) noteEl.innerHTML = '';
+    return;
+  }
+
+  const s = investSummary(items, quotes);
+
+  // ---- 总览 ----
+  const tone = profitTone(s.profit);
+  let html = `<div class="card" style="padding:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;">
+      <div>
+        <div style="font-size:0.68rem;color:var(--text-dim);margin-bottom:3px;">总市值</div>
+        <div style="font-size:1.45rem;font-weight:700;font-family:var(--font-mono);color:var(--text-primary);font-variant-numeric:tabular-nums;">¥${fmtAmount(s.value)}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:0.68rem;color:var(--text-dim);margin-bottom:3px;">总盈亏</div>
+        <div style="font-size:0.98rem;font-family:var(--font-mono);color:${tone.color};font-variant-numeric:tabular-nums;">${tone.sign}¥${fmtAmount(Math.abs(s.profit))}</div>
+        <div style="font-size:0.72rem;font-family:var(--font-mono);color:${tone.color};font-variant-numeric:tabular-nums;">${tone.sign}${fmtPct(Math.abs(s.rate))}</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-dim);margin-top:12px;padding-top:10px;border-top:1px solid var(--border-subtle);">
+      <span>总投入成本 <span style="color:var(--text-secondary);font-family:var(--font-mono);">¥${fmtAmount(s.cost)}</span></span>
+      <span>${items.length} 笔持仓</span>
+    </div>`;
+
+  // 回本进度条：市值 / 成本。亏的时候一眼看出"离回本还差多远"
+  if (s.cost > 0 && s.need > 0 && s.value > 0) {
+    const pct = Math.max(0, Math.min(100, s.value / s.cost * 100));
+    html += `<div style="margin-top:12px;">
+      <div style="display:flex;justify-content:space-between;font-size:0.72rem;margin-bottom:2px;">
+        <span style="color:var(--text-dim);">回本进度 ${pct.toFixed(1)}%</span>
+        <span style="color:var(--expense);font-family:var(--font-mono);">还差 ¥${fmtAmount(s.need)} · 需涨 ${fmtPct(s.need / s.value)}</span>
+      </div>
+      <div class="budget-bar"><div class="budget-fill over" style="width:${pct}%;"></div></div>
+    </div>`;
+  } else if (s.cost > 0) {
+    html += `<div style="margin-top:12px;font-size:0.72rem;color:var(--success);">✓ 已经回本，现在整体是赚的</div>`;
+  }
+  html += `</div>`;
+  sumEl.innerHTML = html;
+
+  // ---- 明细 ----
+  listEl.innerHTML = items.map(it => {
+    const c = computeHolding(it, quotes);
+    const typeLabel = { fund: '基金', gold: '黄金', money: '货基', other: '理财' }[it.type] || '其他';
+    const tone2 = profitTone(c.profit);
+
+    // 副标题：有代码就把代码和净值摆出来，让人能核对
+    let sub2 = typeLabel;
+    if (it.type === 'fund' && it.code) {
+      sub2 = it.code;
+      if (c.live) sub2 += ` · 净值 ${c.priceNow}（${c.priceDate || '—'}）`;
+      else sub2 += ' · 没取到净值，显示的是建档金额';
+    } else if (it.type === 'gold') {
+      sub2 = c.live ? `Au99.99 ${c.priceNow} 元/克（${c.priceDate || '—'}）` : '金价没取到，显示的是建档金额';
+    }
+
+    // 份额/克数：只在能自动更新时才有意义
+    const shareTxt = (c.live && it.shares > 0)
+      ? `<span>${it.type === 'gold' ? '克数' : '份额'} ${(it.shares).toFixed(2)}</span>` : '';
+
+    // 回本那一行
+    let back = '';
+    if (c.cost > 0 && c.need > 0 && c.value > 0) {
+      back = `<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border-subtle);font-size:0.74rem;color:var(--expense);font-variant-numeric:tabular-nums;">
+        还差 ¥${fmtAmount(c.need)} 回本 · 需涨 ${fmtPct(c.needPct)}`;
+      if (c.days === -1) {
+        back += `<div style="color:var(--text-dim);font-size:0.66rem;margin-top:3px;">近一个月是跌的，按现在的走势谈不上还有几天回本</div>`;
+      } else if (c.days > 0) {
+        const shown = c.days > 500 ? '500+ ' : c.days + ' ';
+        back += `<div style="color:var(--text-dim);font-size:0.66rem;margin-top:3px;">按近 30 个交易日速度 ≈ 还要 ${shown}个交易日（外推，不是预测）</div>`;
+      }
+      back += `</div>`;
+    } else if (c.cost > 0 && c.profit > 0) {
+      back = `<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border-subtle);font-size:0.74rem;color:var(--success);">已回本，比成本多 ¥${fmtAmount(c.profit)}</div>`;
+    }
+
+    return `<div class="card" style="padding:14px;margin-bottom:10px;">
+      <div style="display:flex;align-items:flex-start;gap:8px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.9rem;color:var(--text-primary);word-break:break-all;">${escHtml(it.name)}</div>
+          <div style="font-size:0.66rem;color:var(--text-dim);margin-top:3px;">${sub2}</div>
+        </div>
+        <button class="btn btn-sm" onclick="openInvestEdit('${it.id}')">改</button>
+        <button class="btn btn-sm" onclick="deleteInvest('${it.id}')">删</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;">
+        <span style="font-size:1.05rem;color:var(--text-primary);">¥${fmtAmount(c.value)}</span>
+        <span style="font-size:0.85rem;color:${c.cost > 0 ? tone2.color : 'var(--text-dim)'};">
+          ${c.cost > 0 ? `${tone2.sign}¥${fmtAmount(Math.abs(c.profit))}（${tone2.sign}${fmtPct(Math.abs(c.rate))}）` : '没填成本，算不了收益率'}
+        </span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:var(--text-dim);margin-top:4px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;">
+        <span>成本 ¥${fmtAmount(c.cost)}</span>${shareTxt}
+      </div>
+      ${back}
+      ${it.note ? `<div style="font-size:0.66rem;color:var(--text-dim);margin-top:6px;">${escHtml(it.note)}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  // ---- 底部说明：行情什么时候更新的、哪些是查不到的 ----
+  if (noteEl) {
+    const parts = [];
+    if (quotes.fetchedAt) {
+      parts.push('行情更新于 ' + fmtAgo(quotes.fetchedAt));
+    } else {
+      parts.push('还没拉过行情');
+    }
+    if (quotes.gold) {
+      parts.push('金价用上金所 Au99.99 收盘价（' + (quotes.gold.priceDate || quotes.gold.asOf || '—') + '），非交易时段不会变');
+    }
+    parts.push('基金净值每交易日收盘后更新一次，当天看不到当天的');
+    parts.push('货币基金和银行理财没有公开行情，市值要自己来改');
+    noteEl.innerHTML = parts.join(' · ');
+  }
+}
+
+// 添加 / 修改持仓
+
+let _investEditId = null;
+
+function openInvestEdit(id) {
+  _investEditId = id || null;
+  const it = id ? loadInvestments().find(i => i.id === id) : null;
+
+  document.getElementById('invest-edit-title').textContent = it ? '修改持仓' : '添加持仓';
+  document.getElementById('inv-name').value = it ? it.name : '';
+  document.getElementById('inv-type').value = it ? (it.type || 'fund') : 'fund';
+  document.getElementById('inv-code').value = it ? (it.code || '') : '';
+  document.getElementById('inv-note').value = it ? (it.note || '') : '';
+
+  // 回填时用「现在算出来的市值和盈亏」，而不是建档时抄的那个数 ——
+  // 这样用户不动它直接保存，成本也不会被改歪。
+  let v = '', p = '';
+  if (it) {
+    const c = computeHolding(it, loadQuotes());
+    if (c.value > 0) { v = c.value.toFixed(2); p = c.profit.toFixed(2); }
+    else { v = it.marketValue != null ? String(it.marketValue) : ''; }
+  }
+  document.getElementById('inv-value').value = v;
+  document.getElementById('inv-profit').value = p;
+
+  investFormTypeChanged();
+  document.getElementById('invest-edit-modal').classList.add('show');
+}
+
+function closeInvestEdit() {
+  document.getElementById('invest-edit-modal').classList.remove('show');
+}
+
+function investFormTypeChanged() {
+  const type = document.getElementById('inv-type').value;
+  const hint = document.getElementById('inv-profit-hint');
+  document.getElementById('inv-code-row').style.display = (type === 'fund') ? 'block' : 'none';
+  if (!hint) return;
+  if (type === 'fund') {
+    hint.innerHTML = '点进基金详情页，把「持仓收益」照抄（亏了就是负数）。<b style="color:var(--text-secondary);">填了它才算得出收益率和回本缺口</b>；不填就当成"成本=当前金额"，收益率显示 0。';
+  } else if (type === 'gold') {
+    hint.innerHTML = '支付宝黄金 / 积存金页面上的「持有收益」，照抄即可。';
+  } else if (type === 'money') {
+    hint.innerHTML = '货币基金基本不会有盈亏，留空就行（等于成本 = 当前金额）。';
+  } else {
+    hint.innerHTML = '这类没有公开行情，市值要自己隔段时间进来改。收益照抄，留空则算不出收益率。';
+  }
+}
+
+async function submitInvestEdit() {
+  const name = document.getElementById('inv-name').value.trim();
+  const type = document.getElementById('inv-type').value;
+  const code = document.getElementById('inv-code').value.trim();
+  const rawValue = document.getElementById('inv-value').value.trim();
+  const rawProfit = document.getElementById('inv-profit').value.trim();
+  const note = document.getElementById('inv-note').value.trim();
+
+  if (!name) { showToast('给这笔持仓起个名字', 'warning'); return; }
+  if (type === 'fund' && !/^\d{6}$/.test(code)) { showToast('基金代码是 6 位数字，例：000217', 'warning'); return; }
+
+  const marketValue = parseFloat(rawValue);
+  if (!(marketValue > 0)) { showToast('填一下「现在值多少钱」', 'warning'); return; }
+
+  let cost = marketValue;
+  if (rawProfit !== '') {
+    const hp = parseFloat(rawProfit);
+    if (isNaN(hp)) { showToast('持仓收益要填数字，亏了就是负数', 'warning'); return; }
+    cost = marketValue - hp;
+    if (cost <= 0) { showToast('这样算出来的成本是 0 或负数，检查一下这两个数', 'warning'); return; }
+  }
+
+  // 新增基金/黄金时，台账里还没有这条，得把代码单独塞给行情接口，才拿得到净值
+  const quotes0 = loadQuotes();
+  const needFetch = (type === 'fund' && code && !(quotes0.funds[code] && quotes0.funds[code].nav))
+    || (type === 'gold' && !(quotes0.gold && quotes0.gold.price));
+  if (needFetch) {
+    const extra = [];
+    if (type === 'fund' && code) extra.push(code);
+    if (type === 'gold') extra.push('gold');
+    await fetchQuotes(false, extra);
+  }
+
+  // 反推份额：份额 = 持有金额 ÷ 当日净值。有了它以后才能自动更新市值。
+  const q = loadQuotes();
+  let shares = null, openNav = null;
+  if (type === 'fund' && code) {
+    const f = q.funds[code];
+    if (f && f.nav > 0) { openNav = f.nav; shares = marketValue / f.nav; }
+  } else if (type === 'gold') {
+    const g = q.gold;
+    if (g && g.price > 0) { openNav = g.price; shares = marketValue / g.price; }
+  }
+
+  const items = loadInvestments();
+  const old = _investEditId ? items.find(i => i.id === _investEditId) : null;
+  const item = {
+    id: _investEditId || ('inv' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
+    name, type,
+    code: code || '',
+    marketValue: Math.round(marketValue * 100) / 100,
+    cost: Math.round(cost * 100) / 100,
+    shares, openNav,
+    openDate: old ? old.openDate : localDate(new Date()),
+    note,
+    updatedAt: Date.now()
+  };
+
+  saveInvestments(old ? items.map(i => (i.id === old.id ? item : i)) : items.concat([item]));
+
+  closeInvestEdit();
+  renderInvest();
+  renderWalletInvest();
+
+  if ((type === 'fund' || type === 'gold') && !shares) {
+    showToast('已记下，但没取到行情，暂时按你填的金额显示', 'warning');
+  } else {
+    showToast('已保存', 'success');
+  }
+}
+
+function deleteInvest(id) {
+  const it = loadInvestments().find(i => i.id === id);
+  if (!it) return;
+  if (!confirm(`删除「${it.name}」？\n只是从台账里去掉，不影响你在理财 App 里的真实持仓。`)) return;
+  saveInvestments(loadInvestments().filter(i => i.id !== id));
+  renderInvest();
+  renderWalletInvest();
+  showToast('已删除', 'success');
 }
 
 // === Settings Functions ===

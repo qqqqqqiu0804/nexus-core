@@ -313,14 +313,18 @@ function decodeEntities(s) {
 }
 
 // 带超时 + 读取上限的取文，避免大页面把内存吃满
-async function fetchCapped(url, capBytes, timeoutMs) {
+// extraHeaders 可选：东方财富的净值文件带不带 Referer 结果不同（不带会返回空）
+async function fetchCapped(url, capBytes, timeoutMs, extraHeaders) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       signal: ctrl.signal,
       redirect: 'follow',
-      headers: { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9' }
+      headers: Object.assign(
+        { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9' },
+        extraHeaders || {}
+      )
     });
     if (!res.ok || !res.body) return { status: res.status, text: '', finalUrl: res.url };
     const reader = res.body.getReader();
@@ -389,6 +393,131 @@ app.get('/api/link-title', wrapAsync(async req => {
   } catch {
     return { ok: false, error: 'fetch_failed' };
   }
+}));
+
+// ===== 行情（「投资台账」用）=====
+// GET /api/quotes?funds=000217,161725&gold=1
+//
+// 为什么要后端取：浏览器直连东方财富会被 CORS 拦掉，而且金价站是 http，
+// 从 https 页面请求属于混合内容，浏览器直接拒绝。
+//
+// 不接受任意 URL —— 只收 6 位数字代码，域名是写死的，避免变成 SSRF 跳板。
+const FUND_CODE_RE = /^\d{6}$/;
+
+// 东财给的是 UTC 午夜的毫秒时间戳（1778774400000 = 北京时间 2026-05-15 00:00），
+// 直接 toISOString().slice(0,10) 会少一天；固定 +8 小时，不依赖服务器时区。
+const toCstDate = ms => new Date(Number(ms) + 8 * 3600 * 1000).toISOString().slice(0, 10);
+
+// 东方财富的净值文件是 JS 不是 JSON，只能正则抠两个变量：
+//   var fS_name = "华夏回报混合A";
+//   var Data_netWorthTrend = [{x:毫秒时间戳, y:单位净值, equityReturn:当日涨跌%}, ...]
+// 这个接口对 Referer 敏感：不带 Referer 会返回空内容。
+async function fetchFundQuote(code) {
+  const r = await fetchCapped(
+    `https://fund.eastmoney.com/pingzhongdata/${code}.js`,
+    3 * 1024 * 1024, 12000,
+    { Referer: 'https://fund.eastmoney.com/' }
+  );
+  if (r.status !== 200 || !r.text) return null;
+
+  const nameM = r.text.match(/var\s+fS_name\s*=\s*"([^"]*)"/);
+  const trendM = r.text.match(/var\s+Data_netWorthTrend\s*=\s*(\[[\s\S]*?\])\s*;/);
+  if (!trendM) return null;
+
+  let trend;
+  try { trend = JSON.parse(trendM[1]); } catch { return null; }
+  if (!Array.isArray(trend) || !trend.length) return null;
+
+  const last = trend[trend.length - 1];
+  return {
+    name: nameM ? nameM[1] : code,
+    nav: Number(last.y),
+    navDate: toCstDate(last.x),
+    pct: Number(last.equityReturn) || 0,
+    // 只回传近 90 个交易日：前端拿它估「照这个速度还要几天回本」，再往前的用不上。
+    // 统一成 [「YYYY-MM-DD」, 数值]，和金价保持同一种形状，前端不用分两套。
+    trend: trend.slice(-90).map(p => [toCstDate(p.x), Number(p.y)])
+  };
+}
+
+// 上海黄金交易所 Au99.99 金价。两个接口配合：
+//   POST /graph/Dailyhq   → 历史日线 {"time":[["2016-12-19",开,收,低,高], ...]}
+//   GET  /graph/quotations → 当日分时 {times,data,min,max,heyue,delaystr}
+//
+// 当前价**优先取日线最后一天的收盘价**，不是分时的末值。原因：
+//   ① 算「照这个速度还要几天回本」用的是日线涨跌，当前价和历史必须同一口径，
+//      否则拿分时价对比日线趋势会算出错的日均；
+//   ② 非交易时段的分时数据自相矛盾 —— 实测周末拿到末值 936.5，而同一响应里
+//      min 是 938，末值比自己当日最低还低。日线收盘价是可复现的。
+// 分时只在日线拿不到时兜底。
+//
+// 它是 http 站，从服务器取正好绕开浏览器的混合内容限制。
+async function fetchGoldQuote() {
+  let trend = [];
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12000);
+    try {
+      const hr = await fetch('https://www.sge.com.cn/graph/Dailyhq', {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: {
+          'User-Agent': UA,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Referer: 'https://www.sge.com.cn/'
+        },
+        body: 'instid=Au99.99'
+      });
+      const hj = JSON.parse(await hr.text());
+      const rows = Array.isArray(hj && hj.time) ? hj.time : [];
+      // 近 90 个交易日足够估日均，再多没必要传
+      trend = rows.slice(-90)
+        .map(row => [String(row[0]), Number(row[2])])   // row[2] 是收盘价
+        .filter(p => p[1]);
+    } finally { clearTimeout(timer); }
+  } catch { /* 历史拿不到就走下面的分时兜底 */ }
+
+  if (trend.length) {
+    const last = trend[trend.length - 1];
+    return { name: 'Au99.99', price: last[1], priceDate: last[0], source: 'daily', trend };
+  }
+
+  const r = await fetchCapped('https://www.sge.com.cn/graph/quotations', 512 * 1024, 12000);
+  if (r.status !== 200 || !r.text) return null;
+  let j;
+  try { j = JSON.parse(r.text); } catch { return null; }
+  if (!j || String(j.heyue || '') !== 'Au99.99') return null;
+  const arr = Array.isArray(j.data) ? j.data.filter(v => v !== '' && v != null) : [];
+  const price = Number(arr[arr.length - 1]);
+  if (!price) return null;
+  // delaystr 形如「2026年09月21日 02:29:57」，是行情时间戳，不是抓取时间
+  return { name: 'Au99.99', price, priceDate: null, asOf: j.delaystr || null, source: 'intraday', trend: [] };
+}
+
+app.get('/api/quotes', wrapAsync(async req => {
+  const codes = String(req.query.funds || '')
+    .split(',').map(s => s.trim()).filter(s => FUND_CODE_RE.test(s))
+    .filter((c, i, a) => a.indexOf(c) === i)   // 去重
+    .slice(0, 30);
+  const wantGold = String(req.query.gold || '') === '1';
+
+  const out = { ok: true, funds: {}, gold: null, fetchedAt: Date.now(), errors: [] };
+
+  await Promise.all([
+    ...codes.map(async c => {
+      try {
+        const q = await fetchFundQuote(c);
+        if (q) out.funds[c] = q;
+        else out.errors.push(c);
+      } catch { out.errors.push(c); }
+    }),
+    (async () => {
+      if (!wantGold) return;
+      try { out.gold = await fetchGoldQuote(); } catch { out.errors.push('gold'); }
+    })()
+  ]);
+
+  return out;
 }));
 
 // ===== 文件 API（灵感库的图片）=====
