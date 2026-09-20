@@ -453,6 +453,9 @@ button:focus-visible { box-shadow: var(--ring); }
   background: var(--bg-panel);
   margin-bottom: 10px;
   overflow: hidden;
+  /* 从「可用现金」点进来会 scrollIntoView 到这个分组：
+     浮层顶上有吸顶的「资产台账」标题栏，留出它的高度，免得分组标题被压住 */
+  scroll-margin-top: 62px;
 }
 .inv-group-sum { padding: 12px 14px; cursor: pointer; user-select: none; }
 .inv-group-sum:hover { background: var(--bg-hover); }
@@ -833,9 +836,11 @@ button:focus-visible { box-shadow: var(--ring); }
   <div class="panel" id="panel-data">
     <!-- Wallet Balance —— 现金和投资分开显示（见 loadWallet 的注释） -->
     <div class="wallet-balance-card" id="wallet-balance-card">
-      <div class="wallet-balance-label">可用现金</div>
-      <div class="wallet-balance-amount" id="wallet-balance" style="cursor:pointer;" onclick="setWalletCash()" title="点一下调整">¥ 0.00</div>
-      <div style="font-size:0.66rem;color:var(--text-dim);">支付宝余额 · 余额宝 · 银行卡 · 微信零钱</div>
+      <!-- 「可用现金」整块可点：进去就是台账浮层里的「流动资金」组，钱分别躺在哪一目了然。
+           改数字的入口挪到组内（点某一项改 / 直接改总数），免得误触。 -->
+      <div class="wallet-balance-label" style="cursor:pointer;" onclick="openInvest('cash')" title="点进去看钱分别在哪">可用现金 <span style="opacity:0.5;">›</span></div>
+      <div class="wallet-balance-amount" id="wallet-balance" style="cursor:pointer;" onclick="openInvest('cash')" title="点进去看每一笔明细">¥ 0.00</div>
+      <div id="wallet-cash-sub" style="font-size:0.66rem;color:var(--text-dim);cursor:pointer;" onclick="openInvest('cash')">点进去看每一笔明细 ›</div>
       <!-- 投资市值 = 台账里所有持仓的市值之和（点进去看明细 / 收益率 / 回本还差多少）。
            以前这里是个手填的数字，回答不了"赚了还是亏了"；现在改成台账汇总。 -->
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-subtle);cursor:pointer;"
@@ -3625,6 +3630,13 @@ function renderWallet() {
 
   // 现金（记账会自动加减）与投资（台账汇总）分开显示
   document.getElementById('wallet-balance').textContent = '¥ ' + (Number(wallet.cash) || 0).toFixed(2);
+  const cashSubEl = document.getElementById('wallet-cash-sub');
+  if (cashSubEl) {
+    const accs = Array.isArray(wallet.cashAccounts) ? wallet.cashAccounts : [];
+    cashSubEl.textContent = accs.length
+      ? accs.length + ' 个账户 · 点进去看明细 ›'
+      : '点进去记下钱分别在哪 ›';
+  }
   renderWalletInvest();
 
   // Stats
@@ -4206,13 +4218,27 @@ function renderWalletInvest() {
 
 // ---------- 台账浮层 ----------
 
-function openInvest() {
+// focus='cash' 时（从钱包卡的「可用现金」点进来）直接展开「流动资金」并滚到它那儿，
+// 省得进来还要自己找。不传参就是原来的行为：从头看整个台账。
+function openInvest(focus) {
   migrateLegacyInvest();
 
-  document.getElementById('invest-overlay').style.display = 'block';
+  const ov = document.getElementById('invest-overlay');
+  ov.style.display = 'block';
   document.body.style.overflow = 'hidden';
+  // 浮层是常驻 DOM，会记住上次滚到哪。不点名就一律回到顶部，
+  // 免得从左下角「投资市值」进来时停在半截；点名看现金则交给 focusCashGroup 定位。
+  if (focus !== 'cash') ov.scrollTop = 0;
   renderInvest();
+  if (focus === 'cash') focusCashGroup();
   if (quotesStale()) fetchQuotes(false);
+}
+
+function focusCashGroup() {
+  const el = document.getElementById('cash-group');
+  if (!el) return;
+  el.open = true;
+  requestAnimationFrame(() => el.scrollIntoView({ block: 'start', behavior: 'smooth' }));
 }
 
 function closeInvest() {
@@ -4458,16 +4484,16 @@ function cashGroupHtml() {
         还没有明细。点下面的「+ 加一项」，把每张卡、每个钱包记进来，以后就知道钱在哪。
       </div>`;
 
-  return `<details class="inv-group">
+  return `<details class="inv-group" id="cash-group">
     <summary class="inv-group-sum">
       <span class="inv-group-head">
-        <span style="font-size:0.88rem;color:var(--text-primary);">流动资金</span>
+        <span style="font-size:0.88rem;color:var(--text-primary);">可用现金</span>
         <span class="inv-group-num" style="color:var(--text-primary);">¥${fmtAmount(total)}</span>
       </span>
     </summary>
     <div class="inv-group-body">
       <div class="inv-group-hint">
-        平时记账加减的就是这个数${w.cashCheckedAt ? ` · 上次核对 ${fmtAgo(w.cashCheckedAt)}` : ''}
+        ${accts.length ? accts.length + ' 个账户' : '还没有明细'} · 平时记账加减的就是这个数${w.cashCheckedAt ? ` · 上次核对 ${fmtAgo(w.cashCheckedAt)}` : ''}
       </div>
       ${rows}
       <div style="padding:8px 14px 4px;display:flex;gap:8px;">
