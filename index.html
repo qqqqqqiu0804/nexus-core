@@ -1084,6 +1084,7 @@ button:focus-visible { box-shadow: var(--ring); }
         <span id="srv-dot" class="srv-dot"></span>
         <span id="srv-status-text" style="font-size:0.68rem;color:var(--text-dim);">未连接</span>
       </div>
+      <div id="health-bar" style="margin-top:8px;font-size:0.7rem;color:var(--text-dim);line-height:1.7;"></div>
       <details style="margin-top:8px;">
         <summary style="cursor:pointer;font-size:0.72rem;color:var(--text-dim);padding:6px 0;list-style:none;user-select:none;">⚙ 高级设置</summary>
         <div class="card" style="padding:12px;margin-top:6px;">
@@ -3570,6 +3571,41 @@ function openSetBalanceModal() {
 }
 
 // === Settings Functions ===
+// 数据健康条：最近备份 + 待上传积压。
+//   「数据会不会丢」这件事不该靠感觉判断 —— 这两个数字摆在「我的」页面上，
+//   备份断了、日记卡在队列里出不去，一眼就能看见。
+//   备份来自服务器 /root/backup-nexus.sh（每日 03:00），由 /api/health 回传。
+function fmtAgo(ts) {
+  const d = new Date(ts), now = new Date();
+  const dayKey = x => x.getFullYear() + '-' + (x.getMonth() + 1) + '-' + x.getDate();
+  const diff = Math.round((new Date(dayKey(now)) - new Date(dayKey(d))) / 86400000);
+  const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  if (diff <= 0) return '今天 ' + hm;
+  if (diff === 1) return '昨天 ' + hm;
+  return diff + ' 天前';
+}
+
+async function renderHealth() {
+  const el = document.getElementById('health-bar');
+  if (!el) return;
+  const pending = Object.keys(journalPending()).length;
+  let backup = '未连接服务器';
+  if (KVSync.configured()) {
+    try {
+      const res = await fetch(KVSync.base() + '/api/health', { headers: KVSync.headers() });
+      if (res.ok) {
+        const j = await res.json();
+        backup = j.lastBackup ? fmtAgo(j.lastBackup) : '服务器上没有备份';
+      } else backup = KVSync._errText(res.status);
+    } catch { backup = '连不上服务器'; }
+  }
+  const pendingTxt = pending
+    ? '<span style="color:var(--orange);">' + pending + ' 条待上传</span>'
+    : '无积压';
+  el.innerHTML = '🛡️ 最近备份：<span style="color:var(--text-secondary);">' + backup +
+    '</span> · 本机待上传：' + pendingTxt;
+}
+
 function renderSettings() {
   // 灵感库条目数
   updateInspEntryCount();
@@ -3579,6 +3615,9 @@ function renderSettings() {
 
   // Habits
   renderSettingsHabits();
+
+  // 数据健康（最近备份 / 待上传积压）
+  renderHealth();
 
   // Level info
 }

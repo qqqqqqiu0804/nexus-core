@@ -262,6 +262,25 @@ app.delete('/api/kv/:key', wrap(req => ({
   changes: Number(kvStmts.del.run(String(req.params.key)).changes)
 })));
 
+// GET /api/health —— 数据健康自检（「我的」页面用它显示备份状态）
+//   备份由 /root/backup-nexus.sh 每天 03:00 生成 journal-<日期>.db，保留 14 天。
+//   BACKUP_DIR 可覆盖（跑测试时务必指向临时目录，别去读真机备份）。
+app.get('/api/health', wrap(() => {
+  const dir = process.env.BACKUP_DIR || '/root/backups';
+  let lastBackup = null, backups = 0;
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.startsWith('journal-') || !f.endsWith('.db')) continue;
+      backups++;
+      const ms = fs.statSync(path.join(dir, f)).mtimeMs;
+      if (lastBackup === null || ms > lastBackup) lastBackup = ms;
+    }
+  } catch { /* 备份目录不存在不算故障：给 null，前端显示「未知」 */ }
+  let dbBytes = 0;
+  try { dbBytes = fs.statSync(DB_PATH).size; } catch {}
+  return { ok: true, lastBackup, backups, dbBytes, serverTime: Date.now() };
+}));
+
 // ===== 文件 API（灵感库的图片）=====
 // POST /api/files —— 接收 dataUrl（base64），落盘并返回 id。
 // 用 base64 而非 multipart：不引入新依赖（multer 在国内网络下装起来容易翻车）。
