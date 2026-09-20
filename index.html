@@ -1309,6 +1309,20 @@ button:focus-visible { box-shadow: var(--ring); }
       <button class="btn btn-sm btn-primary" onclick="openInvestEdit(null)">+ 添加持仓</button>
     </div>
     <div id="invest-list"></div>
+
+    <!-- 持仓截图：手机相册里的持仓页面直接传上来，不用手敲那些数字 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px;">
+      <span class="section-title">◆ 持仓截图</span>
+      <button class="btn btn-sm" onclick="document.getElementById('invest-shot-input').click()">📷 传截图</button>
+    </div>
+    <input type="file" id="invest-shot-input" accept="image/*" multiple style="display:none;" onchange="investPickShots(this)">
+    <div id="invest-shot-list"></div>
+    <div style="font-size:0.66rem;color:var(--text-dim);margin-top:8px;line-height:1.8;">
+      手机上截好图，从相册一次性选多张传上来，然后<b style="color:var(--text-secondary);">在对话里跟我说一声「传好了」</b>，
+      我来认上面的基金名、代码、持有金额和持仓收益，直接建成持仓。
+      <br>（服务器跑不动本地视觉模型，所以认图这一步由对话里的 AI 做，图只存在你自己的服务器上。）
+    </div>
+
     <div id="invest-quote-note" style="font-size:0.66rem;color:var(--text-dim);margin-top:16px;line-height:1.8;"></div>
   </div>
 </div>
@@ -1394,7 +1408,7 @@ const SYNC_KEYS = [
   'tasks', 'wallet', 'courses', 'completionLog', 'dailyLog',
   'dailyTemplates', 'profile', 'aiReports', 'aiModel',
   'investJournal', 'scheduleOverride', 'budget', 'inspirations', 'videos',
-  'investments'
+  'investments', 'investShots'
 ];
 // 注意 journal（日记）**不在**白名单：它由日记 API + 服务器 SQLite 负责，
 // 两个通道同时写同一条数据会互相覆盖。
@@ -4172,8 +4186,10 @@ function renderInvest() {
       还没有持仓。<br>
       点右上角「+ 添加持仓」，把产品页面上的<b style="color:var(--text-secondary);">持有金额</b>和
       <b style="color:var(--text-secondary);">持仓收益</b>抄进来，<br>收益率和回本缺口就自动算出来了。
+      <br><br>嫌抄着麻烦，也可以直接在下面<b style="color:var(--text-secondary);">传持仓截图</b>，让 AI 认。
     </div>`;
     if (noteEl) noteEl.innerHTML = '';
+    renderShots();
     return;
   }
 
@@ -4256,8 +4272,8 @@ function renderInvest() {
           <div style="font-size:0.9rem;color:var(--text-primary);word-break:break-all;">${escHtml(it.name)}</div>
           <div style="font-size:0.66rem;color:var(--text-dim);margin-top:3px;">${sub2}</div>
         </div>
-        <button class="btn btn-sm" onclick="openInvestEdit('${it.id}')">改</button>
-        <button class="btn btn-sm" onclick="deleteInvest('${it.id}')">删</button>
+        <button class="btn btn-sm" style="flex:0 0 auto;white-space:nowrap;" onclick="openInvestEdit('${it.id}')">改</button>
+        <button class="btn btn-sm" style="flex:0 0 auto;white-space:nowrap;" onclick="deleteInvest('${it.id}')">删</button>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;">
         <span style="font-size:1.05rem;color:var(--text-primary);">¥${fmtAmount(c.value)}</span>
@@ -4288,6 +4304,8 @@ function renderInvest() {
     parts.push('货币基金和银行理财没有公开行情，市值要自己来改');
     noteEl.innerHTML = parts.join(' · ');
   }
+
+  renderShots();
 }
 
 // 添加 / 修改持仓
@@ -4418,6 +4436,102 @@ function deleteInvest(id) {
   renderInvest();
   renderWalletInvest();
   showToast('已删除', 'success');
+}
+
+// ---------- 持仓截图 ----------
+// 为什么要有：手机上把「持有金额」「持仓收益」一个个抄进来很烦，而这些数字本来就在截图里。
+//
+// 分工是这样的：这里只负责「把图送到能被看到的地方」（复用灵感库那套上传，
+// 压缩到长边 1800 再传，3M 带宽下也够快），认图由对话里的 AI 来做 ——
+// 服务器只有 2 核 2G，跑不动本地视觉模型，装了也是白装。
+//
+// 记录写进 investShots 并同步到服务器，所以手机上传的图，电脑这边能看到。
+
+function loadShots() {
+  const v = Store.get('investShots', null);
+  return Array.isArray(v) ? v : [];
+}
+function saveShots(list) { Store.set('investShots', list); }
+
+async function investPickShots(input) {
+  const files = Array.from(input.files || []);
+  input.value = '';   // 清空，否则再选同一张不会触发 change
+  if (!files.length) return;
+  if (!serverConfigured()) { showToast('先到「我的」里填服务器地址和 token', 'warning'); return; }
+
+  const list = loadShots();
+  let ok = 0;
+  for (const f of files) {
+    try {
+      const dataUrl = await compressImage(f, 1800, 0.85);
+      const r = await uploadImage(dataUrl, f.name);
+      if (r.error) { showToast('第 ' + (ok + 1) + ' 张上传失败：' + r.error, 'error'); continue; }
+      list.unshift({
+        id: 'shot' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        fileId: r.id,
+        name: f.name || '截图',
+        size: r.size || 0,
+        ts: Date.now(),
+        status: 'pending'
+      });
+      ok++;
+    } catch (e) {
+      showToast('处理失败：' + e.message, 'error');
+    }
+  }
+  if (ok) {
+    saveShots(list);
+    renderShots();
+    showToast('传好 ' + ok + ' 张了，在对话里说一声我就去认', 'success');
+  }
+}
+
+function renderShots() {
+  const el = document.getElementById('invest-shot-list');
+  if (!el) return;
+  const list = loadShots();
+
+  if (!list.length) {
+    el.innerHTML = '<div style="font-size:0.72rem;color:var(--text-dim);padding:8px 0;">还没有截图。' +
+      '点上面的「📷 传截图」，从相册选持仓页面就行。</div>';
+    return;
+  }
+
+  el.innerHTML = list.slice(0, 12).map(s => {
+    const url = serverCfg().base + '/api/files/' + s.fileId;
+    const tag = s.status === 'done'
+      ? '<span style="color:var(--success);">已入账</span>'
+      : s.status === 'skipped'
+        ? '<span style="color:var(--text-dim);">已跳过</span>'
+        : '<span style="color:var(--warn);">待识别</span>';
+    const kb = s.size ? Math.round(s.size / 1024) + 'KB · ' : '';
+    return `<div style="display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);margin-bottom:8px;">
+      <img src="${url}" loading="lazy" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:var(--radius-sm);flex:0 0 auto;background:var(--bg-hover);">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:0.74rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.name)}</div>
+        <div style="font-size:0.64rem;color:var(--text-dim);margin-top:3px;">${tag} · ${kb}${fmtAgo(s.ts)}</div>
+      </div>
+      <button class="btn btn-sm" style="flex:0 0 auto;white-space:nowrap;" onclick="deleteShot('${s.id}')">删</button>
+    </div>`;
+  }).join('') + (list.length > 12
+    ? `<div style="font-size:0.66rem;color:var(--text-dim);">还有 ${list.length - 12} 张没显示</div>`
+    : '');
+}
+
+// 删记录的同时把服务器上的文件也删掉，不然截图会一直堆在服务器磁盘上
+function deleteShot(id) {
+  const list = loadShots();
+  const s = list.find(x => x.id === id);
+  if (!s) return;
+  if (!confirm('删掉这张截图？')) return;
+  saveShots(list.filter(x => x.id !== id));
+  renderShots();
+  if (s.fileId && serverConfigured()) {
+    fetch(serverCfg().base + '/api/files/' + s.fileId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + serverCfg().token }
+    }).catch(() => { /* 删不掉不外乎留个孤儿文件，不值得打扰用户 */ });
+  }
 }
 
 // === Settings Functions ===
