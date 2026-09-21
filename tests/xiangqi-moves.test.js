@@ -16,7 +16,7 @@ const start = html.indexOf('// ===== 每日象棋残局 =====');
 const end = html.indexOf('function renderDailyHub() {');
 if (start < 0 || end < 0 || end < start) { console.error('提取代码段失败'); process.exit(1); }
 const code = html.slice(start, end);
-const api = new Function(code + '\nreturn { xqBoard, xqLegalMove, xqMovesFor, xqKingsFacing, xqInCheck, xqLoser, xqAiChoose, XIANGQI_ENDGAMES };')();
+const api = new Function(code + '\nreturn { xqBoard, xqLegalMove, xqMovesFor, xqKingsFacing, xqInCheck, xqLoser, xqAiChoose, XIANGQI_LEVELS };')();
 console.log('代码段长度', code.length, '字符\n');
 
 let pass = 0, fail = 0;
@@ -27,15 +27,15 @@ function t(name, actual, expected) {
 }
 const B = api.xqBoard;
 
-console.log('【1】四个残局初始局面必须合法（不照面、红方未被将军）');
-for (const eg of api.XIANGQI_ENDGAMES) {
+console.log('【1】八个关卡的初始局面必须合法（不照面、红方未被将军）');
+for (const eg of api.XIANGQI_LEVELS) {
   const b = B(eg.pieces);
   t(eg.name + ' · 不照面', api.xqKingsFacing(b), false);
   t(eg.name + ' · 红方未被将军', api.xqInCheck(b, 'r'), false);
 }
 
 console.log('\n【2】车');
-const b1 = B(api.XIANGQI_ENDGAMES[0].pieces);   // 车a1 帅d1 将e10
+const b1 = B([['R', 0, 9], ['K', 3, 9], ['k', 4, 0]]);   // 车a1 帅d1 将e10
 t('a1→a5 直线无阻 = 合法', api.xqLegalMove(b1, 0, 9, 0, 5), true);
 t('a1→d1 吃己方帅 = 非法', api.xqLegalMove(b1, 0, 9, 3, 9), false);
 t('a1→e5 不走直线 = 非法', api.xqLegalMove(b1, 0, 9, 4, 5), false);
@@ -54,7 +54,7 @@ t('照面局面能被识别', api.xqKingsFacing(bFace), true);
 t('照面局面下任何走法都不合法（走完仍照面）', api.xqMovesFor(bFace, 0, 9).length, 0);
 
 console.log('\n【5】炮（吃子必须隔一子）');
-const b4 = B(api.XIANGQI_ENDGAMES[3].pieces);   // 马c5 炮e3 帅d1 / 将e10 士e9
+const b4 = B([['N', 2, 4], ['C', 4, 7], ['K', 3, 9], ['k', 4, 0], ['a', 4, 1]]);   // 马c5 炮e3 帅d1 / 将e10 士e9
 t('炮 e3→e10 隔黑士吃将 = 合法', api.xqLegalMove(b4, 4, 7, 4, 0), true);
 t('炮 e3→e9 相邻吃子（中间 0 子）= 非法', api.xqLegalMove(b4, 4, 7, 4, 1), false);
 t('炮 e3→e5 空地直移 = 合法', api.xqLegalMove(b4, 4, 7, 4, 5), true);
@@ -104,16 +104,18 @@ t('红车 d1 不能离开（走了就照面）= 非法', api.xqLegalMove(bPin, 3
 t('红车 d1 沿 d 线走到 d5 也非法（离开即照面）', api.xqLegalMove(bPin, 3, 9, 3, 4), false);
 
 console.log('\n【10】将死 / 胜负判定');
-// 黑将躲在 a10 角上，a 列与 b 列各有一车锁住 → 无路可走
-const bMate = B([['R', 0, 9], ['R', 1, 9], ['K', 4, 9], ['k', 0, 0]]);
+// 黑将缩在九宫左上角：d 列车封住竖线、e 列车封住 e10 → 无路可走
+const bMate = B([['R', 3, 9], ['R', 4, 5], ['K', 4, 9], ['k', 3, 0]]);
 t('黑方被将死 → 判负', api.xqLoser(bMate), 'b');
-t('四个残局的初始局面都未分胜负',
-  api.XIANGQI_ENDGAMES.map(eg => api.xqLoser(B(eg.pieces))).join(','), ',,,');
+const badLevels = api.XIANGQI_LEVELS.filter(eg => api.xqLoser(B(eg.pieces)) !== null);
+t('八个关卡的初始局面都未分胜负' +
+  (badLevels.length ? '（有问题的关卡：' + badLevels.map(x => x.name).join('、') + '）' : ''),
+  badLevels.length, 0);
 
 console.log('\n【11】AI 应手必须是合法着法（跑 30 次）');
 let aiOk = true;
 for (let i = 0; i < 30 && aiOk; i++) {
-  const bb = B(api.XIANGQI_ENDGAMES[0].pieces);
+  const bb = B([['R', 0, 9], ['K', 3, 9], ['k', 4, 0]]);
   const mv = api.xqAiChoose(bb, 'b');
   if (!mv) { aiOk = false; t('AI 应能给出着法（第 ' + i + ' 次）', false, true); break; }
   if (!api.xqLegalMove(bb, mv.from[0], mv.from[1], mv.to[0], mv.to[1])) {
@@ -122,6 +124,25 @@ for (let i = 0; i < 30 && aiOk; i++) {
   }
 }
 if (aiOk) t('AI 连续 30 次都给出合法着法', true, true);
+
+console.log('\n【12】关卡正解序列必须真的能杀（逐关验算）');
+let lvOk = 0, lvBad = 0;
+for (const lv of api.XIANGQI_LEVELS) {
+  if (!lv.solution) continue;              // 限步关没有唯一正解，跳过
+  const bb = B(lv.pieces);
+  let legal = true;
+  for (const mv of lv.solution) {
+    if (!api.xqLegalMove(bb, mv[0], mv[1], mv[2], mv[3])) { legal = false; break; }
+    bb[mv[3]][mv[2]] = bb[mv[1]][mv[0]];
+    bb[mv[1]][mv[0]] = null;
+  }
+  const mate = api.xqLoser(bb) === 'b';
+  const ok = legal && mate;
+  ok ? lvOk++ : lvBad++;
+  console.log((ok ? '  ✓ ' : '  ✗ ') + lv.name + '：' + lv.solution.length + ' 手，' +
+    (legal ? '着法全合法' : '有非法着法') + '，' + (mate ? '终局将死黑方' : '终局没杀死'));
+}
+t('带正解的关卡全部验算通过（' + lvOk + ' 关）', lvBad, 0);
 
 console.log('\n————————————————————————');
 console.log('通过 ' + pass + ' 项，失败 ' + fail + ' 项');

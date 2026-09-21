@@ -442,11 +442,21 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .en-sent-en { font-size: 0.86rem; color: var(--text-primary); line-height: 1.5; }
 .en-sent-zh { margin-top: 3px; font-size: 0.76rem; color: var(--text-secondary); }
 /* === 每日残局 === */
-.xq-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-.xq-name { font-size: 0.86rem; font-weight: 600; color: var(--text-primary); }
-.xq-turn { font-size: 0.72rem; color: var(--text-dim); }
+.xq-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.xq-name { font-size: 0.86rem; font-weight: 600; color: var(--text-primary); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xq-turn { font-size: 0.72rem; color: var(--text-dim); flex: none; }
 .xq-turn.is-red { color: var(--expense); }
-.xq-btns { margin-left: auto; display: flex; gap: 6px; }
+.xq-lvs { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+.xq-lv {
+  width: 22px; height: 22px; border-radius: 50%; flex: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 0.68rem;
+  color: var(--text-dim); border: 1px solid var(--border-subtle); background: var(--bg-panel);
+}
+.xq-lv.done { color: var(--success); border-color: color-mix(in srgb, var(--success) 45%, transparent); }
+.xq-lv.cur { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); font-weight: 700; }
+.xq-ops { display: flex; gap: 6px; margin-bottom: 8px; }
+.xq-done.xq-bad { color: var(--expense); }
 /*
  * 棋盘：8 格宽 × 9 格高（格子近似正方），棋子落在**交叉点**上而不是格子里——
  * 这是象棋盘和「棋子阵列」的区别。SVG 画线、DOM 放子，两者共用 0..8 / 0..9 的格子坐标。
@@ -3328,15 +3338,29 @@ function dailyPick(list) {
 // ===== 每日象棋残局 =====
 // 局面用坐标写（x 0-8 左→右，y 0-9 上→下；y=0 是黑方底线、y=9 是红方底线），
 // 比 FEN 直观、手写不易错。大写红方、小写黑方：K帅 A仕 B相 N马 R车 C炮 P兵。
-const XIANGQI_ENDGAMES = [
-  { name: '单车对单将', pieces: [['R', 0, 9], ['K', 3, 9], ['k', 4, 0]],
-    tip: '车走肋道把将逼向边线，帅占中线形成「对面笑」助攻。单车必胜单将。' },
-  { name: '单车对单士', pieces: [['R', 0, 9], ['K', 4, 9], ['k', 4, 0], ['a', 4, 1]],
-    tip: '先用帅牵住士，再驱车吃士。「单士怕车」，士一丢即成单车胜单将。' },
-  { name: '车兵对士象全', pieces: [['R', 0, 9], ['P', 4, 6], ['K', 4, 9], ['k', 4, 0], ['a', 3, 0], ['a', 5, 0], ['b', 2, 0], ['b', 6, 0]],
-    tip: '兵从中路推进换掉双士或双象，车兵可胜士象全（单车则和）。' },
-  { name: '马炮对单士', pieces: [['N', 2, 4], ['C', 4, 7], ['K', 4, 9], ['k', 4, 0], ['a', 4, 1]],
-    tip: '炮在中路牵制，马跳到卧槽位配合。马炮双将优于单马或单炮。' }
+const XIANGQI_LEVELS = [
+  // ---- 第一类：带正解的一步杀。solution 是红方的唯一正解着法（[fx,fy,tx,ty]），
+  //      测试脚本会逐条验算「着法合法 + 走完确实将死黑方」，所以不会出现假关卡。 ----
+  // 注意：将/帅只能在自己的九宫里活动（黑方 x3-5 / y0-2，红方 x3-5 / y7-9），
+  // 「角」指的是九宫的角（d10/f10/d8/f8），不是棋盘的角——写成棋盘角会让将一步都走不了。
+  { name: '封将门·左', tip: '一步杀：将缩在九宫左上角，逃路只剩两条——一条用竖线车封死，另一条早有横线车等着。',
+    pieces: [['R', 0, 8], ['R', 4, 5], ['K', 4, 9], ['k', 3, 0]], solution: [[0, 8, 3, 8]] },
+  { name: '封将门·右', tip: '一步杀：同上，换到右上角。',
+    pieces: [['R', 8, 8], ['R', 4, 5], ['K', 4, 9], ['k', 5, 0]], solution: [[8, 8, 5, 8]] },
+  { name: '兵封中路', tip: '一步杀：将不在角上时逃路有三条——车横到底线管住左右，小兵提前占住退路。',
+    pieces: [['R', 0, 9], ['P', 4, 2], ['K', 3, 9], ['k', 4, 0]], solution: [[0, 9, 0, 0]] },
+  { name: '回马封门', tip: '一步杀：将退到九宫下角，还是一竖一横锁死，只是这次车从底线横移过去。',
+    pieces: [['R', 0, 9], ['R', 4, 4], ['K', 4, 9], ['k', 3, 2]], solution: [[0, 9, 3, 9]] },
+
+  // ---- 第二类：没有唯一正解，给步数上限，黑方由 AI 应手 ----
+  { name: '单车擒王', limit: 20, tip: '限 20 步：单车必胜单将。车走肋道把将逼向边线，帅占中线助攻。',
+    pieces: [['R', 0, 9], ['K', 3, 9], ['k', 4, 0]] },
+  { name: '单车擒单士', limit: 25, tip: '限 25 步：先用帅牵住士，再驱车吃士。「单士怕车」，士一丢即成单车胜单将。',
+    pieces: [['R', 0, 9], ['K', 4, 9], ['k', 4, 0], ['a', 4, 1]] },
+  { name: '车兵破士象全', limit: 30, tip: '限 30 步：兵从中路推进，换掉双士或双象之一，车兵即可胜士象全（单车则和）。',
+    pieces: [['R', 0, 9], ['P', 4, 6], ['K', 4, 9], ['k', 4, 0], ['a', 3, 0], ['a', 5, 0], ['b', 2, 0], ['b', 6, 0]] },
+  { name: '马炮擒单士', limit: 25, tip: '限 25 步：炮在中路牵制，马跳到卧槽位配合。马炮双将优于单马或单炮。',
+    pieces: [['N', 2, 4], ['C', 4, 7], ['K', 4, 9], ['k', 4, 0], ['a', 4, 1]] }
 ];
 
 const XQ_LABEL = { K:'帅', A:'仕', B:'相', N:'马', R:'车', C:'炮', P:'兵', k:'将', a:'士', b:'象', n:'马', r:'车', c:'炮', p:'卒' };
@@ -3564,33 +3588,83 @@ function xqLoser(board) {
 
 const xqPct = (i, total) => (i / total * 100).toFixed(3) + '%';
 
+let _xqLevel = 0;                                   // 当前关卡索引
+
+function xqCurLevel() { return XIANGQI_LEVELS[_xqLevel]; }
+function xqClearedMap() { return Store.get('xqCleared', {}); }
+function xqMarkCleared() {
+  const c = xqClearedMap();
+  c[_xqLevel] = 1;
+  Store.set('xqCleared', c);
+}
+function xqLevelTo(i) {
+  if (i < 0 || i >= XIANGQI_LEVELS.length) return;
+  _xqLevel = i;
+  xqNewGame();
+  renderDailyChess();
+}
+function xqLevel(delta) { xqLevelTo(_xqLevel + delta); }
+
 function xqNewGame() {
-  const eg = dailyPick(XIANGQI_ENDGAMES);
+  const eg = xqCurLevel();
   _xqState = {
     name: eg.name, tip: eg.tip, board: xqBoard(eg.pieces),
     sel: null, moves: [], turn: 'r', history: [], lastFrom: null, lastTo: null,
+    step: 0,      // 正解模式：已走到解法的第几步
+    used: 0,      // 已用步数（限步模式）
   };
   return eg;
+}
+
+// 落子（记快照 + 清选中）。正解模式和限步模式共用。
+function xqApply(fx, fy, tx, ty) {
+  const st = _xqState;
+  st.history.push({
+    board: st.board.map(function (r) { return r.slice(); }),
+    turn: st.turn, lastFrom: st.lastFrom, lastTo: st.lastTo,
+    step: st.step, used: st.used,
+  });
+  st.board[ty][tx] = st.board[fy][fx];
+  st.board[fy][fx] = null;
+  st.lastFrom = [fx, fy]; st.lastTo = [tx, ty];
+  st.sel = null; st.moves = [];
 }
 
 function renderDailyChess() {
   const box = document.getElementById('daily-chess-body');
   if (!box) return;
-  const eg = dailyPick(XIANGQI_ENDGAMES);
-  if (!_xqState || _xqState.name !== eg.name) xqNewGame();
+  const lv = xqCurLevel();
+  if (!_xqState || _xqState.name !== lv.name) xqNewGame();
   const st = _xqState;
   const b = st.board;
   const loser = xqLoser(b);
+  const solved = !!lv.solution;
+  const outOfSteps = !loser && !!lv.limit && st.used >= lv.limit;
+  const cleared = xqClearedMap();
+
+  let dots = '';
+  XIANGQI_LEVELS.forEach(function (_, i) {
+    dots += '<span class="xq-lv' + (i === _xqLevel ? ' cur' : '') + (cleared[i] ? ' done' : '') +
+      '" onclick="xqLevelTo(' + i + ')">' + (i + 1) + '</span>';
+  });
+
+  const status = loser ? '已分胜负'
+    : outOfSteps ? '步数用尽'
+    : solved ? '第 ' + (Math.floor(st.step / 2) + 1) + ' 回合'
+    : '已用 ' + st.used + '/' + lv.limit + ' 步';
 
   let html = '<div class="xq-bar">' +
-    '<span class="xq-name">' + escHtml(eg.name) + '</span>' +
-    '<span class="xq-turn' + (st.turn === 'r' ? ' is-red' : '') + '">' +
-      (loser ? '已分胜负' : (st.turn === 'r' ? '红先' : '黑先')) + '</span>' +
-    '<span class="xq-btns">' +
-      '<button class="btn btn-sm" onclick="xqHint()">提示</button>' +
+    '<button class="btn btn-sm" onclick="xqLevel(-1)"' + (_xqLevel ? '' : ' disabled') + '>‹</button>' +
+    '<span class="xq-name">' + escHtml(lv.name) + '</span>' +
+    '<span class="xq-turn' + (st.turn === 'r' ? ' is-red' : '') + '">' + status + '</span>' +
+    '<button class="btn btn-sm" onclick="xqLevel(1)"' + (_xqLevel < XIANGQI_LEVELS.length - 1 ? '' : ' disabled') + '>›</button>' +
+    '</div>' +
+    '<div class="xq-lvs">' + dots + '</div>' +
+    '<div class="xq-ops">' +
+      (solved ? '' : '<button class="btn btn-sm" onclick="xqHint()">提示</button>') +
       '<button class="btn btn-sm" onclick="xqUndo()"' + (st.history.length ? '' : ' disabled') + '>悔棋</button>' +
       '<button class="btn btn-sm" onclick="xqReset()">重摆</button>' +
-    '</span></div>';
+    '</div>';
 
   html += '<div class="xq-board"><div class="xq-plane">' + xqGridSvg() +
     '<div class="xq-river"><span>楚 河</span><span>汉 界</span></div>';
@@ -3615,10 +3689,11 @@ function renderDailyChess() {
   }
   html += '</div></div>';
 
-  if (loser) {
-    html += '<div class="xq-done">' + (loser === 'b' ? '红方胜 · 残局解开' : '黑方胜 · 再来一次') + '</div>';
-  }
-  html += '<div class="xq-tip">' + mkIcon('thought', 0.8) + ' ' + escHtml(eg.tip) + '</div>';
+  if (loser === 'b') html += '<div class="xq-done">' + mkIcon('check', 0.85) + ' 通关！</div>';
+  else if (loser === 'r') html += '<div class="xq-done xq-bad">黑方胜 · 重摆再战</div>';
+  else if (outOfSteps) html += '<div class="xq-done xq-bad">步数用尽 · 重摆再战</div>';
+
+  html += '<div class="xq-tip">' + mkIcon('thought', 0.8) + ' ' + escHtml(lv.tip) + '</div>';
   box.innerHTML = html;
 }
 
@@ -3660,35 +3735,45 @@ function xqAiStep() {
   if (!st || st.turn !== 'b' || xqLoser(st.board)) return;
   const mv = xqAiChoose(st.board, 'b');
   if (!mv) return;
-  st.history.push({
-    board: st.board.map(function (r) { return r.slice(); }),
-    turn: st.turn, lastFrom: st.lastFrom, lastTo: st.lastTo,
-  });
-  st.board[mv.to[1]][mv.to[0]] = st.board[mv.from[1]][mv.from[0]];
-  st.board[mv.from[1]][mv.from[0]] = null;
-  st.lastFrom = mv.from; st.lastTo = mv.to;
-  st.sel = null; st.moves = []; st.turn = 'r';
+  xqApply(mv.from[0], mv.from[1], mv.to[0], mv.to[1]);
+  st.turn = 'r';
 }
 
 function xqTap(x, y) {
   const st = _xqState;
   if (!st) return;
-  if (xqLoser(st.board)) return;                 // 已分胜负，不再接受走子
-  if (st.turn !== 'r') return;                   // 黑方由 AI 代走
+  const lv = xqCurLevel();
+  if (xqLoser(st.board)) return;                     // 已分胜负
+  if (lv.limit && st.used >= lv.limit) return;       // 步数用尽
+  if (st.turn !== 'r') return;                       // 黑方由程序代走
   const c = st.board[y][x];
+
   if (st.sel) {
+    const [sx, sy] = st.sel;
     if (st.moves.some(m => m[0] === x && m[1] === y)) {
-      const [sx, sy] = st.sel;
-      // 存整盘快照：只有 90 格，比记增量便宜也更不容易写错
-      st.history.push({
-        board: st.board.map(function (r) { return r.slice(); }),
-        turn: st.turn, lastFrom: st.lastFrom, lastTo: st.lastTo,
-      });
-      st.board[y][x] = st.board[sy][sx];
-      st.board[sy][sx] = null;
-      st.lastFrom = [sx, sy]; st.lastTo = [x, y];
-      st.sel = null; st.moves = []; st.turn = 'b';
-      xqAiStep();                                 // 红方走完，黑方应一手
+      // 正解模式：只认解法里那一步（这是「闯关」和「自由练习」的唯一区别）
+      if (lv.solution) {
+        const need = lv.solution[st.step];
+        if (!need || need[0] !== sx || need[1] !== sy || need[2] !== x || need[3] !== y) {
+          showToast('不是这一步，再想想');
+          st.sel = null; st.moves = [];
+          renderDailyChess();
+          return;
+        }
+      }
+      xqApply(sx, sy, x, y);
+      st.used++; st.step++;
+
+      if (lv.solution) {
+        // 黑方按解法应手（解法里红黑交替，最后一步是红方的杀着）
+        const reply = lv.solution[st.step];
+        if (reply) { xqApply(reply[0], reply[1], reply[2], reply[3]); st.step++; }
+        st.turn = 'r';
+        if (st.step >= lv.solution.length && xqLoser(st.board) === 'b') xqMarkCleared();
+      } else {
+        st.turn = 'b';
+        xqAiStep();                                    // 限步模式：AI 应一手
+      }
       renderDailyChess();
       return;
     }
@@ -3710,6 +3795,7 @@ function xqUndo() {
     st.board = prev.board;
     st.turn = prev.turn;
     st.lastFrom = prev.lastFrom; st.lastTo = prev.lastTo;
+    st.step = prev.step; st.used = prev.used;
     guard++;
   } while (st.turn !== 'r' && st.history.length && guard < 6);
   st.sel = null; st.moves = [];
