@@ -127,6 +127,9 @@ app.get('/api/files/:id', (req, res) => {
 
 // 鉴权中间件：只保护 /api/*，静态文件不拦
 app.use('/api', (req, res, next) => {
+  // 公开只读接口放行：给站点 htt.kotete.xyz 读「切片 / 物料」用。
+  // 这里放行的只是路径前缀，具体能读哪些 key 由下面 /api/public/:key 的硬编码白名单决定。
+  if (req.path.startsWith('/public/')) return next();
   const auth = req.get('Authorization') || '';
   if (auth !== `Bearer ${TOKEN}`) {
     return res.status(401).json({ error: '未授权：token 缺失或不正确' });
@@ -230,6 +233,23 @@ const kvStmts = {
                    updated_at = excluded.updated_at`),
   del: db.prepare('DELETE FROM kv WHERE key = ?')
 };
+
+// ===== 公开只读接口（免鉴权，给站点 htt.kotete.xyz 用）=====
+// 安全要点：白名单是**硬编码**的——只有下面这两个 key 能被匿名读到。
+// 其余任何 key（wallet / tasks / journal / entries …）就算猜到名字，也只会拿到 404。
+// ⚠️ 不要把它改成「排除法」，也不要从别处动态取 key 列表——那等于把私人数据挂到公网上。
+const PUBLIC_KEYS = ['slices', 'assets'];
+app.get('/api/public/:key', (req, res) => {
+  const key = String(req.params.key);
+  if (PUBLIC_KEYS.indexOf(key) < 0) { res.status(404).json({ ok: false, error: 'not found' }); return; }
+  let value = [];
+  try {
+    const row = kvStmts.get.get(key);
+    if (row && row.value) value = JSON.parse(row.value);
+  } catch (e) { value = []; }
+  res.set('Cache-Control', 'public, max-age=60');
+  res.json({ ok: true, value: value });
+});
 
 // GET /api/kv —— 全量读出（单人量级，直接全给，合并交给前端）
 app.get('/api/kv', wrap(() => {
