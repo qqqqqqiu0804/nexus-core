@@ -442,29 +442,45 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .en-sent-en { font-size: 0.86rem; color: var(--text-primary); line-height: 1.5; }
 .en-sent-zh { margin-top: 3px; font-size: 0.76rem; color: var(--text-secondary); }
 /* === 每日残局 === */
-.xq-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.xq-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .xq-name { font-size: 0.86rem; font-weight: 600; color: var(--text-primary); }
 .xq-turn { font-size: 0.72rem; color: var(--text-dim); }
 .xq-turn.is-red { color: var(--expense); }
+.xq-btns { margin-left: auto; display: flex; gap: 6px; }
+/*
+ * 棋盘：8 格宽 × 9 格高（格子近似正方），棋子落在**交叉点**上而不是格子里——
+ * 这是象棋盘和「棋子阵列」的区别。SVG 画线、DOM 放子，两者共用 0..8 / 0..9 的格子坐标。
+ */
 .xq-board {
-  display: grid; grid-template-columns: repeat(9, 1fr);
-  background: var(--bg-panel); border: 1px solid var(--border-subtle);
-  border-radius: 8px; padding: 6px;
+  position: relative; width: 100%; aspect-ratio: 8 / 9; padding: 6%;
+  background: color-mix(in srgb, var(--bg-panel) 92%, var(--accent) 8%);
+  border: 1px solid var(--border-subtle); border-radius: 10px; box-sizing: border-box;
 }
-.xq-cell {
-  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
-  box-shadow: inset 0 0 0 0.5px var(--border-subtle); border-radius: 2px; cursor: pointer;
+.xq-plane { position: relative; width: 100%; height: 100%; color: color-mix(in srgb, var(--text-dim) 55%, transparent); }
+.xq-plane > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.xq-river {
+  position: absolute; left: 0; right: 0; top: 44.44%; transform: translateY(-50%);
+  display: flex; justify-content: space-evenly; pointer-events: none;
+  font-size: 0.7rem; letter-spacing: 0.28em; color: var(--text-dim); opacity: 0.75;
 }
-.xq-piece {
-  width: 86%; aspect-ratio: 1; border-radius: 50%;
+.xq-p {
+  position: absolute; width: 9.6%; aspect-ratio: 1; transform: translate(-50%, -50%);
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.8rem; font-weight: 600; border: 1.5px solid; background: var(--bg-card);
+  border-radius: 50%; border: 1.5px solid; background: var(--bg-card);
+  font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }
-.xq-piece.red { color: var(--expense); border-color: color-mix(in srgb, var(--expense) 45%, transparent); }
-.xq-piece.black { color: var(--text-primary); border-color: var(--border-subtle); }
-.xq-piece.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
-.xq-dot { width: 28%; aspect-ratio: 1; border-radius: 50%; background: var(--accent); opacity: 0.5; }
+.xq-p.red { color: var(--expense); border-color: color-mix(in srgb, var(--expense) 55%, transparent); }
+.xq-p.black { color: var(--text-primary); border-color: color-mix(in srgb, var(--text-primary) 40%, transparent); }
+.xq-p.sel { box-shadow: 0 0 0 2px var(--accent), 0 1px 3px rgba(0,0,0,0.2); }
+.xq-p.last { box-shadow: 0 0 0 2px color-mix(in srgb, var(--orange) 60%, transparent); }
+.xq-hint {
+  position: absolute; width: 4.6%; aspect-ratio: 1; transform: translate(-50%, -50%);
+  border-radius: 50%; background: var(--success); opacity: 0.5; pointer-events: none;
+}
+.xq-hint.cap { width: 9%; background: var(--expense); opacity: 0.42; }
 .xq-tip { margin-top: 8px; font-size: 0.75rem; color: var(--text-dim); line-height: 1.55; }
+.xq-done { margin-top: 6px; font-size: 0.82rem; font-weight: 600; color: var(--success); }
 .history-filter.active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 
 /* === Bottom Tab Bar === */
@@ -2903,9 +2919,47 @@ function speakEnSentence() { speakEnglish(dailyPick(DAILY_SENTENCES).en); }
 // 局面状态挂在 _xqState 上，renderAll 反复重绘也不会丢掉用户已经走的棋。
 let _xqState = null;
 
+// 棋盘底图：10 条横线 + 9 条竖线（中段断开成楚河汉界）+ 两处九宫斜线。
+// 坐标与棋子层共用 0..8 / 0..9，所以线正好穿过棋子圆心。
+function xqGridSvg() {
+  const parts = [];
+  for (let y = 0; y <= 9; y++) parts.push('<line x1="0" y1="' + y + '" x2="8" y2="' + y + '"/>');
+  for (let x = 0; x <= 8; x++) {
+    parts.push('<line x1="' + x + '" y1="0" x2="' + x + '" y2="4"/>');
+    parts.push('<line x1="' + x + '" y1="5" x2="' + x + '" y2="9"/>');
+  }
+  parts.push('<line x1="3" y1="0" x2="5" y2="2"/><line x1="5" y1="0" x2="3" y2="2"/>');
+  parts.push('<line x1="3" y1="7" x2="5" y2="9"/><line x1="5" y1="7" x2="3" y2="9"/>');
+  return '<svg viewBox="-0.015 -0.015 8.03 9.03" preserveAspectRatio="none" aria-hidden="true">' +
+    '<g fill="none" stroke="currentColor" stroke-width="1" vector-effect="non-scaling-stroke">' +
+    parts.join('') + '</g></svg>';
+}
+
+// 某一方是否还有合法着法。没有 = 被将死或困毙（中国象棋两者都判负）。
+function xqHasLegalMove(board, side) {
+  for (let y = 0; y < 10; y++) {
+    for (let x = 0; x < 9; x++) {
+      const c = board[y][x];
+      if (!c || xqSide(c) !== side) continue;
+      if (xqMovesFor(board, x, y).length) return true;
+    }
+  }
+  return false;
+}
+// 已输的一方（'r' / 'b'），未分胜负返回 null
+function xqLoser(board) {
+  for (const side of ['r', 'b']) if (!xqHasLegalMove(board, side)) return side;
+  return null;
+}
+
+const xqPct = (i, total) => (i / total * 100).toFixed(3) + '%';
+
 function xqNewGame() {
   const eg = dailyPick(XIANGQI_ENDGAMES);
-  _xqState = { name: eg.name, tip: eg.tip, board: xqBoard(eg.pieces), sel: null, moves: [], turn: 'r', played: 0 };
+  _xqState = {
+    name: eg.name, tip: eg.tip, board: xqBoard(eg.pieces),
+    sel: null, moves: [], turn: 'r', history: [], lastFrom: null, lastTo: null,
+  };
   return eg;
 }
 
@@ -2916,25 +2970,44 @@ function renderDailyChess() {
   if (!_xqState || _xqState.name !== eg.name) xqNewGame();
   const st = _xqState;
   const b = st.board;
+  const loser = xqLoser(b);
 
   let html = '<div class="xq-bar">' +
     '<span class="xq-name">' + escHtml(eg.name) + '</span>' +
-    '<span class="xq-turn' + (st.turn === 'r' ? ' is-red' : '') + '">' + (st.turn === 'r' ? '红方走' : '黑方走') + '</span>' +
-    '<button class="btn btn-sm" onclick="xqReset()">重摆</button>' +
-    '</div><div class="xq-board">';
+    '<span class="xq-turn' + (st.turn === 'r' ? ' is-red' : '') + '">' +
+      (loser ? '已分胜负' : (st.turn === 'r' ? '红先' : '黑先')) + '</span>' +
+    '<span class="xq-btns">' +
+      '<button class="btn btn-sm" onclick="xqHint()">提示</button>' +
+      '<button class="btn btn-sm" onclick="xqUndo()"' + (st.history.length ? '' : ' disabled') + '>悔棋</button>' +
+      '<button class="btn btn-sm" onclick="xqReset()">重摆</button>' +
+    '</span></div>';
+
+  html += '<div class="xq-board"><div class="xq-plane">' + xqGridSvg() +
+    '<div class="xq-river"><span>楚 河</span><span>汉 界</span></div>';
+
+  // 可走落点画在棋子下面：空点直接可见，可吃子的位置露出偏红的圈
+  st.moves.forEach(function (m) {
+    html += '<div class="xq-hint' + (b[m[1]][m[0]] ? ' cap' : '') +
+      '" style="left:' + xqPct(m[0], 8) + ';top:' + xqPct(m[1], 9) + '"></div>';
+  });
 
   for (let y = 0; y < 10; y++) {
     for (let x = 0; x < 9; x++) {
       const c = b[y][x];
-      const isSel = !!st.sel && st.sel[0] === x && st.sel[1] === y;
-      const isMove = st.moves.some(m => m[0] === x && m[1] === y);
-      html += '<div class="xq-cell" onclick="xqTap(' + x + ',' + y + ')">';
-      if (c) html += '<div class="xq-piece ' + (xqIsRed(c) ? 'red' : 'black') + (isSel ? ' sel' : '') + '">' + XQ_LABEL[c] + '</div>';
-      else if (isMove) html += '<div class="xq-dot"></div>';
-      html += '</div>';
+      if (!c) continue;
+      const cls = 'xq-p ' + (xqIsRed(c) ? 'red' : 'black') +
+        (st.sel && st.sel[0] === x && st.sel[1] === y ? ' sel' : '') +
+        ((st.lastFrom && st.lastFrom[0] === x && st.lastFrom[1] === y) ||
+         (st.lastTo && st.lastTo[0] === x && st.lastTo[1] === y) ? ' last' : '');
+      html += '<div class="' + cls + '" style="left:' + xqPct(x, 8) + ';top:' + xqPct(y, 9) +
+        '" onclick="xqTap(' + x + ',' + y + ')">' + XQ_LABEL[c] + '</div>';
     }
   }
-  html += '</div>';
+  html += '</div></div>';
+
+  if (loser) {
+    html += '<div class="xq-done">' + (loser === 'b' ? '红方胜 · 残局解开' : '黑方胜 · 再来一次') + '</div>';
+  }
   html += '<div class="xq-tip">' + mkIcon('thought', 0.8) + ' ' + escHtml(eg.tip) + '</div>';
   box.innerHTML = html;
 }
@@ -2946,17 +3019,66 @@ function xqSelect(x, y) {
   renderDailyChess();
 }
 
+// 黑方应手的极简启发式（**不是**象棋引擎）：能吃就吃、能将军就将军、同分带点随机。
+// 目的是让残局练习有个像样的对手，而不是真的对弈。
+const XQ_VALUE = { R: 9, C: 4.5, N: 4, B: 2, A: 2, P: 1 };
+
+function xqAiChoose(board, side) {
+  const foe = side === 'r' ? 'b' : 'r';
+  let best = null;
+  for (let y = 0; y < 10; y++) {
+    for (let x = 0; x < 9; x++) {
+      const c = board[y][x];
+      if (!c || xqSide(c) !== side) continue;
+      xqMovesFor(board, x, y).forEach(function (m) {
+        let score = (XQ_VALUE[(board[m[1]][m[0]] || '').toUpperCase()] || 0) * 10;
+        const nb = board.map(function (r) { return r.slice(); });
+        nb[m[1]][m[0]] = nb[y][x]; nb[y][x] = null;
+        if (xqInCheck(nb, foe)) score += 25;      // 将军
+        if (xqInCheck(nb, side)) score -= 40;     // 走完自己被将 → 基本是送
+        score += Math.random() * 6;
+        if (!best || score > best.score) best = { from: [x, y], to: m, score: score };
+      });
+    }
+  }
+  return best;
+}
+
+// 轮到黑方时自动走一步（同步执行，不需要定时器）
+function xqAiStep() {
+  const st = _xqState;
+  if (!st || st.turn !== 'b' || xqLoser(st.board)) return;
+  const mv = xqAiChoose(st.board, 'b');
+  if (!mv) return;
+  st.history.push({
+    board: st.board.map(function (r) { return r.slice(); }),
+    turn: st.turn, lastFrom: st.lastFrom, lastTo: st.lastTo,
+  });
+  st.board[mv.to[1]][mv.to[0]] = st.board[mv.from[1]][mv.from[0]];
+  st.board[mv.from[1]][mv.from[0]] = null;
+  st.lastFrom = mv.from; st.lastTo = mv.to;
+  st.sel = null; st.moves = []; st.turn = 'r';
+}
+
 function xqTap(x, y) {
   const st = _xqState;
   if (!st) return;
+  if (xqLoser(st.board)) return;                 // 已分胜负，不再接受走子
+  if (st.turn !== 'r') return;                   // 黑方由 AI 代走
   const c = st.board[y][x];
   if (st.sel) {
     if (st.moves.some(m => m[0] === x && m[1] === y)) {
       const [sx, sy] = st.sel;
+      // 存整盘快照：只有 90 格，比记增量便宜也更不容易写错
+      st.history.push({
+        board: st.board.map(function (r) { return r.slice(); }),
+        turn: st.turn, lastFrom: st.lastFrom, lastTo: st.lastTo,
+      });
       st.board[y][x] = st.board[sy][sx];
       st.board[sy][sx] = null;
-      st.sel = null; st.moves = []; st.played++;
-      st.turn = st.turn === 'r' ? 'b' : 'r';
+      st.lastFrom = [sx, sy]; st.lastTo = [x, y];
+      st.sel = null; st.moves = []; st.turn = 'b';
+      xqAiStep();                                 // 红方走完，黑方应一手
       renderDailyChess();
       return;
     }
@@ -2968,7 +3090,36 @@ function xqTap(x, y) {
   if (c && xqSide(c) === st.turn) xqSelect(x, y);
 }
 
+// 一次悔棋撤**一整回合**（黑方应手 + 你的着法），回到你上次做决定之前
+function xqUndo() {
+  const st = _xqState;
+  if (!st || !st.history.length) return;
+  let guard = 0;
+  do {
+    const prev = st.history.pop();
+    st.board = prev.board;
+    st.turn = prev.turn;
+    st.lastFrom = prev.lastFrom; st.lastTo = prev.lastTo;
+    guard++;
+  } while (st.turn !== 'r' && st.history.length && guard < 6);
+  st.sel = null; st.moves = [];
+  renderDailyChess();
+}
+
 function xqReset() { xqNewGame(); renderDailyChess(); }
+
+// 坐标 → 棋谱常见记法（红方视角：红底线是 1，黑底线是 10）
+function xqPosText(x, y) { return 'abcdefghi'[x] + (10 - y); }
+
+// 「提示」= 用同一套启发式站在红方角度推荐一步。这不是残局正解，
+// 只是一个不至于太离谱的建议——别把它当标准答案。
+function xqHint() {
+  const st = _xqState;
+  if (!st || st.turn !== 'r' || xqLoser(st.board)) return;
+  const mv = xqAiChoose(st.board, 'r');
+  if (!mv) { showToast('这一步没有可走的着法'); return; }
+  showToast('可考虑：' + xqPosText(mv.from[0], mv.from[1]) + ' → ' + xqPosText(mv.to[0], mv.to[1]));
+}
 
 function renderDailyHub() {
   const today = TODAY();

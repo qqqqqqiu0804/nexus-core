@@ -13,10 +13,10 @@ const HTML = path.join(__dirname, '..', 'index.html');
 const html = fs.readFileSync(HTML, 'utf8');
 
 const start = html.indexOf('// ===== 每日象棋残局 =====');
-const end = html.indexOf('const TODAY = () => localDate();');
+const end = html.indexOf('function renderDailyHub() {');
 if (start < 0 || end < 0 || end < start) { console.error('提取代码段失败'); process.exit(1); }
 const code = html.slice(start, end);
-const api = new Function(code + '\nreturn { xqBoard, xqLegalMove, xqMovesFor, xqKingsFacing, xqInCheck, XIANGQI_ENDGAMES };')();
+const api = new Function(code + '\nreturn { xqBoard, xqLegalMove, xqMovesFor, xqKingsFacing, xqInCheck, xqLoser, xqAiChoose, XIANGQI_ENDGAMES };')();
 console.log('代码段长度', code.length, '字符\n');
 
 let pass = 0, fail = 0;
@@ -102,6 +102,26 @@ console.log('\n【9】走后不能自将（白脸将/被将军）');
 const bPin = B([['K', 4, 9], ['R', 3, 9], ['k', 4, 0], ['r', 3, 0]]);   // 红车 d1 挡在两将之间
 t('红车 d1 不能离开（走了就照面）= 非法', api.xqLegalMove(bPin, 3, 9, 3, 5), false);
 t('红车 d1 沿 d 线走到 d5 也非法（离开即照面）', api.xqLegalMove(bPin, 3, 9, 3, 4), false);
+
+console.log('\n【10】将死 / 胜负判定');
+// 黑将躲在 a10 角上，a 列与 b 列各有一车锁住 → 无路可走
+const bMate = B([['R', 0, 9], ['R', 1, 9], ['K', 4, 9], ['k', 0, 0]]);
+t('黑方被将死 → 判负', api.xqLoser(bMate), 'b');
+t('四个残局的初始局面都未分胜负',
+  api.XIANGQI_ENDGAMES.map(eg => api.xqLoser(B(eg.pieces))).join(','), ',,,');
+
+console.log('\n【11】AI 应手必须是合法着法（跑 30 次）');
+let aiOk = true;
+for (let i = 0; i < 30 && aiOk; i++) {
+  const bb = B(api.XIANGQI_ENDGAMES[0].pieces);
+  const mv = api.xqAiChoose(bb, 'b');
+  if (!mv) { aiOk = false; t('AI 应能给出着法（第 ' + i + ' 次）', false, true); break; }
+  if (!api.xqLegalMove(bb, mv.from[0], mv.from[1], mv.to[0], mv.to[1])) {
+    aiOk = false;
+    t('AI 着法合法（第 ' + i + ' 次）', false, true);
+  }
+}
+if (aiOk) t('AI 连续 30 次都给出合法着法', true, true);
 
 console.log('\n————————————————————————');
 console.log('通过 ' + pass + ' 项，失败 ' + fail + ' 项');
