@@ -144,6 +144,48 @@ for (const lv of api.XIANGQI_LEVELS) {
 }
 t('带正解的关卡全部验算通过（' + lvOk + ' 关）', lvBad, 0);
 
+console.log('\n【13】棋盘可点击性（回归自线上「不能落子」）');
+/*
+ * 出过的真 bug：棋盘从「格子阵列」换成 SVG 真棋盘后，空的交叉点底下没有任何元素——
+ * SVG 的线条压在落点上把点击吃掉了，点空落点毫无反应（只有吃子能走）。
+ * 这里锁三件事：① SVG 让开指针；② 90 个交叉点各有一个带 xqTap 的热区；③ 走通一次选中→落子。
+ */
+const css = html.slice(0, html.indexOf('</style>'));
+t('棋盘 SVG 已让开指针', /\.xq-plane\s*>\s*svg\s*\{[^}]*pointer-events:\s*none/.test(css), true);
+
+const box = { innerHTML: '' };
+const api2 = new Function('document', 'Store', 'mkIcon', 'escHtml', code +
+  '\nreturn { renderDailyChess, xqNewGame, xqTap, xqLevelTo, getState: function () { return _xqState; } };')(
+  { getElementById: id => (id === 'daily-chess-body' ? box : null) },
+  { get: (k, d) => (d === undefined ? null : d), set: function () {} },
+  function () { return '<svg></svg>'; },
+  function (s) { return String(s == null ? '' : s); },
+);
+api2.xqNewGame();
+api2.renderDailyChess();
+const out = String(box.innerHTML);
+const hitList = [...out.matchAll(/class="xq-hit"[^>]*onclick="xqTap\((\d+),(\d+)\)"/g)];
+t('交叉点热区数量', hitList.length, 90);
+t('热区覆盖全部坐标（0-8 × 0-9）', new Set(hitList.map(m => m[1] + ',' + m[2])).size, 90);
+t('棋子不再挂 onclick（避免与热区双触发）', /class="xq-p[^"]*"[^>]*onclick=/.test(out), false);
+
+// 走一遍：选中某个红子 → 点它的合法落点 → 应当真的落子（used +1）
+const freeIdx = api.XIANGQI_LEVELS.findIndex(l => l.limit && !l.solution);
+api2.xqLevelTo(freeIdx);
+const firstBoard = api2.getState().board;
+let fx = -1, fy = -1;
+for (let y = 0; y < 10 && fx < 0; y++) {
+  for (let x = 0; x < 9; x++) {
+    const pc = firstBoard[y][x];
+    if (pc && pc === pc.toUpperCase()) { fx = x; fy = y; break; }
+  }
+}
+api2.xqTap(fx, fy);
+const legal = api2.getState().moves;
+t('点自己的子能选中并给出落点', legal.length > 0, true);
+api2.xqTap(legal[0][0], legal[0][1]);
+t('点落点确实落子（步数 +1）', api2.getState().used, 1);
+
 console.log('\n————————————————————————');
 console.log('通过 ' + pass + ' 项，失败 ' + fail + ' 项');
 process.exit(fail ? 1 : 0);

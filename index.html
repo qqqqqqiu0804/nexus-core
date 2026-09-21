@@ -467,7 +467,15 @@ a { color: var(--accent); text-underline-offset: 2px; }
   border: 1px solid var(--border-subtle); border-radius: 10px; box-sizing: border-box;
 }
 .xq-plane { position: relative; width: 100%; height: 100%; color: color-mix(in srgb, var(--text-dim) 55%, transparent); }
-.xq-plane > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/*
+ * SVG 必须让开指针：落点就压在线上，否则点空交叉点命中的是 <line>，事件被吃掉。
+ * 棋盘的可点击性全靠下面那层 .xq-hit 热区（全 90 个交叉点各一个，铺在最上层）。
+ */
+.xq-plane > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.xq-hit {
+  position: absolute; width: 12.5%; aspect-ratio: 1; transform: translate(-50%, -50%);
+  z-index: 3; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
 .xq-river {
   position: absolute; left: 0; right: 0; top: 44.44%; transform: translateY(-50%);
   display: flex; justify-content: space-evenly; pointer-events: none;
@@ -3684,7 +3692,17 @@ function renderDailyChess() {
         ((st.lastFrom && st.lastFrom[0] === x && st.lastFrom[1] === y) ||
          (st.lastTo && st.lastTo[0] === x && st.lastTo[1] === y) ? ' last' : '');
       html += '<div class="' + cls + '" style="left:' + xqPct(x, 8) + ';top:' + xqPct(y, 9) +
-        '" onclick="xqTap(' + x + ',' + y + ')">' + XQ_LABEL[c] + '</div>';
+        '">' + XQ_LABEL[c] + '</div>';
+    }
+  }
+
+  // 交叉点热区：一格见方（12.5% = 两交叉点的间距）铺满全盘，点哪儿都吸附到最近的交叉点，
+  // 等价于 Math.round 吸附但不用算像素。必须渲染在棋子之后压在最上层——SVG 的线让开了指针，
+  // 但空交叉点底下没有任何元素，没有这层就点不动（棋子本身不再挂 onclick，避免双触发）。
+  for (let y = 0; y < 10; y++) {
+    for (let x = 0; x < 9; x++) {
+      html += '<div class="xq-hit" style="left:' + xqPct(x, 8) + ';top:' + xqPct(y, 9) +
+        '" onclick="xqTap(' + x + ',' + y + ')"></div>';
     }
   }
   html += '</div></div>';
