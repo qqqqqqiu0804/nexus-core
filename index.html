@@ -417,6 +417,54 @@ a { color: var(--accent); text-underline-offset: 2px; }
   border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
   box-shadow: var(--shadow-card);
 }
+/* === 每日英语 === */
+.en-block {
+  padding: 10px 12px; background: var(--bg-panel);
+  border: 1px solid var(--border-subtle); border-radius: 8px;
+}
+.en-block + .en-block { margin-top: 8px; }
+.en-head { display: flex; align-items: baseline; gap: 8px; }
+.en-word { font-family: var(--font-mono); font-size: 1.12rem; font-weight: 600; color: var(--text-primary); }
+.en-phon { font-size: 0.74rem; color: var(--text-dim); }
+.en-say {
+  margin-left: auto; appearance: none; border: 1px solid var(--border-subtle);
+  background: var(--bg-card); color: var(--accent); border-radius: 6px;
+  padding: 3px 9px; cursor: pointer; line-height: 1; min-height: 30px;
+}
+.en-say:active { background: var(--accent-soft); }
+.en-mean { margin-top: 5px; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.55; }
+.en-pos {
+  display: inline-block; margin-right: 6px; padding: 0 4px; border-radius: 3px;
+  font-family: var(--font-mono); font-size: 0.68rem; color: var(--accent);
+  background: var(--accent-soft);
+}
+.en-eg { margin-top: 4px; font-size: 0.78rem; color: var(--text-dim); font-style: italic; line-height: 1.5; }
+.en-sent-en { font-size: 0.86rem; color: var(--text-primary); line-height: 1.5; }
+.en-sent-zh { margin-top: 3px; font-size: 0.76rem; color: var(--text-secondary); }
+/* === 每日残局 === */
+.xq-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.xq-name { font-size: 0.86rem; font-weight: 600; color: var(--text-primary); }
+.xq-turn { font-size: 0.72rem; color: var(--text-dim); }
+.xq-turn.is-red { color: var(--expense); }
+.xq-board {
+  display: grid; grid-template-columns: repeat(9, 1fr);
+  background: var(--bg-panel); border: 1px solid var(--border-subtle);
+  border-radius: 8px; padding: 6px;
+}
+.xq-cell {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  box-shadow: inset 0 0 0 0.5px var(--border-subtle); border-radius: 2px; cursor: pointer;
+}
+.xq-piece {
+  width: 86%; aspect-ratio: 1; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; font-weight: 600; border: 1.5px solid; background: var(--bg-card);
+}
+.xq-piece.red { color: var(--expense); border-color: color-mix(in srgb, var(--expense) 45%, transparent); }
+.xq-piece.black { color: var(--text-primary); border-color: var(--border-subtle); }
+.xq-piece.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.xq-dot { width: 28%; aspect-ratio: 1; border-radius: 50%; background: var(--accent); opacity: 0.5; }
+.xq-tip { margin-top: 8px; font-size: 0.75rem; color: var(--text-dim); line-height: 1.55; }
 .history-filter.active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 
 /* === Bottom Tab Bar === */
@@ -851,6 +899,24 @@ a { color: var(--accent); text-underline-offset: 2px; }
           <div style="font-size:0.68rem; color: var(--text-dim);">今日收入</div>
         </div>
       </div>
+    </div>
+
+    <!-- ⑨ Daily English（每日一词 + 每日一句，按天轮换；发音走浏览器自带语音）-->
+    <div class="daily-section collapsible" id="sec-english">
+      <div class="section-header">
+        <span class="section-title">每日英语</span>
+        <span id="daily-en-hint" style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);"></span>
+      </div>
+      <div id="daily-english-body"></div>
+    </div>
+
+    <!-- ⑩ Daily Chess（每日残局，可自己走子）-->
+    <div class="daily-section collapsible" id="sec-chess">
+      <div class="section-header">
+        <span class="section-title">每日残局</span>
+        <span id="daily-chess-hint" style="font-size:0.7rem;color:var(--text-dim);"></span>
+      </div>
+      <div id="daily-chess-body"></div>
     </div>
 
     <!-- ⑧ Journal（随手记：一天可多条，Ctrl/⌘+Enter 或点按钮即存）-->
@@ -1823,7 +1889,7 @@ Store.onSet((key) => {
 // === 今日面板：区块折叠 ===
 // 规则：有数据默认展开、无数据默认折叠（折成一行，点标题即展开）。
 // 用户手动点过就记住他的选择 —— 存本地，且刻意不进 SYNC_KEYS（折叠是每台设备各自的偏好）。
-const COLLAPSIBLE_SECTIONS = ['meals', 'expense'];
+const COLLAPSIBLE_SECTIONS = ['meals', 'expense', 'english', 'chess'];
 
 function sectionHasData(key) {
   const today = TODAY();
@@ -2500,7 +2566,409 @@ function parseStamp(v) {
 function dateOf(v) { const d = parseStamp(v); return d ? localDate(d) : ''; }
 function timeOf(v) { const d = parseStamp(v); return d ? localHM(d) : ''; }
 
+// ===== 每日英语：六级核心词汇 + 每日短句 =====
+// 轮换规则：按「自 epoch 起的天数」取模 → 同一天在任何设备上看到同一条，可回溯历史，
+// 且不需要存任何状态。扩充方式：往数组尾部追加即可（会让轮换重新洗牌，但不影响正确性）。
+const CET6_WORDS = [
+  { w:'abandon', p:'/əˈbændən/', t:'v.', d:'放弃，抛弃；遗弃', e:'He abandoned his car in the snow.' },
+  { w:'abnormal', p:'/æbˈnɔːml/', t:'adj.', d:'反常的，异常的', e:'The test showed an abnormal result.' },
+  { w:'abolish', p:'/əˈbɒlɪʃ/', t:'v.', d:'废除，取消', e:'The law abolishing slavery was passed in 1865.' },
+  { w:'abrupt', p:'/əˈbrʌpt/', t:'adj.', d:'突然的；唐突的', e:'The meeting came to an abrupt end.' },
+  { w:'absorb', p:'/əbˈzɔːb/', t:'v.', d:'吸收；使专心', e:'Plants absorb water through their roots.' },
+  { w:'abstract', p:'/ˈæbstrækt/', t:'adj./n.', d:'抽象的；摘要', e:'Beauty is an abstract concept.' },
+  { w:'absurd', p:'/əbˈsɜːd/', t:'adj.', d:'荒谬的，可笑的', e:'It is absurd to blame the weather for the delay.' },
+  { w:'abundant', p:'/əˈbʌndənt/', t:'adj.', d:'丰富的，充裕的', e:'The region has abundant natural resources.' },
+  { w:'accelerate', p:'/əkˈseləreɪt/', t:'v.', d:'加速，促进', e:'The car accelerated smoothly up the hill.' },
+  { w:'accessible', p:'/əkˈsesəbl/', t:'adj.', d:'易接近的；可得到的', e:'The library is accessible to all students.' },
+  { w:'accommodate', p:'/əˈkɒmədeɪt/', t:'v.', d:'容纳；适应；提供住宿', e:'The hotel can accommodate 500 guests.' },
+  { w:'accompany', p:'/əˈkʌmpəni/', t:'v.', d:'陪伴，伴随', e:'Her mother accompanied her to the interview.' },
+  { w:'accomplish', p:'/əˈkʌmplɪʃ/', t:'v.', d:'完成，实现', e:'She accomplished the task ahead of schedule.' },
+  { w:'accumulate', p:'/əˈkjuːmjəleɪt/', t:'v.', d:'积累，积聚', e:'Dust had accumulated on the old shelves.' },
+  { w:'accurate', p:'/ˈækjərət/', t:'adj.', d:'准确的，精确的', e:'We need accurate data to make a decision.' },
+  { w:'accuse', p:'/əˈkjuːz/', t:'v.', d:'控告，指责', e:'He was accused of stealing the money.' },
+  { w:'acknowledge', p:'/əkˈnɒlɪdʒ/', t:'v.', d:'承认；感谢', e:'She acknowledged that she had made a mistake.' },
+  { w:'acquire', p:'/əˈkwaɪə(r)/', t:'v.', d:'获得，取得；学到', e:'He acquired a good knowledge of Chinese in two years.' },
+  { w:'adapt', p:'/əˈdæpt/', t:'v.', d:'适应；改编', e:'It took him a while to adapt to the new job.' },
+  { w:'adequate', p:'/ˈædɪkwət/', t:'adj.', d:'充足的，适当的', e:'The food supply is adequate for the winter.' },
+  { w:'adjacent', p:'/əˈdʒeɪsnt/', t:'adj.', d:'邻近的，毗连的', e:'Our office is adjacent to the station.' },
+  { w:'adjust', p:'/əˈdʒʌst/', t:'v.', d:'调整，调节；适应', e:'You can adjust the volume with this button.' },
+  { w:'administer', p:'/ədˈmɪnɪstə(r)/', t:'v.', d:'管理；执行；给予', e:'The fund is administered by a small committee.' },
+  { w:'admire', p:'/ədˈmaɪə(r)/', t:'v.', d:'钦佩，赞赏', e:'I admire her courage and honesty.' },
+  { w:'admit', p:'/ədˈmɪt/', t:'v.', d:'承认；准许进入', e:'He admitted that he had been wrong.' },
+  { w:'adopt', p:'/əˈdɒpt/', t:'v.', d:'采用，采纳；收养', e:'The company adopted a new strategy last year.' },
+  { w:'advocate', p:'/ˈædvəkeɪt/', t:'v./n.', d:'提倡，拥护；拥护者', e:'She advocates a simple and healthy diet.' },
+  { w:'aesthetic', p:'/iːsˈθetɪk/', t:'adj.', d:'美学的，审美的', e:'The old building has great aesthetic value.' },
+  { w:'affect', p:'/əˈfekt/', t:'v.', d:'影响；感动', e:'Smoking seriously affects your health.' },
+  { w:'afford', p:'/əˈfɔːd/', t:'v.', d:'负担得起；提供', e:'I cannot afford a new car this year.' },
+  { w:'aggressive', p:'/əˈɡresɪv/', t:'adj.', d:'侵略的；好斗的；积极进取的', e:'The company adopted an aggressive marketing plan.' },
+  { w:'alleviate', p:'/əˈliːvieɪt/', t:'v.', d:'减轻，缓解', e:'The medicine alleviated her headache quickly.' },
+  { w:'allocate', p:'/ˈæləkeɪt/', t:'v.', d:'分配，分派', e:'The government allocated more funds to education.' },
+  { w:'alter', p:'/ˈɔːltə(r)/', t:'v.', d:'改变，改动', e:'We had to alter our plans at the last minute.' },
+  { w:'alternative', p:'/ɔːlˈtɜːnətɪv/', t:'n./adj.', d:'替代方案；可替代的', e:'We have no alternative but to wait.' },
+  { w:'ambiguous', p:'/æmˈbɪɡjuəs/', t:'adj.', d:'模棱两可的，含糊的', e:'His answer was deliberately ambiguous.' },
+  { w:'ambitious', p:'/æmˈbɪʃəs/', t:'adj.', d:'有雄心的，野心勃勃的', e:'She is ambitious and hard-working.' },
+  { w:'amend', p:'/əˈmend/', t:'v.', d:'修改，修订', e:'The contract was amended last month.' },
+  { w:'ample', p:'/ˈæmpl/', t:'adj.', d:'充足的；宽敞的', e:'There is ample time to finish the work.' },
+  { w:'analogy', p:'/əˈnælədʒi/', t:'n.', d:'类比，比喻', e:'He drew an analogy between the two events.' },
+  { w:'analyze', p:'/ˈænəlaɪz/', t:'v.', d:'分析', e:'We need to analyze the data carefully.' },
+  { w:'anonymous', p:'/əˈnɒnɪməs/', t:'adj.', d:'匿名的', e:'The donation came from an anonymous donor.' },
+  { w:'anticipate', p:'/ænˈtɪsɪpeɪt/', t:'v.', d:'预期，期望', e:'We anticipate a rise in prices next season.' },
+  { w:'apparent', p:'/əˈpærənt/', t:'adj.', d:'明显的；表面上的', e:'It soon became apparent that he was lying.' },
+  { w:'appeal', p:'/əˈpiːl/', t:'v./n.', d:'呼吁；上诉；吸引力', e:'The design appeals to young people.' },
+  { w:'appliance', p:'/əˈplaɪəns/', t:'n.', d:'器具，电器', e:'Kitchen appliances are on sale this week.' },
+  { w:'applicable', p:'/əˈplɪkəbl/', t:'adj.', d:'适用的，可应用的', e:'This rule is applicable to all students.' },
+  { w:'appreciate', p:'/əˈpriːʃieɪt/', t:'v.', d:'欣赏；感激；理解', e:'I appreciate your help very much.' },
+  { w:'approach', p:'/əˈprəʊtʃ/', t:'n./v.', d:'方法，途径；接近', e:'We need a new approach to the problem.' },
+  { w:'appropriate', p:'/əˈprəʊpriət/', t:'adj.', d:'适当的，恰当的', e:'Please wear appropriate clothes for the interview.' },
+  { w:'approve', p:'/əˈpruːv/', t:'v.', d:'批准；赞成', e:'The committee approved the plan yesterday.' },
+  { w:'arbitrary', p:'/ˈɑːbɪtrəri/', t:'adj.', d:'任意的，武断的', e:'The decision seemed completely arbitrary.' },
+  { w:'architecture', p:'/ˈɑːkɪtektʃə(r)/', t:'n.', d:'建筑学；结构', e:'He studied architecture in college.' },
+  { w:'arise', p:'/əˈraɪz/', t:'v.', d:'出现，产生', e:'Problems may arise during the project.' },
+  { w:'articulate', p:'/ɑːˈtɪkjuleɪt/', t:'v./adj.', d:'清晰表达；表达清楚的', e:'She articulated her ideas clearly and calmly.' },
+  { w:'ascend', p:'/əˈsend/', t:'v.', d:'上升，攀登', e:'The plane ascended into the clouds.' },
+  { w:'aspect', p:'/ˈæspekt/', t:'n.', d:'方面；外观', e:'We must consider every aspect of the plan.' },
+  { w:'assemble', p:'/əˈsembl/', t:'v.', d:'集合；装配', e:'The workers assembled the machine in an hour.' },
+  { w:'assert', p:'/əˈsɜːt/', t:'v.', d:'断言，主张；维护', e:'He asserted that he was innocent.' },
+  { w:'assess', p:'/əˈses/', t:'v.', d:'评估，评定', e:'Teachers assess the students each term.' }
+];
+const DAILY_SENTENCES = [
+  { en:'The best way out is always through.', zh:'最好的出路永远是走到底。' },
+  { en:'Action is the foundational key to all success.', zh:'行动是一切成功的根本。' },
+  { en:'Little by little, one travels far.', zh:'积跬步，行千里。' },
+  { en:'What we think, we become.', zh:'我们所想，即我们所成。' },
+  { en:'Fall seven times, stand up eight.', zh:'跌倒七次，第八次站起来。' },
+  { en:'Well begun is half done.', zh:'好的开始是成功的一半。' },
+  { en:'Nothing is impossible to a willing heart.', zh:'心之所愿，无事不成。' },
+  { en:'The harder you work, the luckier you get.', zh:'越努力，越幸运。' },
+  { en:'Every cloud has a silver lining.', zh:'黑暗中总有一线光明。' },
+  { en:'Time and tide wait for no man.', zh:'时光如流水，岁月不待人。' },
+  { en:'A journey of a thousand miles begins with a single step.', zh:'千里之行，始于足下。' },
+  { en:'Practice makes perfect.', zh:'熟能生巧。' },
+  { en:'Where there is a will, there is a way.', zh:'有志者事竟成。' },
+  { en:'Knowledge is power.', zh:'知识就是力量。' },
+  { en:'Rome was not built in a day.', zh:'罗马不是一天建成的。' },
+  { en:'Strike while the iron is hot.', zh:'趁热打铁。' },
+  { en:'Better late than never.', zh:'迟做总比不做好。' },
+  { en:'Easier said than done.', zh:'说起来容易，做起来难。' },
+  { en:'Look before you leap.', zh:'三思而后行。' },
+  { en:'All that glitters is not gold.', zh:'闪光的未必都是金子。' },
+  { en:'It is never too late to learn.', zh:'学习永远不嫌晚。' },
+  { en:'Two heads are better than one.', zh:'三个臭皮匠，顶个诸葛亮。' },
+  { en:'Honesty is the best policy.', zh:'诚实为上策。' },
+  { en:'Silence is golden.', zh:'沉默是金。' },
+  { en:'The early bird catches the worm.', zh:'早起的鸟儿有虫吃。' },
+  { en:'United we stand, divided we fall.', zh:'团结则存，分裂则亡。' },
+  { en:'Genius is one percent inspiration and ninety-nine percent perspiration.', zh:'天才是百分之一的灵感加百分之九十九的汗水。' },
+  { en:'If you want to go fast, go alone; if you want to go far, go together.', zh:'想走得快就独行，想走得远就同行。' },
+  { en:'The only way to do great work is to love what you do.', zh:'做出伟大工作的唯一途径，是热爱你所做的事。' },
+  { en:'Do not wait for the perfect moment; take the moment and make it perfect.', zh:'不要等完美时刻，抓住当下让它完美。' },
+  { en:'Your time is limited, so do not waste it living the life of others.', zh:'你的时间有限，别浪费在过别人的生活上。' },
+  { en:'The future belongs to those who believe in the beauty of their dreams.', zh:'未来属于那些相信梦想之美的人。' },
+  { en:'It always seems impossible until it is done.', zh:'事成之前，一切看似不可能。' },
+  { en:'Success is the sum of small efforts repeated day in and day out.', zh:'成功是日复一日小努力的总和。' },
+  { en:'Do not watch the clock; do what it does. Keep going.', zh:'别盯着时钟，像它一样不停向前。' },
+  { en:'The journey is the reward.', zh:'过程本身就是回报。' },
+  { en:'Believe you can and you are halfway there.', zh:'相信你能做到，你就成功了一半。' },
+  { en:'A smooth sea never made a skilled sailor.', zh:'平静的海面练不出好水手。' },
+  { en:'Change your thoughts and you change your world.', zh:'改变你的想法，就改变了你的世界。' },
+  { en:'In the middle of difficulty lies opportunity.', zh:'困难之中藏着机遇。' },
+  { en:'The best preparation for tomorrow is doing your best today.', zh:'为明天做准备的最好方式，就是今天尽力而为。' },
+  { en:'You miss one hundred percent of the shots you do not take.', zh:'不出手的球，百分之百不会进。' },
+  { en:'Great things never came from comfort zones.', zh:'伟大的成就，从不来自舒适区。' },
+  { en:'Start where you are. Use what you have. Do what you can.', zh:'从当下开始，用你所有，尽你所能。' },
+  { en:'Progress, not perfection.', zh:'要进步，不必完美。' },
+  { en:'Small steps every day add up to big results.', zh:'每天一小步，终成大不同。' },
+  { en:'The pain you feel today is the strength you feel tomorrow.', zh:'今天的痛苦，是明天的力量。' },
+  { en:'Discipline is the bridge between goals and accomplishment.', zh:'自律是目标与成就之间的桥梁。' },
+  { en:'Do not count the days; make the days count.', zh:'不要数着日子过，要让日子有意义。' },
+  { en:'Everything you can imagine is real.', zh:'你能想象的一切，都是真实的。' },
+  { en:'If opportunity does not knock, build a door.', zh:'机会不来敲门，那就造一扇门。' },
+  { en:'The only limit to our realization of tomorrow is our doubts of today.', zh:'实现明天唯一的障碍，是今天的疑虑。' },
+  { en:'Be the change you wish to see in the world.', zh:'成为你希望在世界上看到的改变。' },
+  { en:'What you do today can improve all your tomorrows.', zh:'你今天所做的，能改善你所有的明天。' },
+  { en:'Failure is simply the opportunity to begin again, more intelligently.', zh:'失败只是更聪明地重新开始的机会。' },
+  { en:'The secret of getting ahead is getting started.', zh:'领先的秘诀，就是开始。' },
+  { en:'You do not have to be great to start, but you have to start to be great.', zh:'不必等优秀才开始，但要开始才能优秀。' },
+  { en:'Make each day your masterpiece.', zh:'让每一天都成为你的杰作。' },
+  { en:'Focus on being productive instead of busy.', zh:'专注于有成效，而不是忙碌。' },
+  { en:'Slow progress is still progress.', zh:'慢，也是前进。' }
+];
+// 按「天」取模选一条：同一日期在任何设备上结果一致，可回溯历史，无需存状态。
+function dailyPick(list) {
+  const days = Math.floor(new Date(TODAY() + 'T00:00:00').getTime() / 86400000);
+  return list[((days % list.length) + list.length) % list.length];
+}
+
+// ===== 每日象棋残局 =====
+// 局面用坐标写（x 0-8 左→右，y 0-9 上→下；y=0 是黑方底线、y=9 是红方底线），
+// 比 FEN 直观、手写不易错。大写红方、小写黑方：K帅 A仕 B相 N马 R车 C炮 P兵。
+const XIANGQI_ENDGAMES = [
+  { name: '单车对单将', pieces: [['R', 0, 9], ['K', 3, 9], ['k', 4, 0]],
+    tip: '车走肋道把将逼向边线，帅占中线形成「对面笑」助攻。单车必胜单将。' },
+  { name: '单车对单士', pieces: [['R', 0, 9], ['K', 4, 9], ['k', 4, 0], ['a', 4, 1]],
+    tip: '先用帅牵住士，再驱车吃士。「单士怕车」，士一丢即成单车胜单将。' },
+  { name: '车兵对士象全', pieces: [['R', 0, 9], ['P', 4, 6], ['K', 4, 9], ['k', 4, 0], ['a', 3, 0], ['a', 5, 0], ['b', 2, 0], ['b', 6, 0]],
+    tip: '兵从中路推进换掉双士或双象，车兵可胜士象全（单车则和）。' },
+  { name: '马炮对单士', pieces: [['N', 2, 4], ['C', 4, 7], ['K', 4, 9], ['k', 4, 0], ['a', 4, 1]],
+    tip: '炮在中路牵制，马跳到卧槽位配合。马炮双将优于单马或单炮。' }
+];
+
+const XQ_LABEL = { K:'帅', A:'仕', B:'相', N:'马', R:'车', C:'炮', P:'兵', k:'将', a:'士', b:'象', n:'马', r:'车', c:'炮', p:'卒' };
+const XQ_RED_SET = 'KABNRCP';
+
+function xqIsRed(c) { return !!c && XQ_RED_SET.indexOf(c) >= 0; }
+function xqSide(c) { return c ? (xqIsRed(c) ? 'r' : 'b') : null; }
+function xqInBoard(x, y) { return x >= 0 && x <= 8 && y >= 0 && y <= 9; }
+
+function xqBoard(pieces) {
+  const b = [];
+  for (let y = 0; y < 10; y++) b.push(new Array(9).fill(null));
+  pieces.forEach(function (p) { if (xqInBoard(p[1], p[2])) b[p[2]][p[1]] = p[0]; });
+  return b;
+}
+
+function xqInPalace(x, y, side) {
+  if (x < 3 || x > 5) return false;
+  return side === 'r' ? (y >= 7 && y <= 9) : (y >= 0 && y <= 2);
+}
+
+// 直线路径上是否有子（不含起点与终点）
+function xqPathClear(board, fx, fy, tx, ty) {
+  const sx = Math.sign(tx - fx), sy = Math.sign(ty - fy);
+  let x = fx + sx, y = fy + sy;
+  while (x !== tx || y !== ty) {
+    if (board[y][x]) return false;
+    x += sx; y += sy;
+  }
+  return true;
+}
+
+// 直线两点之间（不含两端）的棋子数——炮用
+function xqCountBetween(board, fx, fy, tx, ty) {
+  const sx = Math.sign(tx - fx), sy = Math.sign(ty - fy);
+  let x = fx + sx, y = fy + sy, n = 0;
+  while (x !== tx || y !== ty) {
+    if (board[y][x]) n++;
+    x += sx; y += sy;
+  }
+  return n;
+}
+
+// 只看棋子本身走法，不管走后是否被将军（内部用）
+function xqPseudoLegal(board, fx, fy, tx, ty) {
+  if (!xqInBoard(tx, ty) || !xqInBoard(fx, fy)) return false;
+  const p = board[fy][fx];
+  if (!p) return false;
+  if (fx === tx && fy === ty) return false;
+  const target = board[ty][tx];
+  if (target && xqSide(target) === xqSide(p)) return false;
+  const side = xqSide(p);
+  const dx = tx - fx, dy = ty - fy;
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+  const type = p.toUpperCase();
+
+  if (type === 'K') {
+    if (!xqInPalace(tx, ty, side)) return false;
+    return ax + ay === 1;
+  }
+  if (type === 'A') {
+    if (!xqInPalace(tx, ty, side)) return false;
+    return ax === 1 && ay === 1;
+  }
+  if (type === 'B') {
+    if (ax !== 2 || ay !== 2) return false;
+    if (board[fy + dy / 2][fx + dx / 2]) return false;          // 塞象眼
+    return side === 'r' ? ty >= 5 : ty <= 4;                    // 象不过河
+  }
+  if (type === 'N') {
+    if (!((ax === 1 && ay === 2) || (ax === 2 && ay === 1))) return false;
+    const lx = fx + (ax === 2 ? Math.sign(dx) : 0);             // 蹩马腿
+    const ly = fy + (ay === 2 ? Math.sign(dy) : 0);
+    return !board[ly][lx];
+  }
+  if (type === 'R') {
+    if (dx !== 0 && dy !== 0) return false;
+    return xqPathClear(board, fx, fy, tx, ty);
+  }
+  if (type === 'C') {
+    if (dx !== 0 && dy !== 0) return false;
+    const between = xqCountBetween(board, fx, fy, tx, ty);
+    return target ? between === 1 : between === 0;              // 吃子需隔一子
+  }
+  if (type === 'P') {
+    const forward = side === 'r' ? -1 : 1;
+    if (dx === 0 && dy === forward) return true;
+    const crossed = side === 'r' ? fy <= 4 : fy >= 5;           // 过河后可横走
+    return crossed && dy === 0 && ax === 1;
+  }
+  return false;
+}
+
+// 两将是否照面（同一列且中间无子）
+function xqKingsFacing(board) {
+  let rx = -1, ry = -1, bx = -1, by = -1;
+  for (let y = 0; y < 10; y++) for (let x = 0; x < 9; x++) {
+    if (board[y][x] === 'K') { rx = x; ry = y; }
+    else if (board[y][x] === 'k') { bx = x; by = y; }
+  }
+  if (rx < 0 || bx < 0 || rx !== bx) return false;
+  return xqCountBetween(board, rx, ry, bx, by) === 0;
+}
+
+// 某一方是否被将军
+function xqInCheck(board, side) {
+  const king = side === 'r' ? 'K' : 'k';
+  let kx = -1, ky = -1;
+  for (let y = 0; y < 10; y++) for (let x = 0; x < 9; x++) if (board[y][x] === king) { kx = x; ky = y; }
+  if (kx < 0) return false;
+  for (let y = 0; y < 10; y++) for (let x = 0; x < 9; x++) {
+    const c = board[y][x];
+    if (!c || xqSide(c) === side) continue;
+    if (xqPseudoLegal(board, x, y, kx, ky)) return true;
+  }
+  return false;
+}
+
+// 完整合法性：走完之后不能让两将照面，也不能让自己被将军
+function xqLegalMove(board, fx, fy, tx, ty) {
+  if (!xqPseudoLegal(board, fx, fy, tx, ty)) return false;
+  const p = board[fy][fx];
+  const nb = board.map(function (row) { return row.slice(); });
+  nb[ty][tx] = p; nb[fy][fx] = null;
+  if (xqKingsFacing(nb)) return false;
+  return !xqInCheck(nb, xqSide(p));
+}
+
+// 某个子的全部合法落点（用于高亮提示）
+function xqMovesFor(board, fx, fy) {
+  const out = [];
+  for (let y = 0; y < 10; y++) for (let x = 0; x < 9; x++) {
+    if (xqLegalMove(board, fx, fy, x, y)) out.push([x, y]);
+  }
+  return out;
+}
+
 const TODAY = () => localDate();
+
+// ---- 每日英语：渲染 + 发音 ----
+function renderDailyEnglish() {
+  const box = document.getElementById('daily-english-body');
+  if (!box) return;
+  const word = dailyPick(CET6_WORDS);
+  const sent = dailyPick(DAILY_SENTENCES);
+  const hint = document.getElementById('daily-en-hint');
+  if (hint) {
+    const days = Math.floor(new Date(TODAY() + 'T00:00:00').getTime() / 86400000);
+    const idx = ((days % CET6_WORDS.length) + CET6_WORDS.length) % CET6_WORDS.length;
+    hint.textContent = (idx + 1) + '/' + CET6_WORDS.length;
+  }
+  box.innerHTML =
+    '<div class="en-block">' +
+      '<div class="en-head">' +
+        '<span class="en-word">' + escHtml(word.w) + '</span>' +
+        '<span class="en-phon">' + escHtml(word.p) + '</span>' +
+        '<button class="en-say" aria-label="朗读单词" onclick="speakEnWord()">' + mkIcon('mic', 0.85) + '</button>' +
+      '</div>' +
+      '<div class="en-mean"><span class="en-pos">' + escHtml(word.t) + '</span>' + escHtml(word.d) + '</div>' +
+      '<div class="en-eg">' + escHtml(word.e) + '</div>' +
+    '</div>' +
+    '<div class="en-block">' +
+      '<div class="en-head"><span style="font-size:0.8rem;color:var(--text-dim);">今日一句</span>' +
+        '<button class="en-say" aria-label="朗读句子" onclick="speakEnSentence()">' + mkIcon('mic', 0.85) + '</button>' +
+      '</div>' +
+      '<div class="en-sent-en">' + escHtml(sent.en) + '</div>' +
+      '<div class="en-sent-zh">' + escHtml(sent.zh) + '</div>' +
+    '</div>';
+}
+
+// 发音走浏览器自带的 speechSynthesis：零依赖、离线可用。
+// 显式挑一个 en-* 语音——iOS 上默认语音常是中文，让它读英文会非常怪。
+function speakEnglish(text) {
+  if (!('speechSynthesis' in window)) { showToast('当前浏览器不支持语音朗读', 'warning'); return; }
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US';
+    u.rate = 0.92;
+    const voices = typeof speechSynthesis.getVoices === 'function' ? speechSynthesis.getVoices() : [];
+    const en = voices.filter(v => (v.lang || '').toLowerCase().indexOf('en') === 0);
+    if (en.length) u.voice = en[0];
+    speechSynthesis.speak(u);
+  } catch (e) { showToast('朗读失败：' + e.message, 'error'); }
+}
+function speakEnWord() { speakEnglish(dailyPick(CET6_WORDS).w); }
+function speakEnSentence() { speakEnglish(dailyPick(DAILY_SENTENCES).en); }
+
+// ---- 每日象棋残局：渲染 + 走子交互 ----
+// 局面状态挂在 _xqState 上，renderAll 反复重绘也不会丢掉用户已经走的棋。
+let _xqState = null;
+
+function xqNewGame() {
+  const eg = dailyPick(XIANGQI_ENDGAMES);
+  _xqState = { name: eg.name, tip: eg.tip, board: xqBoard(eg.pieces), sel: null, moves: [], turn: 'r', played: 0 };
+  return eg;
+}
+
+function renderDailyChess() {
+  const box = document.getElementById('daily-chess-body');
+  if (!box) return;
+  const eg = dailyPick(XIANGQI_ENDGAMES);
+  if (!_xqState || _xqState.name !== eg.name) xqNewGame();
+  const st = _xqState;
+  const b = st.board;
+
+  let html = '<div class="xq-bar">' +
+    '<span class="xq-name">' + escHtml(eg.name) + '</span>' +
+    '<span class="xq-turn' + (st.turn === 'r' ? ' is-red' : '') + '">' + (st.turn === 'r' ? '红方走' : '黑方走') + '</span>' +
+    '<button class="btn btn-sm" onclick="xqReset()">重摆</button>' +
+    '</div><div class="xq-board">';
+
+  for (let y = 0; y < 10; y++) {
+    for (let x = 0; x < 9; x++) {
+      const c = b[y][x];
+      const isSel = !!st.sel && st.sel[0] === x && st.sel[1] === y;
+      const isMove = st.moves.some(m => m[0] === x && m[1] === y);
+      html += '<div class="xq-cell" onclick="xqTap(' + x + ',' + y + ')">';
+      if (c) html += '<div class="xq-piece ' + (xqIsRed(c) ? 'red' : 'black') + (isSel ? ' sel' : '') + '">' + XQ_LABEL[c] + '</div>';
+      else if (isMove) html += '<div class="xq-dot"></div>';
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+  html += '<div class="xq-tip">' + mkIcon('thought', 0.8) + ' ' + escHtml(eg.tip) + '</div>';
+  box.innerHTML = html;
+}
+
+function xqSelect(x, y) {
+  const st = _xqState;
+  st.sel = [x, y];
+  st.moves = xqMovesFor(st.board, x, y);
+  renderDailyChess();
+}
+
+function xqTap(x, y) {
+  const st = _xqState;
+  if (!st) return;
+  const c = st.board[y][x];
+  if (st.sel) {
+    if (st.moves.some(m => m[0] === x && m[1] === y)) {
+      const [sx, sy] = st.sel;
+      st.board[y][x] = st.board[sy][sx];
+      st.board[sy][sx] = null;
+      st.sel = null; st.moves = []; st.played++;
+      st.turn = st.turn === 'r' ? 'b' : 'r';
+      renderDailyChess();
+      return;
+    }
+    if (c && xqSide(c) === st.turn) { xqSelect(x, y); return; }
+    st.sel = null; st.moves = [];
+    renderDailyChess();
+    return;
+  }
+  if (c && xqSide(c) === st.turn) xqSelect(x, y);
+}
+
+function xqReset() { xqNewGame(); renderDailyChess(); }
 
 function renderDailyHub() {
   const today = TODAY();
@@ -2525,6 +2993,13 @@ function renderDailyHub() {
 
   // ⑦ Today Expense
   renderDailyExpense();
+
+  // ⑨ Daily English（每日一词 + 每日一句）
+  renderDailyEnglish();
+
+  // ⑩ Daily Chess（每日残局，可自己走子）
+  renderDailyChess();
+
   updateSectionCollapse();
 
   // ⑧ Journal（随手记）
@@ -5533,6 +6008,21 @@ const SCHEDULE_OVERRIDES = [
   { day:'星期六', section:3, name:'操作系统', location:'知行楼309', weeks:[5] }
 ];
 
+// 课表显示用简称：全名（如「习近平新时代中国特色社会主义思想概论」）会把日视图卡片
+// 和周视图格子撑爆。只影响显示，课程数据本身保持全名——所以导入的课表不用迁移也生效。
+// 查不到的课程名原样返回，加课/换课不必同步维护这张表。
+const COURSE_SHORT = {
+  '习近平新时代中国特色社会主义思想概论': '习概',
+  '毛泽东思想和中国特色社会主义理论体系概论': '毛概',
+  'Python语言程序设计': 'Python',
+  '数据结构与算法': '数据结构',
+  '概率论与数理统计': '概率论',
+  'Linux操作系统实验': 'Linux实验',
+  '大学体育（三）（散打）': '体育（散打）',
+  '形势与政策（三）': '形势与政策'
+};
+function shortCourseName(name) { return COURSE_SHORT[name] || name; }
+
 let _coursesCache = null, _coursesCacheKey = '';
 function getCourses() {
   const src = Store.get('courses', DEFAULT_COURSES);
@@ -5608,7 +6098,7 @@ function courseRow(c) {
   const t = getCurrentSchedule()[c.section];
   return `<div class="forecast-row">
     <span class="fr-time">${t.start}-${t.end}</span>
-    <span class="fr-name">${c.name}</span>
+    <span class="fr-name">${shortCourseName(c.name)}</span>
     <span class="fr-loc">${c.location || ''}</span>
   </div>`;
 }
@@ -5685,7 +6175,7 @@ function renderCourseDay(week) {
     return `<div class="course-card">
       <div class="course-time">${t.start}<br>${t.end}</div>
       <div class="course-body">
-        <div class="course-name">${c.name}</div>
+        <div class="course-name">${shortCourseName(c.name)}</div>
         <div class="course-meta">${icon('pin', 0.8)} ${c.location || '地点待定'} · ${wtxt}</div>
       </div>
       ${status}
@@ -5711,7 +6201,7 @@ function renderCourseWeek(week) {
     days.forEach((d, i) => {
       const hol = holidayForDate(dates[i]);
       const cs = hol ? [] : getCourses().filter(c => c.day === d && c.section === s && courseMatches(c, week));
-      const inner = cs.map(c => `<div class="week-cell-course" title="${c.name} @ ${c.location}">${c.name}<br><span class="week-cell-loc">${c.location || ''}</span></div>`).join('');
+      const inner = cs.map(c => `<div class="week-cell-course" title="${c.name} @ ${c.location}">${shortCourseName(c.name)}<br><span class="week-cell-loc">${c.location || ''}</span></div>`).join('');
       html += `<div class="week-cell${hol ? ' week-cell-holiday' : ''}">${inner}</div>`;
     });
   }
@@ -5743,8 +6233,8 @@ function renderNextClassBanner() {
   const startDt = new Date(); startDt.setHours(h, m, 0, 0);
   const diff = Math.round((startDt - now) / 60000);
   const txt = diff > 0
-    ? `下一节：${next.name} · ${getCurrentSchedule()[next.section].start} @ ${next.location}（${diff} 分钟后）`
-    : `正在上课：${next.name} @ ${next.location}`;
+    ? `下一节：${shortCourseName(next.name)} · ${getCurrentSchedule()[next.section].start} @ ${next.location}（${diff} 分钟后）`
+    : `正在上课：${shortCourseName(next.name)} @ ${next.location}`;
   el.innerHTML = icon('book', 0.9) + ' ' + txt;
   el.style.display = '';
 }
