@@ -447,6 +447,16 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .xq-turn { font-size: 0.72rem; color: var(--text-dim); flex: none; }
 .xq-turn.is-red { color: var(--expense); }
 .xq-lvs { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+.xq-tiers { display: flex; gap: 6px; margin-bottom: 8px; }
+.xq-tier {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 7px 4px; border-radius: 8px; cursor: pointer;
+  font-size: 0.74rem; color: var(--text-secondary);
+  border: 1px solid var(--border-subtle); background: var(--bg-panel);
+}
+.xq-tier.cur { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.xq-tier-n { font-family: var(--font-mono); font-size: 0.64rem; opacity: 0.75; }
+.xq-goal { margin-left: auto; align-self: center; font-size: 0.7rem; color: var(--text-dim); }
 .xq-lv {
   width: 22px; height: 22px; border-radius: 50%; flex: none; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
@@ -455,7 +465,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
 }
 .xq-lv.done { color: var(--success); border-color: color-mix(in srgb, var(--success) 45%, transparent); }
 .xq-lv.cur { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); font-weight: 700; }
-.xq-ops { display: flex; gap: 6px; margin-bottom: 8px; }
+.xq-ops { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
 .xq-done.xq-bad { color: var(--expense); }
 /*
  * 棋盘：8 格宽 × 9 格高（格子近似正方），棋子落在**交叉点**上而不是格子里——
@@ -3346,29 +3356,126 @@ function dailyPick(list) {
 // ===== 每日象棋残局 =====
 // 局面用坐标写（x 0-8 左→右，y 0-9 上→下；y=0 是黑方底线、y=9 是红方底线），
 // 比 FEN 直观、手写不易错。大写红方、小写黑方：K帅 A仕 B相 N马 R车 C炮 P兵。
+// ===== 中国象棋闯关题库 =====
+// 题源：历代大师实战杀棋局面。取自开源中国象棋实战棋谱库（maksimKorzh/wukong-xiangqi 的
+//       puzzle_generator 数据集，3386 题，原库按「几步将死」分档）。
+//       这里精选 104 题，并用 index.html 里这同一套走法规则反向验算过：
+//       难度标定正确、每题都存在正解着法、单次判定耗时达标（tests/xiangqi-levels.test.js）。
+// 字段：f = 局面（中国象棋 FEN，全部红先）；m = 要求几步之内将死；s = 出处（对局或关名）；tip = 讲解（仅教学关）
+// 注意：将/帅只能在自己的九宫里活动（黑方 x3-5 / y0-2，红方 x3-5 / y7-9），
+//       「角」指九宫的角（d10/f10/d8/f8），不是棋盘的角——写成棋盘角会让将一步都走不了。
 const XIANGQI_LEVELS = [
-  // ---- 第一类：带正解的一步杀。solution 是红方的唯一正解着法（[fx,fy,tx,ty]），
-  //      测试脚本会逐条验算「着法合法 + 走完确实将死黑方」，所以不会出现假关卡。 ----
-  // 注意：将/帅只能在自己的九宫里活动（黑方 x3-5 / y0-2，红方 x3-5 / y7-9），
-  // 「角」指的是九宫的角（d10/f10/d8/f8），不是棋盘的角——写成棋盘角会让将一步都走不了。
-  { name: '封将门·左', tip: '一步杀：将缩在九宫左上角，逃路只剩两条——一条用竖线车封死，另一条早有横线车等着。',
-    pieces: [['R', 0, 8], ['R', 4, 5], ['K', 4, 9], ['k', 3, 0]], solution: [[0, 8, 3, 8]] },
-  { name: '封将门·右', tip: '一步杀：同上，换到右上角。',
-    pieces: [['R', 8, 8], ['R', 4, 5], ['K', 4, 9], ['k', 5, 0]], solution: [[8, 8, 5, 8]] },
-  { name: '兵封中路', tip: '一步杀：将不在角上时逃路有三条——车横到底线管住左右，小兵提前占住退路。',
-    pieces: [['R', 0, 9], ['P', 4, 2], ['K', 3, 9], ['k', 4, 0]], solution: [[0, 9, 0, 0]] },
-  { name: '回马封门', tip: '一步杀：将退到九宫下角，还是一竖一横锁死，只是这次车从底线横移过去。',
-    pieces: [['R', 0, 9], ['R', 4, 4], ['K', 4, 9], ['k', 3, 2]], solution: [[0, 9, 3, 9]] },
+  { f: '3k5/9/9/9/9/4R4/9/9/R8/4K4 w', m: 1, s: '封将门·左', tip: '一步杀：将缩在九宫左上角，逃路只剩两条——一条用竖线车封死，另一条早有横线车等着。' },
+  { f: '5k3/9/9/9/9/4R4/9/9/8R/4K4 w', m: 1, s: '封将门·右', tip: '一步杀：同上，换到右上角。' },
+  { f: '4k4/9/4P4/9/9/9/9/9/9/R2K5 w', m: 1, s: '兵封中路', tip: '一步杀：将不在角上时逃路有三条——车横到底线管住左右，小兵提前占住退路。' },
+  { f: '9/9/3k5/9/4R4/9/9/9/9/R3K4 w', m: 1, s: '回马封门', tip: '一步杀：将退到九宫下角，还是一竖一横锁死，只是这次车从底线横移过去。' },
+  { f: '5N3/9/3k5/4P4/c5b2/9/9/5Kn2/9/4C4 w - - 0 1', m: 1, s: 'XIAO GeLian - XU JianMiao' },
+  { f: '9/1c1k5/2N6/9/2b3b2/6B2/9/3A5/4C4/4K4 w - - 0 1', m: 1, s: 'ZHAO GuoRong - WAN ChunLin' },
+  { f: '2c3R2/3k5/b2aN2r1/9/9/9/9/4B4/3K5/2B6 w - - 0 1', m: 1, s: 'Thianchai SARINNAPHAKORN - YAMAZAKI Hideo' },
+  { f: '3k2b2/4P4/9/9/1N3Cn2/6B2/9/4B4/4c4/3AK4 w - - 0 1', m: 1, s: 'CHEN FuJie - HUANG HaiLin' },
+  { f: '3P1k3/4PN3/9/9/9/2B2n3/5p3/4p4/4A4/3A1K3 w - - 0 1', m: 1, s: 'HU RongHua - LI LaiQun' },
+  { f: '3k5/4P4/3Pb4/9/3c2b2/3p5/9/9/4K4/2BA1A3 w - - 0 1', m: 1, s: 'ZHANG Jiang - ZHANG Qiang' },
+  { f: '3k1P3/4P4/3cb3b/9/9/9/P8/4B4/4A4/3K1AB2 w - - 0 1', m: 1, s: 'JIAN TianNan - TOH Yeow Chong' },
+  { f: '5k3/4R4/5P2b/5N3/9/9/2P5P/3A5/4A4/2nK2B2 w - - 0 1', m: 1, s: 'FENG Jao - CHEN Qiu' },
+  { f: 'C3ka3/1RP6/3a5/9/9/4r4/8c/B8/5K3/2BA5 w - - 0 1', m: 1, s: 'XU YongJia - MA NaiXuan' },
+  { f: '3a1a2R/4k4/4nN3/9/9/8P/r8/B3B4/4A4/4KA3 w - - 0 1', m: 1, s: 'LI JiaHua - TANG FangYun' },
+  { f: '2ba5/4a1N2/5k3/4C4/p3P4/3R5/P7P/9/r8/4K4 w - - 0 1', m: 1, s: 'LAI Chi Kong - ZHANG WangHou' },
+  { f: '5a3/5k3/3aP4/3N4p/6N2/9/9/3Ac4/2p6/4KAB2 w - - 0 1', m: 1, s: 'LIU DaHua - CAO Lin' },
+  { f: '9/2P6/b2k5/9/7Np/7n1/3n4P/3p1A3/3C5/4K1B2 w - - 0 1', m: 1, s: 'ZONG YongSheng - GAO MingHai' },
+  { f: '4kab1C/1c1P5/2N6/6c2/4p4/8p/9/4B4/3K5/5An2 w - - 0 1', m: 1, s: 'HU RongHua - ZHANG Weimin' },
+  { f: '9/1C2P1N2/2C2k3/p1n6/9/8p/9/1n3p3/4A4/c3K1B2 w - - 0 1', m: 1, s: 'LIU DianZhong - LIN HongMin' },
+  { f: '2baka3/9/4P4/9/2r6/3R2P2/8P/1p2BA3/3K1p3/9 w - - 0 1', m: 1, s: 'HII Kong Ming - ZHANG Gao Yang' },
+  { f: '2bk5/9/3N1a3/2Nc5/2n1n4/2B5P/4C4/3A5/9/3A1K3 w - - 0 1', m: 1, s: 'HU RongHua - FU GuangMing' },
+  { f: '4kab1C/9/2N2R3/5r3/2n5p/9/8P/4B4/9/3AKA3 w - - 0 1', m: 1, s: 'SUNG Peter - LOW Gin Wan' },
+  { f: '2bR5/2N1k4/5P3/7P1/6P2/9/9/4B4/2p6/2BAKA1rc w - - 0 1', m: 1, s: 'ZHUANG YuTing - TANG ZhuoGuang' },
+  { f: '3k1ab1C/c3P2c1/1N7/4n4/9/9/4C4/4B4/4A4/4KAB2 w - - 0 1', m: 1, s: 'YUAN HongLiang - CHEN Yu' },
+  { f: '3k5/4P2N1/3Nb1c1b/8p/9/2B6/P7P/4B4/4A4/3AK4 w - - 0 1', m: 1, s: 'QUYANG Peng - WU ShiGen' },
+  { f: '4kab2/1N2a4/4b4/c4R1N1/3r5/P1P6/9/4B4/4K4/3A5 w - - 0 1', m: 1, s: 'ZONG YongSheng - LIN YiSheng' },
+  { f: 'C2a1ab2/3R5/4k1P2/5N3/9/3r4c/5n3/4BA3/9/2B1K4 w - - 0 1', m: 1, s: 'CHEN JianYun - LI YuTao' },
+  { f: '3k1a3/4a4/7R1/5r2p/6b2/9/4C3P/B2Cn1N2/4A4/3AK4 w - - 0 1', m: 1, s: 'HOFFARTH Karsten - RAMO Juoni' },
+  { f: '5a3/5k3/1r7/p6Rp/3cN2n1/9/P7P/4C4/4A4/2BAK4 w - - 0 1', m: 1, s: 'LOOK Kean Chor - WANG Bing' },
+  { f: '3a1ab2/1R7/3N1k3/p7p/2P2N3/9/P8/3KB1r1c/6p2/9 w - - 0 1', m: 1, s: 'XU TianLi - YANG GuanLin' },
+  { f: '3akab2/4n4/4b4/3Nn3p/p3C4/9/8P/9/4A4/2B1KA3 w - - 0 1', m: 1, s: 'HONG LeiXin - CHEN MingSheng' },
+  { f: '3k1ab2/4a4/3Nbn3/9/4C3p/2B1P4/9/B2p5/8c/3AK4 w - - 0 1', m: 1, s: 'MONG Nhi - VO Hong Chau' },
+  { f: '3k1ab2/4a3c/2P1bn3/5N3/3C5/P8/7p1/4B4/3K5/3A1A3 w - - 0 1', m: 1, s: 'Wong Man Wai - Ma Kwok Keung' },
+  { f: '4ka3/2CPa4/4N4/p8/9/4n4/4cp2P/4BA3/3K5/5AB2 w - - 0 1', m: 1, s: 'xianliang - LAI Robin' },
+  { f: '3k5/4P4/9/4n4/9/9/9/4K4/4A4/3C5 w - - 0 1', m: 2, s: 'WU Kui Lin - WONG Wan Heng' },
+  { f: '5k3/CN2P4/9/9/9/9/9/1p4n2/4c4/4K4 w - - 0 1', m: 2, s: 'LI Bo - ZANG RuYi' },
+  { f: '4c4/4R3C/5k1P1/9/6r2/9/9/9/4A4/3CK4 w - - 0 1', m: 2, s: 'JIANG QuanSheng - CAO Lin' },
+  { f: '2Ra1k3/3P5/9/9/9/6p2/4cr3/3A1A3/4K4/9 w - - 0 1', m: 2, s: 'WANG YuCai - TANG FangYun' },
+  { f: '9/3P1k1N1/6n2/5c3/6b2/3N2B2/9/5A3/9/4K1B2 w - - 0 1', m: 2, s: 'TAO HanMing - DONG XuBin' },
+  { f: '2b2k3/4P4/5a2b/7N1/9/9/9/B8/5K3/3A1AB2 w - - 0 1', m: 2, s: 'ZHENG ZhengMing - SU ZhiYong' },
+  { f: '2r2k3/1N2a4/3a5/7R1/9/2B6/9/9/9/3AKAB2 w - - 0 1', m: 2, s: 'ZHAO GuoRong - LI ZhiPing' },
+  { f: '3k4C/5P1R1/3a5/9/9/2B1c1B2/3r4p/9/9/4K4 w - - 0 1', m: 2, s: 'LI YiTing - MA Kuan' },
+  { f: '2N1k4/9/4Pa3/8p/5Cn2/9/3p5/4B4/9/2BK1n3 w - - 0 1', m: 2, s: 'LIN JinChun - FENG Jao' },
+  { f: '5c3/3P5/5k3/4P4/4nN3/2B6/5p3/4BA3/4A4/3K5 w - - 0 1', m: 2, s: 'XIAN Liang - SU ZhiYong' },
+  { f: '3a2b2/4ak3/4P4/3n1N3/1Cb6/9/9/5A3/4K4/3A5 w - - 0 1', m: 2, s: 'YANG GuanLin - HOU YuShan' },
+  { f: '5k3/3P2P2/4R4/4p4/9/9/2r2n3/9/3pA4/2B1KA3 w - - 0 1', m: 2, s: 'ZHANG XiaoPing - TAO HanMing' },
+  { f: '3k5/4P4/9/9/2c5p/9/1n2N4/3C5/4A4/2BK1AB2 w - - 0 1', m: 2, s: 'HUANG BaoCong - CHEN XiaoKun' },
+  { f: '3ak4/4a4/5nN2/7R1/9/r5B2/2p6/9/9/3AKA3 w - - 0 1', m: 2, s: 'LI WangXiang - ZHU ZhuQin' },
+  { f: '4ka3/3Pa4/b3n4/9/9/4C1B2/9/4B4/4A4/4KA3 w - - 0 1', m: 2, s: 'ZHANG WenBin - TANAKA Atsushi' },
+  { f: '4R4/3k1P3/9/p7p/9/9/P7P/3r2p2/9/3AK1B2 w - - 0 1', m: 2, s: 'CENG DongPing - WU YinHui' },
+  { f: '3ak1b2/4a4/4bRn2/3N5/8p/9/8P/4C4/3r5/5K3 w - - 0 1', m: 2, s: 'SONG GuoQiang - TANG ZhuoGuang' },
+  { f: '2b6/5k3/8c/5P3/2b1r4/5R3/9/4C4/6p2/2B1KAB2 w - - 0 1', m: 2, s: 'LUO ZhongCai - GUO JiPing' },
+  { f: '4kcR2/3Pa2N1/5a3/9/9/9/3r5/3AB4/9/2BAK4 w - - 0 1', m: 2, s: 'XU TianLi - LIANG WenBin' },
+  { f: '4kabC1/4nP3/9/2N6/9/p8/9/9/1n2Ap3/4K1B2 w - - 0 1', m: 2, s: 'ZHENG XiangFu - NG Chun Hei' },
+  { f: 'C4kb2/4P4/4cN3/9/3n5/6p2/P8/4nA3/9/3A1K3 w - - 0 1', m: 2, s: 'LEE Kah Kheng - HUA Say Ty' },
+  { f: 'R4a3/3ka4/2P1N4/3r4p/9/9/9/3A5/4Ap3/2B1K4 w - - 0 1', m: 2, s: 'CHAN Stephen - ZHENG Qin Lin' },
+  { f: '5k3/1CP6/8R/9/p7P/4pn3/6r2/4B4/4A4/3AK4 w - - 0 1', m: 2, s: 'HAN SongLing - HUANG Yong' },
+  { f: '1C3k3/C8/3Rba3/4p3p/p1p6/9/9/4r4/4A4/4K4 w - - 0 1', m: 2, s: 'CHAN Ling Fai - ZHANG WenChang' },
+  { f: '2bk5/2N1a4/9/5C3/3C2b2/2pn5/9/9/4A4/2BcK4 w - - 0 1', m: 2, s: 'HU RongHua - LIU DianZhong' },
+  { f: '3k1an1c/4P4/8b/3P5/9/3c3p1/3C5/3A5/4K4/2BA5 w - - 0 1', m: 2, s: 'Lv Qin - FU GuangMing' },
+  { f: '9/5k3/3a2N1P/3P2N2/p1b6/9/c8/5An1B/9/4K1B2 w - - 0 1', m: 2, s: 'LIU DaHua - WANG BingGuo' },
+  { f: 'R2ak4/9/4b4/9/2pN2b2/9/2P5P/2r6/9/3CKC2r w - - 0 1', m: 2, s: 'ZHU XiaoHu - LI QiJie' },
+  { f: '2ba1a3/2R1r4/3k5/p1N6/6b2/9/9/4B4/4A4/4KAB2 w - - 0 1', m: 2, s: 'LIU WeiZhi - ZHANG YongXiang' },
+  { f: '4k4/R3aP3/6c2/4r4/6b1N/9/1p7/4B4/4A4/3AK1B2 w - - 0 1', m: 2, s: 'CHEN XinAn - LIU Zheng' },
+  { f: '2C1k4/3P1P3/3a5/9/4c1b2/3c2B2/9/5A3/3C5/2BA1K3 w - - 0 1', m: 2, s: 'SHANG Wei - JIANG QuanSheng' },
+  { f: '5k3/2N1a4/5a3/2nC2P2/4C4/5p3/P4cn2/9/4A4/4K4 w - - 0 1', m: 2, s: 'Lv Qin - LIU DaHua' },
+  { f: '2ba5/4ak1N1/9/6R1p/9/6P2/P7P/5A3/2n1p4/5KB2 w - - 0 1', m: 2, s: 'Lv Qin - LI LaiQun' },
+  { f: '3P1k3/1C3n3/3aba3/9/5Cb2/2B3B2/3n5/5A3/4A4/3K5 w - - 0 1', m: 2, s: 'CHEN FuJie - YUAN HongLiang' },
+  { f: '3a5/3ka4/4P4/3C4p/2b1N4/8c/4n4/4B4/4A4/2cAK4 w - - 0 1', m: 2, s: 'OUYANG ChanJuan - LIU Jing' },
+  { f: '3ak4/4aP1n1/4b4/1N1cP4/6b2/6B2/9/4BA3/4A4/4K4 w - - 0 1', m: 2, s: 'CAI Yi - ZHANG JinQi' },
+  { f: '5aC2/3k5/3a1P3/4c4/2b1N1n1p/9/P8/B8/4A4/3A1K3 w - - 0 1', m: 2, s: 'LIU DaHua - LIU YiCi' },
+  { f: '3k2b2/3c5/4b1N2/3R5/3r5/3C2P2/4n4/4B4/4A4/2BAK4 w - - 0 1', m: 2, s: 'LEUNG TatMan - ZHENG XiangFu' },
+  { f: '2b2P2C/3k2N2/2Pa5/9/5P3/4p4/3n1c3/3A4B/4K4/2B6 w - - 0 1', m: 2, s: 'Lv Qin - LI LaiQun' },
+  { f: '1r6C/3k5/4R1N2/9/9/9/p3P3n/4B4/9/ncBAKA3 w - - 0 1', m: 2, s: 'Lv Qin - ZHANG Qiang' },
+  { f: '9/3Rak3/4P4/9/8p/9/4c4/9/4K4/2BA1r3 w - - 0 1', m: 3, s: 'HUANG ZhiHui - SONG DaoXin' },
+  { f: '3a1k3/4a4/4P4/3Nc4/6P2/1p3Cn2/9/9/4A4/3K5 w - - 0 1', m: 3, s: 'REN Jian - NG Chun Hei' },
+  { f: '2Rakrb2/9/9/9/9/3n5/7R1/p3B4/4A4/2BAK4 w - - 0 1', m: 3, s: 'JIN HaiYing - GANG QiuYing' },
+  { f: '9/3ka4/4ba2n/4C4/p2N2b2/9/P8/3A5/3C5/4KA3 w - - 0 1', m: 3, s: 'LI LaiQun - MA NaiXuan' },
+  { f: '3k1a3/2R1aN3/9/4p4/9/6B1p/9/4C4/9/3AKArc1 w - - 0 1', m: 3, s: 'LIU DaHua - CHEN XiaoKun' },
+  { f: '1C1R1ab2/4k4/9/N7p/6p2/P8/8P/9/3K5/5rBc1 w - - 0 1', m: 3, s: 'YU ZhiQing - YAO Chun' },
+  { f: '2bk5/9/4b4/p2C5/9/2r3P2/4c4/4B4/4A4/3RKAB2 w - - 0 1', m: 3, s: 'J ayme - KUSTOMO B.' },
+  { f: '4kab2/4a4/4b4/1N2P3p/3C5/2P3n2/4cn3/4p4/9/5K3 w - - 0 1', m: 3, s: 'CHANG Diana - CHIENG Ming Chuo' },
+  { f: '5a3/3k3C1/b8/4P4/6N2/6P2/8r/4B4/3r5/1R1AKAB2 w - - 0 1', m: 3, s: 'CHIENG Ming Chuo - SOH Ying Ying' },
+  { f: '5ab1N/1N1ka4/2P1b4/3P5/9/9/4c4/4B4/4A2n1/2BAK4 w - - 0 1', m: 3, s: 'ZHOU JiRong - XIE SiChi' },
+  { f: '4k4/4a4/3aN4/5P3/3C2n2/4c4/2Cc1p3/4B4/4A4/3K1AB2 w - - 0 1', m: 3, s: 'WANG LinNa - SHAN XiaLi' },
+  { f: '1C7/2C1k4/3ab2R1/4p3p/9/9/4n4/3AB4/6r2/2BAK3c w - - 0 1', m: 3, s: 'ZHAO GuoRong - ZHUANG YuTing' },
+  { f: '3k2b2/2N2R3/b2a5/1C6p/9/9/P3P3P/B2K5/1r7/6n1c w - - 0 1', m: 3, s: 'CENG DongPing - MENG LiGuo' },
+  { f: '3k5/4a4/4Pac2/3N2N2/4C1n2/6B2/1c2p4/9/4A4/3K1AB2 w - - 0 1', m: 3, s: 'ZHAO GuoRong - LI Xuan' },
+  { f: '4k1c2/6R2/4ba3/7rC/2b5p/2B6/7n1/3A5/3C5/2B1KA3 w - - 0 1', m: 3, s: 'ZHANG XiaoPing - XU JianMiao' },
+  { f: '3ak4/4a4/4N4/1R7/4C4/P5P1P/4p4/5p3/2r6/3AKABc1 w - - 0 1', m: 3, s: 'Lv Qin - XU YinChuan' },
+  { f: '4k1b2/4a4/4ba3/3P3N1/C7p/n8/6c1P/4B4/4A4/2BAK4 w - - 0 1', m: 3, s: 'LI Aidong - HU QingYang' },
+  { f: '3k1c3/4R4/b3R4/p3C4/9/3r5/P1p1n4/9/4A4/2BNKAB2 w - - 0 1', m: 3, s: 'ZHANG GuoTai - ZHANG ZiLiang' },
+  { f: '9/2R1ak3/5a3/4Rn3/9/6P2/p4C2P/9/2Nrc4/1r1AK1B2 w - - 0 1', m: 3, s: 'Lv Qin - LIU DianZhong' },
+  { f: '3a5/C3a4/N4k1c1/p1R5p/4r4/3n5/P7P/5A3/9/3K1AB2 w - - 0 1', m: 3, s: 'LI Peng - XIAO GeLian' },
+  { f: '3r1a2C/R3a4/3k2N2/3r5/8p/p1B3p2/8P/9/4A4/2BAK4 w - - 0 1', m: 3, s: 'CHEN Zheng - ZHANG Xiang' },
+  { f: '1R3ab2/1CC6/5k3/p3p4/9/2p3N2/P8/4r4/3rA4/2B1KA3 w - - 0 1', m: 3, s: 'LIU DaHua - YANG BoLin' },
+  { f: '3k1ab2/3ca4/4N4/8p/4C4/6C2/1p4n1c/4B4/4A4/4KAB2 w - - 0 1', m: 3, s: 'XU TianHong - TAO HanMing' },
+  { f: '3a2R2/7C1/5k2C/7cp/9/P8/4P3P/3KB4/2r3n2/2BA1A3 w - - 0 1', m: 3, s: 'LEUNG TatMan - LIN YaoSen' },
+  { f: '2ba5/5kN2/2N2a3/p4P3/2b2C3/P5B2/4p4/9/5K1n1/2n5c w - - 0 1', m: 3, s: 'HU RongHua - LIU DaHua' },
+  { f: '3ak1b2/r2PaR3/4b4/p3r3p/9/P1R6/9/4C4/9/3AK1B2 w - - 0 1', m: 3, s: 'QIAN HongFa - ZHAO Feng' },
+  { f: '4kab2/7N1/2n1P4/4c3p/2p3r2/9/2p5P/3C5/4A4/2BA1KB2 w - - 0 1', m: 3, s: 'GUO LiPing - HAN Bing' },
+  { f: '1C1a1ab2/2R6/3Nk4/9/3P5/4pcP1p/P8/4B4/3K4c/2B1r4 w - - 0 1', m: 3, s: 'ZONG YongSheng - SHANG Wei' },
+  { f: '2bak4/C1n1a2N1/9/p7R/1r7/P3p4/5c3/4B4/4A4/2BAK4 w - - 0 1', m: 3, s: 'HU RongHua - XU WenXue' },
+  { f: '3ak4/3ca4/4N3R/p4N2p/1n7/4P2p1/6r2/B8/9/3AKAB2 w - - 0 1', m: 3, s: 'Li Hong Jia - LI WangXiang' },
+];
 
-  // ---- 第二类：没有唯一正解，给步数上限，黑方由 AI 应手 ----
-  { name: '单车擒王', limit: 20, tip: '限 20 步：单车必胜单将。车走肋道把将逼向边线，帅占中线助攻。',
-    pieces: [['R', 0, 9], ['K', 3, 9], ['k', 4, 0]] },
-  { name: '单车擒单士', limit: 25, tip: '限 25 步：先用帅牵住士，再驱车吃士。「单士怕车」，士一丢即成单车胜单将。',
-    pieces: [['R', 0, 9], ['K', 4, 9], ['k', 4, 0], ['a', 4, 1]] },
-  { name: '车兵破士象全', limit: 30, tip: '限 30 步：兵从中路推进，换掉双士或双象之一，车兵即可胜士象全（单车则和）。',
-    pieces: [['R', 0, 9], ['P', 4, 6], ['K', 4, 9], ['k', 4, 0], ['a', 3, 0], ['a', 5, 0], ['b', 2, 0], ['b', 6, 0]] },
-  { name: '马炮擒单士', limit: 25, tip: '限 25 步：炮在中路牵制，马跳到卧槽位配合。马炮双将优于单马或单炮。',
-    pieces: [['N', 2, 4], ['C', 4, 7], ['K', 4, 9], ['k', 4, 0], ['a', 4, 1]] }
+// 难度分档（下标区间对应上面题库的顺序：教学+一步杀 / 两步杀 / 三步杀）
+const XQ_TIERS = [
+  { name: '一步杀', hint: '先学看退路：把将的每个逃口都堵死', from: 0, to: 33 },
+  { name: '两步杀', hint: '算一步不够——要想「我走完他会怎么应」', from: 34, to: 73 },
+  { name: '三步杀', hint: '连将成杀，第一着往往是最难找的那一着', from: 74, to: 103 }
 ];
 
 const XQ_LABEL = { K:'帅', A:'仕', B:'相', N:'马', R:'车', C:'炮', P:'兵', k:'将', a:'士', b:'象', n:'马', r:'车', c:'炮', p:'卒' };
@@ -3596,9 +3703,14 @@ function xqLoser(board) {
 
 const xqPct = (i, total) => (i / total * 100).toFixed(3) + '%';
 
-let _xqLevel = 0;                                   // 当前关卡索引
+let _xqLevel = 0;                                   // 当前关卡（题库全局下标）
+let _xqTier = 0;                                    // 当前难度分档
 
 function xqCurLevel() { return XIANGQI_LEVELS[_xqLevel]; }
+function xqTierOf(i) {
+  for (let t = 0; t < XQ_TIERS.length; t++) if (i >= XQ_TIERS[t].from && i <= XQ_TIERS[t].to) return t;
+  return 0;
+}
 function xqClearedMap() { return Store.get('xqCleared', {}); }
 function xqMarkCleared() {
   const c = xqClearedMap();
@@ -3608,70 +3720,218 @@ function xqMarkCleared() {
 function xqLevelTo(i) {
   if (i < 0 || i >= XIANGQI_LEVELS.length) return;
   _xqLevel = i;
+  _xqTier = xqTierOf(i);
   xqNewGame();
   renderDailyChess();
 }
 function xqLevel(delta) { xqLevelTo(_xqLevel + delta); }
-
-function xqNewGame() {
-  const eg = xqCurLevel();
-  _xqState = {
-    name: eg.name, tip: eg.tip, board: xqBoard(eg.pieces),
-    sel: null, moves: [], turn: 'r', history: [], lastFrom: null, lastTo: null,
-    step: 0,      // 正解模式：已走到解法的第几步
-    used: 0,      // 已用步数（限步模式）
-  };
-  return eg;
+// 切档：优先跳到这一档里第一道还没通关的题
+function xqTierTo(t) {
+  if (t < 0 || t >= XQ_TIERS.length) return;
+  const tier = XQ_TIERS[t], done = xqClearedMap();
+  let target = tier.from;
+  for (let i = tier.from; i <= tier.to; i++) if (!done[i]) { target = i; break; }
+  xqLevelTo(target);
 }
 
-// 落子（记快照 + 清选中）。正解模式和限步模式共用。
-function xqApply(fx, fy, tx, ty) {
+// 局面 FEN（中国象棋）→ 10×9 棋盘。FEN 第一行就是 y=0（黑方底线），与内部坐标一致。
+function xqFromFen(fen) {
+  const rows = String(fen).trim().split(/\s+/)[0].split('/');
+  const b = [];
+  for (let y = 0; y < 10; y++) {
+    b.push(new Array(9).fill(null));
+    let x = 0;
+    for (const ch of (rows[y] || '')) {
+      if (ch >= '1' && ch <= '9') x += +ch;
+      else if (x < 9) b[y][x++] = ch;
+    }
+  }
+  return b;
+}
+
+/* ===== 强制杀搜索 —— 闯关判定的地基 =====
+ *
+ * xqMateIn(board, side, depth)：假设**当前轮到 side 走**，side 能否在 depth 步内强制将死
+ *   （对对方任意应手都成立）。返回 true 意味着「发现了确凿的杀法」。
+ *
+ * 两个版本，用途严格区分：
+ *   剪枝版 pruned=true 只让红方试将军着法。它仍然穷尽黑方所有应手，所以**找到的解一定正确**；
+ *   但会漏掉需要「等着」的解 —— 因此只能用来「确认」，绝不能用来「否决」。
+ *   完整版没有这个假设，实测慢三个数量级，只在剪枝否定之后当复核用。
+ *
+ * 踩过的坑：调这个函数时 board 必须轮到 side 走。玩家落子后轮到黑方，
+ * 这时要判「是否仍保杀」得用 xqRedWinsFromHere，不能直接调 mateIn(after, 'r', k-1)
+ * —— 那等于让红方连走两步、无视黑方应手，会得出「没有正解着法」的假象。
+ */
+function xqAllMoves(board, side) {
+  const out = [];
+  for (let y = 0; y < 10; y++) {
+    for (let x = 0; x < 9; x++) {
+      const c = board[y][x];
+      if (!c || xqSide(c) !== side) continue;
+      xqMovesFor(board, x, y).forEach(function (m) { out.push([x, y, m[0], m[1]]); });
+    }
+  }
+  return out;
+}
+function xqDo(board, m) {                            // 落子，返回被吃的子（用于回退）
+  const cap = board[m[3]][m[2]];
+  board[m[3]][m[2]] = board[m[1]][m[0]];
+  board[m[1]][m[0]] = null;
+  return cap;
+}
+function xqBack(board, m, cap) {
+  board[m[1]][m[0]] = board[m[3]][m[2]];
+  board[m[3]][m[2]] = cap;
+}
+
+function xqMateIn(board, side, depth, pruned) {
+  if (depth <= 0) return false;
+  const foe = side === 'r' ? 'b' : 'r';
+  const moves = xqAllMoves(board, side);
+  for (let i = 0; i < moves.length; i++) {
+    const m = moves[i];
+    const cap = xqDo(board, m);
+    if (!xqAllMoves(board, foe).length) { xqBack(board, m, cap); return true; }   // 将死/困毙
+    if (pruned && side === 'r' && !xqInCheck(board, foe)) { xqBack(board, m, cap); continue; }
+    if (depth > 1) {
+      let all = true;
+      const reps = xqAllMoves(board, foe);
+      for (let j = 0; j < reps.length; j++) {
+        const cap2 = xqDo(board, reps[j]);
+        const sub = xqMateIn(board, side, depth - 1, pruned);
+        xqBack(board, reps[j], cap2);
+        if (!sub) { all = false; break; }
+      }
+      if (all) { xqBack(board, m, cap); return true; }
+    }
+    xqBack(board, m, cap);
+  }
+  return false;
+}
+
+// board 轮到黑方，红方还剩 depth 步：黑方怎么应都躲不掉吗？
+function xqRedWinsFromHere(board, depth, pruned) {
+  const reps = xqAllMoves(board, 'b');
+  if (!reps.length) return true;                     // 已经被将死/困毙
+  for (let j = 0; j < reps.length; j++) {
+    const cap = xqDo(board, reps[j]);
+    const sub = xqMateIn(board, 'r', depth, pruned);
+    xqBack(board, reps[j], cap);
+    if (!sub) return false;
+  }
+  return true;
+}
+
+// 玩家这一着是否仍然保杀：先剪枝确认，剪枝为假再完整复核
+function xqIsGoodMove(board, m, mate) {
+  const cap = xqDo(board, m);
+  let good;
+  if (mate === 1) good = xqAllMoves(board, 'b').length === 0;
+  else good = xqRedWinsFromHere(board, mate - 1, true) || xqRedWinsFromHere(board, mate - 1, false);
+  xqBack(board, m, cap);
+  return good;
+}
+
+// 红方在当前局面最短几步能杀（1..max），杀不掉返回 0
+function xqShortestMate(board, max) {
+  for (let d = 1; d <= max; d++) if (xqMateIn(board, 'r', d, true)) return d;
+  for (let d = 1; d <= max; d++) if (xqMateIn(board, 'r', d, false)) return d;
+  return 0;
+}
+
+// 黑方的最强防守：选「让红方还需要最多步数」的那一着——不是随机乱走，会真的还手
+function xqBestDefense(board, left) {
+  const reps = xqAllMoves(board, 'b');
+  if (!reps.length) return null;
+  let best = null, bestScore = -1;
+  for (let j = 0; j < reps.length; j++) {
+    const cap = xqDo(board, reps[j]);
+    const need = xqShortestMate(board, left);
+    xqBack(board, reps[j], cap);
+    const score = need === 0 ? left + 1 : need;
+    if (score > bestScore) { bestScore = score; best = reps[j]; }
+  }
+  return best;
+}
+
+/* ===== 关卡状态 ===== */
+
+function xqNewGame() {
+  const lv = xqCurLevel();
+  _xqState = {
+    lv: _xqLevel,
+    board: xqFromFen(lv.f), sel: null, moves: [], turn: 'r', history: [],
+    lastFrom: null, lastTo: null, used: 0, done: '',
+  };
+  return lv;
+}
+
+function xqSnapshot() {                              // 悔棋用整盘快照：只有 90 格，比记增量可靠
   const st = _xqState;
   st.history.push({
     board: st.board.map(function (r) { return r.slice(); }),
-    turn: st.turn, lastFrom: st.lastFrom, lastTo: st.lastTo,
-    step: st.step, used: st.used,
+    turn: st.turn, lastFrom: st.lastFrom, lastTo: st.lastTo, used: st.used,
   });
-  st.board[ty][tx] = st.board[fy][fx];
-  st.board[fy][fx] = null;
-  st.lastFrom = [fx, fy]; st.lastTo = [tx, ty];
+}
+function xqPlay(m) {
+  const st = _xqState;
+  xqDo(st.board, m);
+  st.lastFrom = [m[0], m[1]]; st.lastTo = [m[2], m[3]];
   st.sel = null; st.moves = [];
 }
+function xqDefense() {                               // 黑方按最强防守应一手
+  const st = _xqState;
+  const lv = xqCurLevel();
+  const rep = xqBestDefense(st.board, Math.max(1, lv.m - st.used));
+  if (!rep) return;
+  xqSnapshot();                                      // 黑方这一手也要入历史，否则悔棋撤不干净
+  xqPlay(rep);
+  st.turn = 'r';
+}
+
+/* ===== 渲染 ===== */
 
 function renderDailyChess() {
   const box = document.getElementById('daily-chess-body');
   if (!box) return;
   const lv = xqCurLevel();
-  if (!_xqState || _xqState.name !== lv.name) xqNewGame();
+  if (!_xqState || _xqState.lv !== _xqLevel) xqNewGame();
   const st = _xqState;
   const b = st.board;
-  const loser = xqLoser(b);
-  const solved = !!lv.solution;
-  const outOfSteps = !loser && !!lv.limit && st.used >= lv.limit;
   const cleared = xqClearedMap();
+  const tier = XQ_TIERS[_xqTier] || XQ_TIERS[0];
 
-  let dots = '';
-  XIANGQI_LEVELS.forEach(function (_, i) {
-    dots += '<span class="xq-lv' + (i === _xqLevel ? ' cur' : '') + (cleared[i] ? ' done' : '') +
-      '" onclick="xqLevelTo(' + i + ')">' + (i + 1) + '</span>';
+  let chips = '';
+  XQ_TIERS.forEach(function (t, i) {
+    let done = 0;
+    for (let k = t.from; k <= t.to; k++) if (cleared[k]) done++;
+    chips += '<button class="xq-tier' + (i === _xqTier ? ' cur' : '') + '" onclick="xqTierTo(' + i + ')">' +
+      escHtml(t.name) + '<span class="xq-tier-n">' + done + '/' + (t.to - t.from + 1) + '</span></button>';
   });
 
-  const status = loser ? '已分胜负'
-    : outOfSteps ? '步数用尽'
-    : solved ? '第 ' + (Math.floor(st.step / 2) + 1) + ' 回合'
-    : '已用 ' + st.used + '/' + lv.limit + ' 步';
+  let grid = '';
+  for (let i = tier.from; i <= tier.to; i++) {
+    grid += '<span class="xq-lv' + (i === _xqLevel ? ' cur' : '') + (cleared[i] ? ' done' : '') +
+      '" onclick="xqLevelTo(' + i + ')">' + (i - tier.from + 1) + '</span>';
+  }
+
+  const status = st.done === 'win' ? '已通关'
+    : '第 ' + (st.used + 1) + ' 手 / 共 ' + lv.m + ' 手';
 
   let html = '<div class="xq-bar">' +
     '<button class="btn btn-sm" onclick="xqLevel(-1)"' + (_xqLevel ? '' : ' disabled') + '>‹</button>' +
-    '<span class="xq-name">' + escHtml(lv.name) + '</span>' +
+    '<span class="xq-name">第 ' + (_xqLevel + 1) + ' 关 · ' + escHtml(lv.s) + '</span>' +
     '<span class="xq-turn' + (st.turn === 'r' ? ' is-red' : '') + '">' + status + '</span>' +
     '<button class="btn btn-sm" onclick="xqLevel(1)"' + (_xqLevel < XIANGQI_LEVELS.length - 1 ? '' : ' disabled') + '>›</button>' +
     '</div>' +
-    '<div class="xq-lvs">' + dots + '</div>' +
+    '<div class="xq-tiers">' + chips + '</div>' +
+    '<div class="xq-lvs">' + grid + '</div>' +
     '<div class="xq-ops">' +
-      (solved ? '' : '<button class="btn btn-sm" onclick="xqHint()">提示</button>') +
+      '<button class="btn btn-sm" onclick="xqHint()"' + (st.done ? ' disabled' : '') + '>' + mkIcon('thought', 0.8) + '提示</button>' +
       '<button class="btn btn-sm" onclick="xqUndo()"' + (st.history.length ? '' : ' disabled') + '>悔棋</button>' +
       '<button class="btn btn-sm" onclick="xqReset()">重摆</button>' +
+      '<span class="xq-goal">' + lv.m + ' 步内将死黑方</span>' +
     '</div>';
 
   html += '<div class="xq-board"><div class="xq-plane">' + xqGridSvg() +
@@ -3707,11 +3967,15 @@ function renderDailyChess() {
   }
   html += '</div></div>';
 
-  if (loser === 'b') html += '<div class="xq-done">' + mkIcon('check', 0.85) + ' 通关！</div>';
-  else if (loser === 'r') html += '<div class="xq-done xq-bad">黑方胜 · 重摆再战</div>';
-  else if (outOfSteps) html += '<div class="xq-done xq-bad">步数用尽 · 重摆再战</div>';
+  if (st.done === 'win') {
+    html += '<div class="xq-done">' + mkIcon('check', 0.85) + ' 通关！' +
+      (lv.m > 1 ? ' ' + lv.m + ' 步杀。' : '') + '</div>';
+  } else if (xqLoser(b) === 'r') {
+    html += '<div class="xq-done xq-bad">被反杀了 · 重摆再战</div>';
+  }
 
-  html += '<div class="xq-tip">' + mkIcon('thought', 0.8) + ' ' + escHtml(lv.tip) + '</div>';
+  const tipText = lv.tip || (tier.hint + '。' + (lv.m > 1 ? '出自对局：' + lv.s : ''));
+  html += '<div class="xq-tip">' + mkIcon('thought', 0.8) + ' ' + escHtml(tipText) + '</div>';
   box.innerHTML = html;
 }
 
@@ -3722,85 +3986,44 @@ function xqSelect(x, y) {
   renderDailyChess();
 }
 
-// 黑方应手的极简启发式（**不是**象棋引擎）：能吃就吃、能将军就将军、同分带点随机。
-// 目的是让残局练习有个像样的对手，而不是真的对弈。
-const XQ_VALUE = { R: 9, C: 4.5, N: 4, B: 2, A: 2, P: 1 };
-
-function xqAiChoose(board, side) {
-  const foe = side === 'r' ? 'b' : 'r';
-  let best = null;
-  for (let y = 0; y < 10; y++) {
-    for (let x = 0; x < 9; x++) {
-      const c = board[y][x];
-      if (!c || xqSide(c) !== side) continue;
-      xqMovesFor(board, x, y).forEach(function (m) {
-        let score = (XQ_VALUE[(board[m[1]][m[0]] || '').toUpperCase()] || 0) * 10;
-        const nb = board.map(function (r) { return r.slice(); });
-        nb[m[1]][m[0]] = nb[y][x]; nb[y][x] = null;
-        if (xqInCheck(nb, foe)) score += 25;      // 将军
-        if (xqInCheck(nb, side)) score -= 40;     // 走完自己被将 → 基本是送
-        score += Math.random() * 6;
-        if (!best || score > best.score) best = { from: [x, y], to: m, score: score };
-      });
-    }
-  }
-  return best;
-}
-
-// 轮到黑方时自动走一步（同步执行，不需要定时器）
-function xqAiStep() {
-  const st = _xqState;
-  if (!st || st.turn !== 'b' || xqLoser(st.board)) return;
-  const mv = xqAiChoose(st.board, 'b');
-  if (!mv) return;
-  xqApply(mv.from[0], mv.from[1], mv.to[0], mv.to[1]);
-  st.turn = 'r';
-}
-
 function xqTap(x, y) {
   const st = _xqState;
-  if (!st) return;
+  if (!st || st.done) return;                        // 已通关
+  if (st.turn !== 'r') return;                       // 黑方由程序按最强防守应手
   const lv = xqCurLevel();
-  if (xqLoser(st.board)) return;                     // 已分胜负
-  if (lv.limit && st.used >= lv.limit) return;       // 步数用尽
-  if (st.turn !== 'r') return;                       // 黑方由程序代走
   const c = st.board[y][x];
 
   if (st.sel) {
-    const [sx, sy] = st.sel;
-    if (st.moves.some(m => m[0] === x && m[1] === y)) {
-      // 正解模式：只认解法里那一步（这是「闯关」和「自由练习」的唯一区别）
-      if (lv.solution) {
-        const need = lv.solution[st.step];
-        if (!need || need[0] !== sx || need[1] !== sy || need[2] !== x || need[3] !== y) {
-          showToast('不是这一步，再想想');
-          st.sel = null; st.moves = [];
-          renderDailyChess();
-          return;
-        }
+    const sx = st.sel[0], sy = st.sel[1];
+    if (st.moves.some(function (m) { return m[0] === x && m[1] === y; })) {
+      const mv = [sx, sy, x, y];
+      // 闯关判定：这一步走完，黑方无论怎么应都还会在剩余步数内被将死吗？
+      if (!xqIsGoodMove(st.board, mv, lv.m)) {
+        st.sel = null; st.moves = [];
+        showToast('这步给了他喘息的机会，再想想');
+        renderDailyChess();
+        return;
       }
-      xqApply(sx, sy, x, y);
-      st.used++; st.step++;
-
-      if (lv.solution) {
-        // 黑方按解法应手（解法里红黑交替，最后一步是红方的杀着）
-        const reply = lv.solution[st.step];
-        if (reply) { xqApply(reply[0], reply[1], reply[2], reply[3]); st.step++; }
+      xqSnapshot();
+      xqPlay(mv);
+      st.used++;
+      if (!xqAllMoves(st.board, 'b').length) {       // 将死了 → 通关
         st.turn = 'r';
-        if (st.step >= lv.solution.length && xqLoser(st.board) === 'b') xqMarkCleared();
+        st.done = 'win';
+        xqMarkCleared();
       } else {
         st.turn = 'b';
-        xqAiStep();                                    // 限步模式：AI 应一手
+        xqDefense();
       }
       renderDailyChess();
       return;
     }
-    if (c && xqSide(c) === st.turn) { xqSelect(x, y); return; }
+    if (c && xqSide(c) === 'r') { xqSelect(x, y); return; }
     st.sel = null; st.moves = [];
     renderDailyChess();
     return;
   }
-  if (c && xqSide(c) === st.turn) xqSelect(x, y);
+  if (c && xqSide(c) === 'r') xqSelect(x, y);
 }
 
 // 一次悔棋撤**一整回合**（黑方应手 + 你的着法），回到你上次做决定之前
@@ -3813,7 +4036,8 @@ function xqUndo() {
     st.board = prev.board;
     st.turn = prev.turn;
     st.lastFrom = prev.lastFrom; st.lastTo = prev.lastTo;
-    st.step = prev.step; st.used = prev.used;
+    st.used = prev.used;
+    st.done = '';
     guard++;
   } while (st.turn !== 'r' && st.history.length && guard < 6);
   st.sel = null; st.moves = [];
@@ -3822,17 +4046,34 @@ function xqUndo() {
 
 function xqReset() { xqNewGame(); renderDailyChess(); }
 
-// 坐标 → 棋谱常见记法（红方视角：红底线是 1，黑底线是 10）
+// 坐标 → 棋盘记法（a-i 列 / 1-10 行，红方底线是 1）
 function xqPosText(x, y) { return 'abcdefghi'[x] + (10 - y); }
+function xqMoveText(board, m) {
+  return (XQ_LABEL[board[m[1]][m[0]]] || '') + ' ' + xqPosText(m[0], m[1]) + ' → ' + xqPosText(m[2], m[3]);
+}
 
-// 「提示」= 用同一套启发式站在红方角度推荐一步。这不是残局正解，
-// 只是一个不至于太离谱的建议——别把它当标准答案。
+// 提示 = 用同一套杀棋搜索找一步真正保杀的着法（不是启发式瞎猜）
 function xqHint() {
   const st = _xqState;
-  if (!st || st.turn !== 'r' || xqLoser(st.board)) return;
-  const mv = xqAiChoose(st.board, 'r');
-  if (!mv) { showToast('这一步没有可走的着法'); return; }
-  showToast('可考虑：' + xqPosText(mv.from[0], mv.from[1]) + ' → ' + xqPosText(mv.to[0], mv.to[1]));
+  if (!st || st.done || st.turn !== 'r') return;
+  const lv = xqCurLevel();
+  const moves = xqAllMoves(st.board, 'r');
+  let found = null;
+  for (let i = 0; i < moves.length && !found; i++) {          // 先剪枝：连将杀一步就能试出来
+    const m = moves[i];
+    const cap = xqDo(st.board, m);
+    const ok = (lv.m === 1) ? (xqAllMoves(st.board, 'b').length === 0)
+                            : xqRedWinsFromHere(st.board, lv.m - 1, true);
+    xqBack(st.board, m, cap);
+    if (ok) found = m;
+  }
+  for (let i = 0; i < moves.length && !found; i++) {          // 剪枝找不到（要等着）再完整搜
+    if (xqIsGoodMove(st.board, moves[i], lv.m)) found = moves[i];
+  }
+  if (!found) { showToast('这局面已经没有保杀的着法了，重摆试试'); return; }
+  st.sel = null; st.moves = [];
+  showToast('试试：' + xqMoveText(st.board, found));
+  renderDailyChess();
 }
 
 function renderDailyHub() {

@@ -1,0 +1,522 @@
+[
+ {
+  "fen": "3k5/9/9/9/9/4R4/9/9/R8/4K4 w",
+  "mate": 1,
+  "src": "封将门·左"
+ },
+ {
+  "fen": "5k3/9/9/9/9/4R4/9/9/8R/4K4 w",
+  "mate": 1,
+  "src": "封将门·右"
+ },
+ {
+  "fen": "4k4/9/4P4/9/9/9/9/9/9/R2K5 w",
+  "mate": 1,
+  "src": "兵封中路"
+ },
+ {
+  "fen": "9/9/3k5/9/4R4/9/9/9/9/R3K4 w",
+  "mate": 1,
+  "src": "回马封门"
+ },
+ {
+  "fen": "5N3/9/3k5/4P4/c5b2/9/9/5Kn2/9/4C4 w - - 0 1",
+  "mate": 1,
+  "src": "XIAO GeLian - XU JianMiao"
+ },
+ {
+  "fen": "9/1c1k5/2N6/9/2b3b2/6B2/9/3A5/4C4/4K4 w - - 0 1",
+  "mate": 1,
+  "src": "ZHAO GuoRong - WAN ChunLin"
+ },
+ {
+  "fen": "2c3R2/3k5/b2aN2r1/9/9/9/9/4B4/3K5/2B6 w - - 0 1",
+  "mate": 1,
+  "src": "Thianchai SARINNAPHAKORN - YAMAZAKI Hideo"
+ },
+ {
+  "fen": "3k2b2/4P4/9/9/1N3Cn2/6B2/9/4B4/4c4/3AK4 w - - 0 1",
+  "mate": 1,
+  "src": "CHEN FuJie - HUANG HaiLin"
+ },
+ {
+  "fen": "3P1k3/4PN3/9/9/9/2B2n3/5p3/4p4/4A4/3A1K3 w - - 0 1",
+  "mate": 1,
+  "src": "HU RongHua - LI LaiQun"
+ },
+ {
+  "fen": "3k5/4P4/3Pb4/9/3c2b2/3p5/9/9/4K4/2BA1A3 w - - 0 1",
+  "mate": 1,
+  "src": "ZHANG Jiang - ZHANG Qiang"
+ },
+ {
+  "fen": "3k1P3/4P4/3cb3b/9/9/9/P8/4B4/4A4/3K1AB2 w - - 0 1",
+  "mate": 1,
+  "src": "JIAN TianNan - TOH Yeow Chong"
+ },
+ {
+  "fen": "5k3/4R4/5P2b/5N3/9/9/2P5P/3A5/4A4/2nK2B2 w - - 0 1",
+  "mate": 1,
+  "src": "FENG Jao - CHEN Qiu"
+ },
+ {
+  "fen": "C3ka3/1RP6/3a5/9/9/4r4/8c/B8/5K3/2BA5 w - - 0 1",
+  "mate": 1,
+  "src": "XU YongJia - MA NaiXuan"
+ },
+ {
+  "fen": "3a1a2R/4k4/4nN3/9/9/8P/r8/B3B4/4A4/4KA3 w - - 0 1",
+  "mate": 1,
+  "src": "LI JiaHua - TANG FangYun"
+ },
+ {
+  "fen": "2ba5/4a1N2/5k3/4C4/p3P4/3R5/P7P/9/r8/4K4 w - - 0 1",
+  "mate": 1,
+  "src": "LAI Chi Kong - ZHANG WangHou"
+ },
+ {
+  "fen": "5a3/5k3/3aP4/3N4p/6N2/9/9/3Ac4/2p6/4KAB2 w - - 0 1",
+  "mate": 1,
+  "src": "LIU DaHua - CAO Lin"
+ },
+ {
+  "fen": "9/2P6/b2k5/9/7Np/7n1/3n4P/3p1A3/3C5/4K1B2 w - - 0 1",
+  "mate": 1,
+  "src": "ZONG YongSheng - GAO MingHai"
+ },
+ {
+  "fen": "4kab1C/1c1P5/2N6/6c2/4p4/8p/9/4B4/3K5/5An2 w - - 0 1",
+  "mate": 1,
+  "src": "HU RongHua - ZHANG Weimin"
+ },
+ {
+  "fen": "9/1C2P1N2/2C2k3/p1n6/9/8p/9/1n3p3/4A4/c3K1B2 w - - 0 1",
+  "mate": 1,
+  "src": "LIU DianZhong - LIN HongMin"
+ },
+ {
+  "fen": "2baka3/9/4P4/9/2r6/3R2P2/8P/1p2BA3/3K1p3/9 w - - 0 1",
+  "mate": 1,
+  "src": "HII Kong Ming - ZHANG Gao Yang"
+ },
+ {
+  "fen": "2bk5/9/3N1a3/2Nc5/2n1n4/2B5P/4C4/3A5/9/3A1K3 w - - 0 1",
+  "mate": 1,
+  "src": "HU RongHua - FU GuangMing"
+ },
+ {
+  "fen": "4kab1C/9/2N2R3/5r3/2n5p/9/8P/4B4/9/3AKA3 w - - 0 1",
+  "mate": 1,
+  "src": "SUNG Peter - LOW Gin Wan"
+ },
+ {
+  "fen": "2bR5/2N1k4/5P3/7P1/6P2/9/9/4B4/2p6/2BAKA1rc w - - 0 1",
+  "mate": 1,
+  "src": "ZHUANG YuTing - TANG ZhuoGuang"
+ },
+ {
+  "fen": "3k1ab1C/c3P2c1/1N7/4n4/9/9/4C4/4B4/4A4/4KAB2 w - - 0 1",
+  "mate": 1,
+  "src": "YUAN HongLiang - CHEN Yu"
+ },
+ {
+  "fen": "3k5/4P2N1/3Nb1c1b/8p/9/2B6/P7P/4B4/4A4/3AK4 w - - 0 1",
+  "mate": 1,
+  "src": "QUYANG Peng - WU ShiGen"
+ },
+ {
+  "fen": "4kab2/1N2a4/4b4/c4R1N1/3r5/P1P6/9/4B4/4K4/3A5 w - - 0 1",
+  "mate": 1,
+  "src": "ZONG YongSheng - LIN YiSheng"
+ },
+ {
+  "fen": "C2a1ab2/3R5/4k1P2/5N3/9/3r4c/5n3/4BA3/9/2B1K4 w - - 0 1",
+  "mate": 1,
+  "src": "CHEN JianYun - LI YuTao"
+ },
+ {
+  "fen": "3k1a3/4a4/7R1/5r2p/6b2/9/4C3P/B2Cn1N2/4A4/3AK4 w - - 0 1",
+  "mate": 1,
+  "src": "HOFFARTH Karsten - RAMO Juoni"
+ },
+ {
+  "fen": "5a3/5k3/1r7/p6Rp/3cN2n1/9/P7P/4C4/4A4/2BAK4 w - - 0 1",
+  "mate": 1,
+  "src": "LOOK Kean Chor - WANG Bing"
+ },
+ {
+  "fen": "3a1ab2/1R7/3N1k3/p7p/2P2N3/9/P8/3KB1r1c/6p2/9 w - - 0 1",
+  "mate": 1,
+  "src": "XU TianLi - YANG GuanLin"
+ },
+ {
+  "fen": "3akab2/4n4/4b4/3Nn3p/p3C4/9/8P/9/4A4/2B1KA3 w - - 0 1",
+  "mate": 1,
+  "src": "HONG LeiXin - CHEN MingSheng"
+ },
+ {
+  "fen": "3k1ab2/4a4/3Nbn3/9/4C3p/2B1P4/9/B2p5/8c/3AK4 w - - 0 1",
+  "mate": 1,
+  "src": "MONG Nhi - VO Hong Chau"
+ },
+ {
+  "fen": "3k1ab2/4a3c/2P1bn3/5N3/3C5/P8/7p1/4B4/3K5/3A1A3 w - - 0 1",
+  "mate": 1,
+  "src": "Wong Man Wai - Ma Kwok Keung"
+ },
+ {
+  "fen": "4ka3/2CPa4/4N4/p8/9/4n4/4cp2P/4BA3/3K5/5AB2 w - - 0 1",
+  "mate": 1,
+  "src": "xianliang - LAI Robin"
+ },
+ {
+  "fen": "3k5/4P4/9/4n4/9/9/9/4K4/4A4/3C5 w - - 0 1",
+  "mate": 2,
+  "src": "WU Kui Lin - WONG Wan Heng"
+ },
+ {
+  "fen": "5k3/CN2P4/9/9/9/9/9/1p4n2/4c4/4K4 w - - 0 1",
+  "mate": 2,
+  "src": "LI Bo - ZANG RuYi"
+ },
+ {
+  "fen": "4c4/4R3C/5k1P1/9/6r2/9/9/9/4A4/3CK4 w - - 0 1",
+  "mate": 2,
+  "src": "JIANG QuanSheng - CAO Lin"
+ },
+ {
+  "fen": "2Ra1k3/3P5/9/9/9/6p2/4cr3/3A1A3/4K4/9 w - - 0 1",
+  "mate": 2,
+  "src": "WANG YuCai - TANG FangYun"
+ },
+ {
+  "fen": "9/3P1k1N1/6n2/5c3/6b2/3N2B2/9/5A3/9/4K1B2 w - - 0 1",
+  "mate": 2,
+  "src": "TAO HanMing - DONG XuBin"
+ },
+ {
+  "fen": "2b2k3/4P4/5a2b/7N1/9/9/9/B8/5K3/3A1AB2 w - - 0 1",
+  "mate": 2,
+  "src": "ZHENG ZhengMing - SU ZhiYong"
+ },
+ {
+  "fen": "2r2k3/1N2a4/3a5/7R1/9/2B6/9/9/9/3AKAB2 w - - 0 1",
+  "mate": 2,
+  "src": "ZHAO GuoRong - LI ZhiPing"
+ },
+ {
+  "fen": "3k4C/5P1R1/3a5/9/9/2B1c1B2/3r4p/9/9/4K4 w - - 0 1",
+  "mate": 2,
+  "src": "LI YiTing - MA Kuan"
+ },
+ {
+  "fen": "2N1k4/9/4Pa3/8p/5Cn2/9/3p5/4B4/9/2BK1n3 w - - 0 1",
+  "mate": 2,
+  "src": "LIN JinChun - FENG Jao"
+ },
+ {
+  "fen": "5c3/3P5/5k3/4P4/4nN3/2B6/5p3/4BA3/4A4/3K5 w - - 0 1",
+  "mate": 2,
+  "src": "XIAN Liang - SU ZhiYong"
+ },
+ {
+  "fen": "3a2b2/4ak3/4P4/3n1N3/1Cb6/9/9/5A3/4K4/3A5 w - - 0 1",
+  "mate": 2,
+  "src": "YANG GuanLin - HOU YuShan"
+ },
+ {
+  "fen": "5k3/3P2P2/4R4/4p4/9/9/2r2n3/9/3pA4/2B1KA3 w - - 0 1",
+  "mate": 2,
+  "src": "ZHANG XiaoPing - TAO HanMing"
+ },
+ {
+  "fen": "3k5/4P4/9/9/2c5p/9/1n2N4/3C5/4A4/2BK1AB2 w - - 0 1",
+  "mate": 2,
+  "src": "HUANG BaoCong - CHEN XiaoKun"
+ },
+ {
+  "fen": "3ak4/4a4/5nN2/7R1/9/r5B2/2p6/9/9/3AKA3 w - - 0 1",
+  "mate": 2,
+  "src": "LI WangXiang - ZHU ZhuQin"
+ },
+ {
+  "fen": "4ka3/3Pa4/b3n4/9/9/4C1B2/9/4B4/4A4/4KA3 w - - 0 1",
+  "mate": 2,
+  "src": "ZHANG WenBin - TANAKA Atsushi"
+ },
+ {
+  "fen": "4R4/3k1P3/9/p7p/9/9/P7P/3r2p2/9/3AK1B2 w - - 0 1",
+  "mate": 2,
+  "src": "CENG DongPing - WU YinHui"
+ },
+ {
+  "fen": "3ak1b2/4a4/4bRn2/3N5/8p/9/8P/4C4/3r5/5K3 w - - 0 1",
+  "mate": 2,
+  "src": "SONG GuoQiang - TANG ZhuoGuang"
+ },
+ {
+  "fen": "2b6/5k3/8c/5P3/2b1r4/5R3/9/4C4/6p2/2B1KAB2 w - - 0 1",
+  "mate": 2,
+  "src": "LUO ZhongCai - GUO JiPing"
+ },
+ {
+  "fen": "4kcR2/3Pa2N1/5a3/9/9/9/3r5/3AB4/9/2BAK4 w - - 0 1",
+  "mate": 2,
+  "src": "XU TianLi - LIANG WenBin"
+ },
+ {
+  "fen": "4kabC1/4nP3/9/2N6/9/p8/9/9/1n2Ap3/4K1B2 w - - 0 1",
+  "mate": 2,
+  "src": "ZHENG XiangFu - NG Chun Hei"
+ },
+ {
+  "fen": "C4kb2/4P4/4cN3/9/3n5/6p2/P8/4nA3/9/3A1K3 w - - 0 1",
+  "mate": 2,
+  "src": "LEE Kah Kheng - HUA Say Ty"
+ },
+ {
+  "fen": "R4a3/3ka4/2P1N4/3r4p/9/9/9/3A5/4Ap3/2B1K4 w - - 0 1",
+  "mate": 2,
+  "src": "CHAN Stephen - ZHENG Qin Lin"
+ },
+ {
+  "fen": "5k3/1CP6/8R/9/p7P/4pn3/6r2/4B4/4A4/3AK4 w - - 0 1",
+  "mate": 2,
+  "src": "HAN SongLing - HUANG Yong"
+ },
+ {
+  "fen": "1C3k3/C8/3Rba3/4p3p/p1p6/9/9/4r4/4A4/4K4 w - - 0 1",
+  "mate": 2,
+  "src": "CHAN Ling Fai - ZHANG WenChang"
+ },
+ {
+  "fen": "2bk5/2N1a4/9/5C3/3C2b2/2pn5/9/9/4A4/2BcK4 w - - 0 1",
+  "mate": 2,
+  "src": "HU RongHua - LIU DianZhong"
+ },
+ {
+  "fen": "3k1an1c/4P4/8b/3P5/9/3c3p1/3C5/3A5/4K4/2BA5 w - - 0 1",
+  "mate": 2,
+  "src": "Lv Qin - FU GuangMing"
+ },
+ {
+  "fen": "9/5k3/3a2N1P/3P2N2/p1b6/9/c8/5An1B/9/4K1B2 w - - 0 1",
+  "mate": 2,
+  "src": "LIU DaHua - WANG BingGuo"
+ },
+ {
+  "fen": "R2ak4/9/4b4/9/2pN2b2/9/2P5P/2r6/9/3CKC2r w - - 0 1",
+  "mate": 2,
+  "src": "ZHU XiaoHu - LI QiJie"
+ },
+ {
+  "fen": "2ba1a3/2R1r4/3k5/p1N6/6b2/9/9/4B4/4A4/4KAB2 w - - 0 1",
+  "mate": 2,
+  "src": "LIU WeiZhi - ZHANG YongXiang"
+ },
+ {
+  "fen": "4k4/R3aP3/6c2/4r4/6b1N/9/1p7/4B4/4A4/3AK1B2 w - - 0 1",
+  "mate": 2,
+  "src": "CHEN XinAn - LIU Zheng"
+ },
+ {
+  "fen": "2C1k4/3P1P3/3a5/9/4c1b2/3c2B2/9/5A3/3C5/2BA1K3 w - - 0 1",
+  "mate": 2,
+  "src": "SHANG Wei - JIANG QuanSheng"
+ },
+ {
+  "fen": "5k3/2N1a4/5a3/2nC2P2/4C4/5p3/P4cn2/9/4A4/4K4 w - - 0 1",
+  "mate": 2,
+  "src": "Lv Qin - LIU DaHua"
+ },
+ {
+  "fen": "2ba5/4ak1N1/9/6R1p/9/6P2/P7P/5A3/2n1p4/5KB2 w - - 0 1",
+  "mate": 2,
+  "src": "Lv Qin - LI LaiQun"
+ },
+ {
+  "fen": "3P1k3/1C3n3/3aba3/9/5Cb2/2B3B2/3n5/5A3/4A4/3K5 w - - 0 1",
+  "mate": 2,
+  "src": "CHEN FuJie - YUAN HongLiang"
+ },
+ {
+  "fen": "3a5/3ka4/4P4/3C4p/2b1N4/8c/4n4/4B4/4A4/2cAK4 w - - 0 1",
+  "mate": 2,
+  "src": "OUYANG ChanJuan - LIU Jing"
+ },
+ {
+  "fen": "3ak4/4aP1n1/4b4/1N1cP4/6b2/6B2/9/4BA3/4A4/4K4 w - - 0 1",
+  "mate": 2,
+  "src": "CAI Yi - ZHANG JinQi"
+ },
+ {
+  "fen": "5aC2/3k5/3a1P3/4c4/2b1N1n1p/9/P8/B8/4A4/3A1K3 w - - 0 1",
+  "mate": 2,
+  "src": "LIU DaHua - LIU YiCi"
+ },
+ {
+  "fen": "3k2b2/3c5/4b1N2/3R5/3r5/3C2P2/4n4/4B4/4A4/2BAK4 w - - 0 1",
+  "mate": 2,
+  "src": "LEUNG TatMan - ZHENG XiangFu"
+ },
+ {
+  "fen": "2b2P2C/3k2N2/2Pa5/9/5P3/4p4/3n1c3/3A4B/4K4/2B6 w - - 0 1",
+  "mate": 2,
+  "src": "Lv Qin - LI LaiQun"
+ },
+ {
+  "fen": "1r6C/3k5/4R1N2/9/9/9/p3P3n/4B4/9/ncBAKA3 w - - 0 1",
+  "mate": 2,
+  "src": "Lv Qin - ZHANG Qiang"
+ },
+ {
+  "fen": "9/3Rak3/4P4/9/8p/9/4c4/9/4K4/2BA1r3 w - - 0 1",
+  "mate": 3,
+  "src": "HUANG ZhiHui - SONG DaoXin"
+ },
+ {
+  "fen": "3a1k3/4a4/4P4/3Nc4/6P2/1p3Cn2/9/9/4A4/3K5 w - - 0 1",
+  "mate": 3,
+  "src": "REN Jian - NG Chun Hei"
+ },
+ {
+  "fen": "2Rakrb2/9/9/9/9/3n5/7R1/p3B4/4A4/2BAK4 w - - 0 1",
+  "mate": 3,
+  "src": "JIN HaiYing - GANG QiuYing"
+ },
+ {
+  "fen": "9/3ka4/4ba2n/4C4/p2N2b2/9/P8/3A5/3C5/4KA3 w - - 0 1",
+  "mate": 3,
+  "src": "LI LaiQun - MA NaiXuan"
+ },
+ {
+  "fen": "3k1a3/2R1aN3/9/4p4/9/6B1p/9/4C4/9/3AKArc1 w - - 0 1",
+  "mate": 3,
+  "src": "LIU DaHua - CHEN XiaoKun"
+ },
+ {
+  "fen": "1C1R1ab2/4k4/9/N7p/6p2/P8/8P/9/3K5/5rBc1 w - - 0 1",
+  "mate": 3,
+  "src": "YU ZhiQing - YAO Chun"
+ },
+ {
+  "fen": "2bk5/9/4b4/p2C5/9/2r3P2/4c4/4B4/4A4/3RKAB2 w - - 0 1",
+  "mate": 3,
+  "src": "J ayme - KUSTOMO B."
+ },
+ {
+  "fen": "4kab2/4a4/4b4/1N2P3p/3C5/2P3n2/4cn3/4p4/9/5K3 w - - 0 1",
+  "mate": 3,
+  "src": "CHANG Diana - CHIENG Ming Chuo"
+ },
+ {
+  "fen": "5a3/3k3C1/b8/4P4/6N2/6P2/8r/4B4/3r5/1R1AKAB2 w - - 0 1",
+  "mate": 3,
+  "src": "CHIENG Ming Chuo - SOH Ying Ying"
+ },
+ {
+  "fen": "5ab1N/1N1ka4/2P1b4/3P5/9/9/4c4/4B4/4A2n1/2BAK4 w - - 0 1",
+  "mate": 3,
+  "src": "ZHOU JiRong - XIE SiChi"
+ },
+ {
+  "fen": "4k4/4a4/3aN4/5P3/3C2n2/4c4/2Cc1p3/4B4/4A4/3K1AB2 w - - 0 1",
+  "mate": 3,
+  "src": "WANG LinNa - SHAN XiaLi"
+ },
+ {
+  "fen": "1C7/2C1k4/3ab2R1/4p3p/9/9/4n4/3AB4/6r2/2BAK3c w - - 0 1",
+  "mate": 3,
+  "src": "ZHAO GuoRong - ZHUANG YuTing"
+ },
+ {
+  "fen": "3k2b2/2N2R3/b2a5/1C6p/9/9/P3P3P/B2K5/1r7/6n1c w - - 0 1",
+  "mate": 3,
+  "src": "CENG DongPing - MENG LiGuo"
+ },
+ {
+  "fen": "3k5/4a4/4Pac2/3N2N2/4C1n2/6B2/1c2p4/9/4A4/3K1AB2 w - - 0 1",
+  "mate": 3,
+  "src": "ZHAO GuoRong - LI Xuan"
+ },
+ {
+  "fen": "4k1c2/6R2/4ba3/7rC/2b5p/2B6/7n1/3A5/3C5/2B1KA3 w - - 0 1",
+  "mate": 3,
+  "src": "ZHANG XiaoPing - XU JianMiao"
+ },
+ {
+  "fen": "3ak4/4a4/4N4/1R7/4C4/P5P1P/4p4/5p3/2r6/3AKABc1 w - - 0 1",
+  "mate": 3,
+  "src": "Lv Qin - XU YinChuan"
+ },
+ {
+  "fen": "4k1b2/4a4/4ba3/3P3N1/C7p/n8/6c1P/4B4/4A4/2BAK4 w - - 0 1",
+  "mate": 3,
+  "src": "LI Aidong - HU QingYang"
+ },
+ {
+  "fen": "3k1c3/4R4/b3R4/p3C4/9/3r5/P1p1n4/9/4A4/2BNKAB2 w - - 0 1",
+  "mate": 3,
+  "src": "ZHANG GuoTai - ZHANG ZiLiang"
+ },
+ {
+  "fen": "9/2R1ak3/5a3/4Rn3/9/6P2/p4C2P/9/2Nrc4/1r1AK1B2 w - - 0 1",
+  "mate": 3,
+  "src": "Lv Qin - LIU DianZhong"
+ },
+ {
+  "fen": "3a5/C3a4/N4k1c1/p1R5p/4r4/3n5/P7P/5A3/9/3K1AB2 w - - 0 1",
+  "mate": 3,
+  "src": "LI Peng - XIAO GeLian"
+ },
+ {
+  "fen": "3r1a2C/R3a4/3k2N2/3r5/8p/p1B3p2/8P/9/4A4/2BAK4 w - - 0 1",
+  "mate": 3,
+  "src": "CHEN Zheng - ZHANG Xiang"
+ },
+ {
+  "fen": "1R3ab2/1CC6/5k3/p3p4/9/2p3N2/P8/4r4/3rA4/2B1KA3 w - - 0 1",
+  "mate": 3,
+  "src": "LIU DaHua - YANG BoLin"
+ },
+ {
+  "fen": "3k1ab2/3ca4/4N4/8p/4C4/6C2/1p4n1c/4B4/4A4/4KAB2 w - - 0 1",
+  "mate": 3,
+  "src": "XU TianHong - TAO HanMing"
+ },
+ {
+  "fen": "3a2R2/7C1/5k2C/7cp/9/P8/4P3P/3KB4/2r3n2/2BA1A3 w - - 0 1",
+  "mate": 3,
+  "src": "LEUNG TatMan - LIN YaoSen"
+ },
+ {
+  "fen": "2ba5/5kN2/2N2a3/p4P3/2b2C3/P5B2/4p4/9/5K1n1/2n5c w - - 0 1",
+  "mate": 3,
+  "src": "HU RongHua - LIU DaHua"
+ },
+ {
+  "fen": "3ak1b2/r2PaR3/4b4/p3r3p/9/P1R6/9/4C4/9/3AK1B2 w - - 0 1",
+  "mate": 3,
+  "src": "QIAN HongFa - ZHAO Feng"
+ },
+ {
+  "fen": "4kab2/7N1/2n1P4/4c3p/2p3r2/9/2p5P/3C5/4A4/2BA1KB2 w - - 0 1",
+  "mate": 3,
+  "src": "GUO LiPing - HAN Bing"
+ },
+ {
+  "fen": "1C1a1ab2/2R6/3Nk4/9/3P5/4pcP1p/P8/4B4/3K4c/2B1r4 w - - 0 1",
+  "mate": 3,
+  "src": "ZONG YongSheng - SHANG Wei"
+ },
+ {
+  "fen": "2bak4/C1n1a2N1/9/p7R/1r7/P3p4/5c3/4B4/4A4/2BAK4 w - - 0 1",
+  "mate": 3,
+  "src": "HU RongHua - XU WenXue"
+ },
+ {
+  "fen": "3ak4/3ca4/4N3R/p4N2p/1n7/4P2p1/6r2/B8/9/3AKAB2 w - - 0 1",
+  "mate": 3,
+  "src": "Li Hong Jia - LI WangXiang"
+ }
+]

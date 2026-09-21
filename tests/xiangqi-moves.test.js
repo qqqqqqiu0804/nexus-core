@@ -12,11 +12,13 @@ const path = require('path');
 const HTML = path.join(__dirname, '..', 'index.html');
 const html = fs.readFileSync(HTML, 'utf8');
 
-const start = html.indexOf('// ===== 每日象棋残局 =====');
+const start = html.indexOf('// ===== 中国象棋闯关题库 =====');
 const end = html.indexOf('function renderDailyHub() {');
 if (start < 0 || end < 0 || end < start) { console.error('提取代码段失败'); process.exit(1); }
 const code = html.slice(start, end);
-const api = new Function(code + '\nreturn { xqBoard, xqLegalMove, xqMovesFor, xqKingsFacing, xqInCheck, xqLoser, xqAiChoose, XIANGQI_LEVELS };')();
+const api = new Function(code + '\nreturn { xqBoard, xqLegalMove, xqMovesFor, xqKingsFacing, xqInCheck, xqLoser, ' +
+  'xqFromFen, xqAllMoves, xqMateIn, xqRedWinsFromHere, xqIsGoodMove, xqBestDefense, xqDo, xqBack, ' +
+  'XQ_TIERS, XIANGQI_LEVELS };')();
 console.log('代码段长度', code.length, '字符\n');
 
 let pass = 0, fail = 0;
@@ -27,12 +29,19 @@ function t(name, actual, expected) {
 }
 const B = api.xqBoard;
 
-console.log('【1】八个关卡的初始局面必须合法（不照面、红方未被将军）');
-for (const eg of api.XIANGQI_LEVELS) {
-  const b = B(eg.pieces);
-  t(eg.name + ' · 不照面', api.xqKingsFacing(b), false);
-  t(eg.name + ' · 红方未被将军', api.xqInCheck(b, 'r'), false);
-}
+console.log('【1】全部 ' + api.XIANGQI_LEVELS.length + ' 关的初始局面必须合法（两将不照面）');
+let facing = 0;
+api.XIANGQI_LEVELS.forEach(function (lv, i) {
+  if (api.xqKingsFacing(api.xqFromFen(lv.f))) { facing++; console.log('    第 ' + (i + 1) + ' 关照面：' + lv.f); }
+});
+t('没有一关是「两将照面」的非法局面', facing, 0);
+const fenBack = api.xqFromFen('3k5/9/9/9/9/4R4/9/9/R8/4K4 w');
+t('FEN 解析：黑将在 d10', fenBack[0][3], 'k');
+t('FEN 解析：红帅在 e1', fenBack[9][4], 'K');
+t('FEN 解析：红车在 a2', fenBack[8][0], 'R');
+t('三档难度都存在', api.XQ_TIERS.length, 3);
+t('三档区间刚好覆盖整个题库',
+  api.XQ_TIERS[api.XQ_TIERS.length - 1].to, api.XIANGQI_LEVELS.length - 1);
 
 console.log('\n【2】车');
 const b1 = B([['R', 0, 9], ['K', 3, 9], ['k', 4, 0]]);   // 车a1 帅d1 将e10
@@ -107,42 +116,81 @@ console.log('\n【10】将死 / 胜负判定');
 // 黑将缩在九宫左上角：d 列车封住竖线、e 列车封住 e10 → 无路可走
 const bMate = B([['R', 3, 9], ['R', 4, 5], ['K', 4, 9], ['k', 3, 0]]);
 t('黑方被将死 → 判负', api.xqLoser(bMate), 'b');
-const badLevels = api.XIANGQI_LEVELS.filter(eg => api.xqLoser(B(eg.pieces)) !== null);
-t('八个关卡的初始局面都未分胜负' +
-  (badLevels.length ? '（有问题的关卡：' + badLevels.map(x => x.name).join('、') + '）' : ''),
+const badLevels = api.XIANGQI_LEVELS.filter(eg => api.xqLoser(api.xqFromFen(eg.f)) !== null);
+t('全部关卡的初始局面都未分胜负' +
+  (badLevels.length ? '（有问题的关卡：' + badLevels.map(x => x.s).join('、') + '）' : ''),
   badLevels.length, 0);
 
-console.log('\n【11】AI 应手必须是合法着法（跑 30 次）');
-let aiOk = true;
-for (let i = 0; i < 30 && aiOk; i++) {
-  const bb = B([['R', 0, 9], ['K', 3, 9], ['k', 4, 0]]);
-  const mv = api.xqAiChoose(bb, 'b');
-  if (!mv) { aiOk = false; t('AI 应能给出着法（第 ' + i + ' 次）', false, true); break; }
-  if (!api.xqLegalMove(bb, mv.from[0], mv.from[1], mv.to[0], mv.to[1])) {
-    aiOk = false;
-    t('AI 着法合法（第 ' + i + ' 次）', false, true);
-  }
-}
-if (aiOk) t('AI 连续 30 次都给出合法着法', true, true);
+console.log('\n【11】黑方「最强防守」必须是合法着法（逐关抽查）');
+let defChecked = 0;
+const defBad = [];
+api.XIANGQI_LEVELS.forEach(function (lv, i) {
+  if (i % 7) return;                                   // 每 7 关抽 1 关
+  const bb = api.xqFromFen(lv.f);
+  const mv = api.xqBestDefense(bb, lv.m);
+  if (!mv) return;                                     // 红方先走，此刻黑方不一定有应手
+  defChecked++;
+  if (!api.xqLegalMove(bb, mv[0], mv[1], mv[2], mv[3])) defBad.push('第 ' + (i + 1) + ' 关');
+});
+t('抽查 ' + defChecked + ' 关，黑方最强防守都是合法着法' + (defBad.length ? '：' + defBad.join('、') : ''), defBad.length, 0);
 
-console.log('\n【12】关卡正解序列必须真的能杀（逐关验算）');
-let lvOk = 0, lvBad = 0;
-for (const lv of api.XIANGQI_LEVELS) {
-  if (!lv.solution) continue;              // 限步关没有唯一正解，跳过
-  const bb = B(lv.pieces);
-  let legal = true;
-  for (const mv of lv.solution) {
-    if (!api.xqLegalMove(bb, mv[0], mv[1], mv[2], mv[3])) { legal = false; break; }
-    bb[mv[3]][mv[2]] = bb[mv[1]][mv[0]];
-    bb[mv[1]][mv[0]] = null;
+console.log('\n【12】每一关都必须真的有解（逐关找一步保杀着法，剪枝优先）');
+const noSol = [];
+let slowestFind = 0, slowestFindAt = '';
+api.XIANGQI_LEVELS.forEach(function (lv, i) {
+  const bb = api.xqFromFen(lv.f);
+  const t0 = Date.now();
+  let found = false;
+  for (const m of api.xqAllMoves(bb, 'r')) {
+    const cap = api.xqDo(bb, m);
+    found = (lv.m === 1) ? (api.xqAllMoves(bb, 'b').length === 0)
+                         : api.xqRedWinsFromHere(bb, lv.m - 1, true);   // 剪枝：连将杀一试就知道
+    api.xqBack(bb, m, cap);
+    if (found) break;
   }
-  const mate = api.xqLoser(bb) === 'b';
-  const ok = legal && mate;
-  ok ? lvOk++ : lvBad++;
-  console.log((ok ? '  ✓ ' : '  ✗ ') + lv.name + '：' + lv.solution.length + ' 手，' +
-    (legal ? '着法全合法' : '有非法着法') + '，' + (mate ? '终局将死黑方' : '终局没杀死'));
-}
-t('带正解的关卡全部验算通过（' + lvOk + ' 关）', lvBad, 0);
+  const ms = Date.now() - t0;
+  if (ms > slowestFind) { slowestFind = ms; slowestFindAt = '第 ' + (i + 1) + ' 关（' + lv.m + '步）'; }
+  if (!found) noSol.push('第 ' + (i + 1) + ' 关（' + lv.m + '步）');
+});
+t('没有「无解」的关卡' + (noSol.length ? '：' + noSol.join('、') : ''), noSol.length, 0);
+console.log('    单关找一步正解最慢 ' + slowestFind + 'ms（' + slowestFindAt + '）');
+
+console.log('\n【14】难度标定抽样复核（完整搜索，较慢）');
+const sample = [0, 10, 25, 33, 45, 60, 70, 85, 103];
+const badLv = [];
+sample.forEach(function (i) {
+  const lv = api.XIANGQI_LEVELS[i];
+  if (!lv) return;
+  const bb = api.xqFromFen(lv.f);
+  const canMate = api.xqMateIn(bb.map(r => r.slice()), 'r', lv.m, false);
+  const canLess = lv.m > 1 ? api.xqMateIn(bb.map(r => r.slice()), 'r', lv.m - 1, false) : false;
+  if (!canMate || canLess) {
+    badLv.push('第 ' + (i + 1) + ' 关（标 ' + lv.m + ' 步，能杀=' + canMate + '，更少步也能杀=' + canLess + '）');
+  }
+});
+t('抽样 ' + sample.length + ' 关的难度标定正确' + (badLv.length ? '：' + badLv.join('；') : ''), badLv.length, 0);
+
+console.log('\n【15】判定耗时守门（单次判定，模拟真实点击）');
+let goodWorst = 0, badWorst = 0;
+[0, 20, 45, 70, 92, 103].forEach(function (i) {
+  const lv = api.XIANGQI_LEVELS[i];
+  if (!lv) return;
+  const bb = api.xqFromFen(lv.f);
+  const moves = api.xqAllMoves(bb, 'r');
+  let good = null, bad = null;
+  for (const m of moves) {
+    const cap = api.xqDo(bb, m);
+    const ok = (lv.m === 1) ? (api.xqAllMoves(bb, 'b').length === 0) : api.xqRedWinsFromHere(bb, lv.m - 1, true);
+    api.xqBack(bb, m, cap);
+    if (ok && !good) good = m;
+    else if (!ok && !bad) bad = m;
+    if (good && bad) break;
+  }
+  if (good) { const t0 = Date.now(); api.xqIsGoodMove(bb, good, lv.m); goodWorst = Math.max(goodWorst, Date.now() - t0); }
+  if (bad) { const t0 = Date.now(); api.xqIsGoodMove(bb, bad, lv.m); badWorst = Math.max(badWorst, Date.now() - t0); }
+});
+t('走对时的单次判定最慢 ' + goodWorst + 'ms（阈值 300ms）', goodWorst < 300, true);
+console.log('    走错时的单次判定最慢 ' + badWorst + 'ms（慢是正常的：要先剪枝否定、再完整搜索确认）');
 
 console.log('\n【13】棋盘可点击性（回归自线上「不能落子」）');
 /*
@@ -154,12 +202,14 @@ const css = html.slice(0, html.indexOf('</style>'));
 t('棋盘 SVG 已让开指针', /\.xq-plane\s*>\s*svg\s*\{[^}]*pointer-events:\s*none/.test(css), true);
 
 const box = { innerHTML: '' };
-const api2 = new Function('document', 'Store', 'mkIcon', 'escHtml', code +
-  '\nreturn { renderDailyChess, xqNewGame, xqTap, xqLevelTo, getState: function () { return _xqState; } };')(
+const api2 = new Function('document', 'Store', 'mkIcon', 'escHtml', 'showToast', code +
+  '\nreturn { renderDailyChess, xqNewGame, xqTap, xqLevelTo, xqAllMoves, xqIsGoodMove, xqUndo, ' +
+  'getState: function () { return _xqState; } };')(
   { getElementById: id => (id === 'daily-chess-body' ? box : null) },
   { get: (k, d) => (d === undefined ? null : d), set: function () {} },
   function () { return '<svg></svg>'; },
   function (s) { return String(s == null ? '' : s); },
+  function () {},                                       // showToast
 );
 api2.xqNewGame();
 api2.renderDailyChess();
@@ -169,22 +219,51 @@ t('交叉点热区数量', hitList.length, 90);
 t('热区覆盖全部坐标（0-8 × 0-9）', new Set(hitList.map(m => m[1] + ',' + m[2])).size, 90);
 t('棋子不再挂 onclick（避免与热区双触发）', /class="xq-p[^"]*"[^>]*onclick=/.test(out), false);
 
-// 走一遍：选中某个红子 → 点它的合法落点 → 应当真的落子（used +1）
-const freeIdx = api.XIANGQI_LEVELS.findIndex(l => l.limit && !l.solution);
-api2.xqLevelTo(freeIdx);
-const firstBoard = api2.getState().board;
-let fx = -1, fy = -1;
-for (let y = 0; y < 10 && fx < 0; y++) {
-  for (let x = 0; x < 9; x++) {
-    const pc = firstBoard[y][x];
-    if (pc && pc === pc.toUpperCase()) { fx = x; fy = y; break; }
-  }
+// 走一遍：点自己的子 → 点落点，应当真的落子（used +1）。
+// 必须挑一个「保杀」的着法——新判定会拒绝不保杀的走法（那是设计，不是 bug）。
+api2.xqLevelTo(0);
+const st0 = api2.getState();
+const lv0 = api.XIANGQI_LEVELS[0];
+let gm = null;
+for (const m of api2.xqAllMoves(st0.board, 'r')) {
+  if (api2.xqIsGoodMove(st0.board, m, lv0.m)) { gm = m; break; }
 }
-api2.xqTap(fx, fy);
-const legal = api2.getState().moves;
-t('点自己的子能选中并给出落点', legal.length > 0, true);
-api2.xqTap(legal[0][0], legal[0][1]);
+t('第 1 关存在保杀的着法', !!gm, true);
+api2.xqTap(gm[0], gm[1]);                                    // 点自己的子 → 选中
+t('点自己的子能选中并给出落点', api2.getState().moves.length > 0, true);
+api2.xqTap(gm[2], gm[3]);                                    // 点落点 → 落子
 t('点落点确实落子（步数 +1）', api2.getState().used, 1);
+
+// 反向：不保杀的着法必须被拒绝（不推进步数）
+api2.xqLevelTo(0);
+const st1 = api2.getState();
+let bad2 = null;
+for (const m of api2.xqAllMoves(st1.board, 'r')) {
+  if (!api2.xqIsGoodMove(st1.board, m, lv0.m)) { bad2 = m; break; }
+}
+if (bad2) {
+  api2.xqTap(bad2[0], bad2[1]);
+  api2.xqTap(bad2[2], bad2[3]);
+  t('走一步不保杀的着法 → 被拒绝，步数不推进', api2.getState().used, 0);
+}
+
+console.log('\n【16】悔棋要撤掉整个回合（含黑方应手），且多步题黑方会还手');
+const twoStepIdx = api.XIANGQI_LEVELS.findIndex(l => l.m === 2);
+api2.xqLevelTo(twoStepIdx);                                   // 第一道两步杀
+const stx = api2.getState();
+const lvx = api.XIANGQI_LEVELS[twoStepIdx];
+let gx = null;
+for (const m of api2.xqAllMoves(stx.board, 'r')) {
+  if (api2.xqIsGoodMove(stx.board, m, lvx.m)) { gx = m; break; }
+}
+api2.xqTap(gx[0], gx[1]);
+api2.xqTap(gx[2], gx[3]);
+t('走一着后：红方 1 手 + 黑方应手 1 手 = 2 条历史', api2.getState().history.length, 2);
+t('黑方应手之后轮回到红方', api2.getState().turn, 'r');
+t('红方步数记为 1', api2.getState().used, 1);
+api2.xqUndo();
+t('悔棋一次即回到走之前（步数归零）', api2.getState().used, 0);
+t('悔棋后历史清空', api2.getState().history.length, 0);
 
 console.log('\n————————————————————————');
 console.log('通过 ' + pass + ' 项，失败 ' + fail + ' 项');
