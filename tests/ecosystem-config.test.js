@@ -16,6 +16,14 @@ const { execFileSync } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const CFG = path.join(ROOT, 'ecosystem.config.js');
 
+// 测试必须与「机器上真实存在 server/.env」这件事隔离。
+//
+// 起因是个真实的坑：配置的优先级是 .env 文件 > 进程环境变量，这在线上是对的，
+// 但测试往子进程里注入 AUTH_TOKEN=test-token 时，会被机器上真实的 server/.env
+// 盖掉 —— 于是断言拿到的是真 token，既误报失败，又把真实密钥打印进输出。
+// 解决：传一个不存在的路径，让配置只读那个空文件。
+const NO_ENV_FILE = path.join(ROOT, 'tests', '.no-such-env-file');
+
 let pass = 0, fail = 0;
 const ok = (m) => { pass++; console.log('  ✓ ' + m); };
 const bad = (m) => { fail++; console.log('  ✗ ' + m); };
@@ -49,8 +57,10 @@ function loadConfigInProcess({ env = {} } = {}) {
   // 于是异常信息里只有 '__EXIT__1'，那句真正有用的提示跑到了 stderr，
   // 断言 /缺少 AUTH_TOKEN/ 就永远匹配不上（表现为「报错了但原因不明」）。
   // 所以这里把 console.error 也一并截流，拼进 message 里。
+  //
+  // 另一个坑：NEXUS_ENV_FILE 必须一起改，否则真实 .env 会盖掉注入的 token。
   const saved = {};
-  const keys = ['AUTH_TOKEN', 'PORT', 'CORS_ORIGIN'];
+  const keys = ['AUTH_TOKEN', 'PORT', 'CORS_ORIGIN', 'NEXUS_ENV_FILE'];
   for (const k of keys) { saved[k] = process.env[k]; }
   const realExit = process.exit;
   const realErr = console.error;
@@ -58,7 +68,9 @@ function loadConfigInProcess({ env = {} } = {}) {
   process.exit = (code) => { throw new Error('__EXIT__' + code); };
   console.error = (...a) => { lines.push(a.map(String).join(' ')); };
   try {
+    process.env.NEXUS_ENV_FILE = NO_ENV_FILE;
     for (const k of keys) {
+      if (k === 'NEXUS_ENV_FILE') continue;
       if (env[k] === undefined) delete process.env[k];
       else process.env[k] = env[k];
     }
@@ -90,7 +102,7 @@ function loadConfig(opts) {
     process.stdout.write('__OK__' + JSON.stringify(c.apps[0]));
   `;
   const child = require('child_process').spawnSync(_nodeBin, ['-e', code], {
-    env: Object.assign({}, process.env, env),
+    env: Object.assign({}, process.env, env, { NEXUS_ENV_FILE: NO_ENV_FILE }),
     encoding: 'utf8',
   });
   if (child.error || child.status === null) return loadConfigInProcess(opts);
@@ -148,6 +160,22 @@ console.log('【2】无 AUTH_TOKEN 时必须拒绝启动');
     ok('缺 token 时报错退出，且提示清楚');
   } else {
     bad('缺 token 时报错了但原因不明：' + JSON.stringify(r).slice(0, 200));
+  }
+}
+
+console.log('【2b】注入的 token 不能被机器上的真实 .env 盖掉');
+{
+  // 回归测试：曾经因为优先级是「.env > 进程环境变量」，
+  // 在有 server/.env 的机器上测试会读到真 token —— 误报 + 泄漏密钥。
+  const r = loadConfig({ env: { AUTH_TOKEN: 'injected-token-xyz' } });
+  if (!r.app) {
+    bad('加载失败：' + JSON.stringify(r).slice(0, 200));
+  } else if (r.app.env.AUTH_TOKEN === 'injected-token-xyz') {
+    ok('注入值生效（测试与真实 .env 已隔离）');
+  } else if (/^[0-9a-f]{64}$/.test(String(r.app.env.AUTH_TOKEN))) {
+    bad('读到了真实 .env 里的 token —— 隔离失效，且会把密钥打印出来');
+  } else {
+    bad('注入值被覆盖成了：' + String(r.app.env.AUTH_TOKEN).slice(0, 40));
   }
 }
 

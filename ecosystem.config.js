@@ -64,14 +64,29 @@ function loadEnvFile(file) {
 
 // server/.env 优先；没有就退回仓库根的 .env（两种位置都认）
 const SERVER_DIR = path.join(__dirname, 'server');
-const fileEnv = Object.assign(
-  {},
-  loadEnvFile(path.join(__dirname, '.env')),
-  loadEnvFile(path.join(SERVER_DIR, '.env'))
-);
+
+// 测试逃生门：设了 NEXUS_ENV_FILE 就只读那一个文件，跳过默认的 .env 探测。
+//
+// 为什么必须有：默认优先级是「.env 文件 > 进程环境变量」，这在线上是对的，
+// 但让测试无法注入假 token —— 只要机器上存在 server/.env（每个真实部署都有），
+// 传进去的 AUTH_TOKEN 就会被文件里的真值盖掉。后果有两个，都不好：
+//   1. 测出来的不是被测对象，断言会误报
+//   2. 断言失败时会把**真实 token 打印到测试输出里**
+// 所以这里开一个显式口子：测试传 NEXUS_ENV_FILE=/tmp/不存在 就得到干净环境。
+const ENV_FILE_OVERRIDE = process.env.NEXUS_ENV_FILE;
+const fileEnv = ENV_FILE_OVERRIDE !== undefined
+  ? loadEnvFile(ENV_FILE_OVERRIDE)   // 只读指定文件（传个不存在的路径即「无文件」）
+  : Object.assign(
+      {},
+      loadEnvFile(path.join(__dirname, '.env')),
+      loadEnvFile(path.join(SERVER_DIR, '.env'))
+    );
 
 // 优先级：.env 文件 > 进程已有环境变量 > 配置里的默认值。
 // 这样「临时覆盖」和「持久配置」两套都工作。
+//
+// 注意 `||` 会把空字符串当成「没有」：AUTH_TOKEN='' 会继续往下取。
+// 这正是自检能生效的原因 —— 测试传空 token 时不会停在空串上。
 const pick = (key, fallback) => fileEnv[key] || process.env[key] || fallback;
 
 const PORT = pick('PORT', '3458');
