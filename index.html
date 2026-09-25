@@ -49,10 +49,32 @@
   /* 动效：一个 authored 缓动，全程复用 */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --dur: 0.24s;
-  /* 字体层级（排版纪律：正文 14px，显示字最大 ~2.6rem，字距下限 -0.02em） */
-  --fs-display: 2.4rem;
-  --fs-title: 1.05rem;
-  --fs-body: 0.875rem;
+  /* 字体层级（排版纪律：正文 14px，显示字最大 ~2.6rem，字距下限 -0.02em）
+     ─────────────────────────────────────────────────────────────
+     手机优先：<12px 在手机上「看得见但读起来累」，所以下限锁在 12px。
+     这套令牌是 2026-09-26 从散落的 262 处硬编码字号收敛来的 ——
+     改字号请改这里，不要再往组件里写 0.xxrem 字面量。
+     旧值 → 新值的映射（普遍上调一档，最小的一批涨得最多）：
+       0.60 → 0.75 (9.6→12px)    0.64/0.65/0.66 → 0.75 (→12px)
+       0.68 → 0.75 (10.9→12px)   0.70/0.72 → 0.8125 (→13px)
+       0.74 → 0.8125             0.75 → 0.8125
+       0.76/0.78/0.8 → 0.875 (→14px)   0.82/0.84/0.85/0.86/0.88 → 0.9375 (→15px)
+       0.9/0.95/0.98 → 1.0 (16px)      1.05/1.1 → 1.125 (18px)
+       1.12/1.15 → 1.25 (20px)         1.3 → 1.375 (22px)
+       1.45/1.5 → 1.625 (26px)         2.5 → hero (40px)
+     显示字（--fs-display）与超大数字保持原样：它们本来就在 24px 以上，不受此约束。
+     旧 --fs-body / --fs-title 已废弃（前者被 --fs-sm 取代，后者从未被引用）。 */
+  --fs-2xs: 0.75rem;    /* 12px  最小，仅用于真正的辅助信息（时间戳、角标） */
+  --fs-xs: 0.8125rem;   /* 13px  次要说明文字 */
+  --fs-sm: 0.875rem;    /* 14px  正文，全站默认 */
+  --fs-base: 0.9375rem; /* 15px  略大的正文 */
+  --fs-md: 1rem;        /* 16px  强调正文 */
+  --fs-lg: 1.125rem;    /* 18px  小标题 */
+  --fs-xl: 1.25rem;     /* 20px  面板标题 */
+  --fs-2xl: 1.375rem;   /* 22px  区块标题 */
+  --fs-3xl: 1.625rem;   /* 26px  卡片内重点数字 */
+  --fs-hero: 2.5rem;    /* 40px  空状态占位大数字 */
+  --fs-display: 2.4rem; /* 38px  仪表盘大数字 */
   --ls-tight: -0.02em;
   /* 滚动条主题色（暗态更深，保证与轨道的对比） */
   --scroll-thumb: #313846;
@@ -90,7 +112,14 @@ html.light {
 
 /* === Reset & Base === */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 14px; }
+/* 根字号 16px（浏览器默认），不要改成 14px。
+   ─────────────────────────────────────────────────────────────
+   这里曾经是 14px，本意是「整体缩小一点」，实际效果是：
+   所有 rem 令牌都被打了 87.5 折，--fs-2xs 的 0.75rem 渲染出来只有 10.5px，
+   手机上「看得见但读起来累」—— 而看代码完全看不出来，因为字面上写的是 0.75rem。
+   教训：rem 的语义依赖根字号，隐式改根字号会让整个字号体系撒谎。
+   现在 --fs-* 令牌的注释里标的 px 就是真实渲染的 px。 */
+html { font-size: 16px; }
 body {
   font-family: var(--font-sans);
   background: var(--bg-deep);
@@ -117,12 +146,12 @@ body {
   position: relative;
 }
 .header-title {
-  font-size:1.3rem; font-weight: 700;
+  font-size:var(--fs-2xl); font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--text-primary);
 }
 .header-subtitle {
-  font-size:0.78rem; color: var(--text-dim);
+  font-size:var(--fs-sm); color: var(--text-dim);
   letter-spacing: 0.02em; margin-top: 2px;
 }
 
@@ -150,10 +179,10 @@ body {
   margin-bottom: 8px;
 }
 .card-title {
-  font-size:0.88rem; font-weight: 600;
+  font-size:var(--fs-base); font-weight: 600;
   color: var(--text-primary);
 }
-.card-subtitle { font-size:0.78rem; color: var(--text-dim); }
+.card-subtitle { font-size:var(--fs-sm); color: var(--text-dim); }
 
 /* === Progress Bar === */
 .progress-bar {
@@ -169,7 +198,7 @@ body {
 /* === Status Badge === */
 .badge {
   display: inline-block; padding: 2px 8px; border-radius: 999px;
-  font-size:0.68rem; font-weight: 500;
+  font-size:var(--fs-2xs); font-weight: 500;
 }
 .badge-cyan { background: var(--accent-soft); color: var(--accent); }
 .badge-magenta { background: color-mix(in srgb, var(--accent-2) 14%, transparent); color: var(--accent-2); }
@@ -183,7 +212,7 @@ body {
 .btn {
   padding: 8px 16px; border: 1px solid var(--border-subtle);
   background: var(--bg-card); color: var(--text-secondary);
-  font-family: var(--font-sans); font-size:0.8rem; font-weight: 500;
+  font-family: var(--font-sans); font-size:var(--fs-sm); font-weight: 500;
   border-radius: var(--radius-sm); cursor: pointer; min-height: 36px;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
@@ -197,14 +226,14 @@ body {
 .btn-primary:hover { background: color-mix(in srgb, var(--accent) 85%, #fff); color: #fff; }
 .btn-danger { border-color: color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger); }
 .btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
-.btn-sm { padding: 4px 10px; font-size:0.72rem; min-height: 32px; }
+.btn-sm { padding: 4px 10px; font-size:var(--fs-xs); min-height: 32px; }
 .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
 
 /* === Forms === */
 input, select, textarea {
   background: var(--bg-deep); border: 1px solid var(--border-subtle);
   color: var(--text-primary); font-family: var(--font-sans);
-  font-size:0.88rem; padding: 8px 12px; border-radius: var(--radius-sm);
+  font-size:var(--fs-base); padding: 8px 12px; border-radius: var(--radius-sm);
   width: 100%; outline: none; transition: border-color 0.15s, box-shadow 0.15s;
 }
 input:focus, select:focus, textarea:focus {
@@ -215,7 +244,7 @@ textarea { resize: vertical; min-height: 60px; }
 select { cursor: pointer; appearance: none; }
 select option { background: var(--bg-panel); color: var(--text-primary); }
 label {
-  display: block; font-size:0.78rem; color: var(--text-secondary);
+  display: block; font-size:var(--fs-sm); color: var(--text-secondary);
   margin-bottom: 4px;
 }
 .form-group { margin-bottom: 12px; }
@@ -236,17 +265,17 @@ label {
   border-radius: var(--radius); padding: 16px; text-align: center;
 }
 .stat-value {
-  font-family: var(--font-mono); font-size:1.5rem; font-weight: 700;
+  font-family: var(--font-mono); font-size:var(--fs-3xl); font-weight: 700;
   color: var(--text-primary);
 }
-.stat-label { font-size:0.72rem; color: var(--text-dim); margin-top: 4px; }
+.stat-label { font-size:var(--fs-xs); color: var(--text-dim); margin-top: 4px; }
 
 /* === Level Display === */
 
 
 
 
-.level-xp { font-size:0.72rem; color: var(--text-dim); margin-top: 4px; }
+.level-xp { font-size:var(--fs-xs); color: var(--text-dim); margin-top: 4px; }
 
 /* === Task List === */
 .task-item {
@@ -263,7 +292,7 @@ label {
   width: 20px; height: 20px; border: 2px solid var(--border-subtle);
   border-radius: 6px; cursor: pointer; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  transition: background 0.15s, border-color 0.15s; font-size:0.72rem;
+  transition: background 0.15s, border-color 0.15s; font-size:var(--fs-xs);
 }
 .task-check:hover { border-color: var(--accent); }
 .task-check.checked {
@@ -271,9 +300,9 @@ label {
   color: #fff;
 }
 .task-info { flex: 1; min-width: 0; }
-.task-title { font-size:0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-title { font-size:var(--fs-base); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .task-meta {
-  font-size:0.72rem; color: var(--text-dim);
+  font-size:var(--fs-xs); color: var(--text-dim);
   display: flex; gap: 12px; margin-top: 2px;
 }
 
@@ -286,7 +315,7 @@ label {
   border-bottom: 1px solid var(--border-subtle);
 }
 .section-title {
-  font-size:0.88rem; font-weight: 600;
+  font-size:var(--fs-base); font-weight: 600;
   color: var(--text-primary);
   display: inline-flex; align-items: center; gap: 8px;
 }
@@ -295,7 +324,7 @@ label {
   background: var(--accent); flex: none;
 }
 .section-count {
-  font-size:0.72rem;
+  font-size:var(--fs-xs);
   color: var(--text-dim);
 }
 
@@ -316,7 +345,7 @@ label {
   max-height: 85vh; overflow-y: auto;
 }
 .modal-title {
-  font-size:1rem; font-weight: 700;
+  font-size:var(--fs-md); font-weight: 700;
   color: var(--text-primary); margin-bottom: 16px;
 }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
@@ -336,7 +365,7 @@ label {
 }
 .toast {
   padding: 10px 16px; border-radius: var(--radius-sm);
-  font-size:0.8rem; box-shadow: var(--shadow-pop);
+  font-size:var(--fs-sm); box-shadow: var(--shadow-pop);
   border: 1px solid;
 }
 .toast-success { background: var(--bg-card); border-color: var(--success); color: var(--success); }
@@ -371,7 +400,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
   padding: 6px 12px; background: var(--bg-card);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
   cursor: pointer; white-space: nowrap;
-  font-size:0.78rem; color: var(--text-secondary);
+  font-size:var(--fs-sm); color: var(--text-secondary);
   transition: border-color 0.15s, color 0.15s;
 }
 .sync-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -388,7 +417,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
 @keyframes syncPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 .checkbox-label {
   display: flex; align-items: center; gap: 8px;
-  font-family: var(--font-sans); font-size:0.8rem;
+  font-family: var(--font-sans); font-size:var(--fs-sm);
   cursor: pointer; letter-spacing: 0;
 }
 .checkbox-label input[type="checkbox"] { width: auto; margin: 0; }
@@ -402,12 +431,12 @@ a { color: var(--accent); text-underline-offset: 2px; }
 }
 .daily-date-main { display: flex; align-items: center; gap: 12px; }
 .daily-date-big {
-  font-family: var(--font-mono); font-size:2.5rem; font-weight: 700;
+  font-family: var(--font-mono); font-size:var(--fs-hero); font-weight: 700;
   color: var(--text-primary); line-height: 1;
 }
-.daily-date-info { font-size:0.8rem; color: var(--text-secondary); }
+.daily-date-info { font-size:var(--fs-sm); color: var(--text-secondary); }
 .daily-streak-badge {
-  font-family: var(--font-mono); font-size:0.78rem;
+  font-family: var(--font-mono); font-size:var(--fs-sm);
   padding: 4px 10px; border-radius: 12px;
   background: color-mix(in srgb, var(--orange) 10%, transparent); border: 1px solid color-mix(in srgb, var(--orange) 30%, transparent);
   color: var(--orange);
@@ -424,43 +453,43 @@ a { color: var(--accent); text-underline-offset: 2px; }
 }
 .en-block + .en-block { margin-top: 8px; }
 .en-head { display: flex; align-items: baseline; gap: 8px; }
-.en-word { font-family: var(--font-mono); font-size: 1.12rem; font-weight: 600; color: var(--text-primary); }
-.en-phon { font-size: 0.74rem; color: var(--text-dim); }
+.en-word { font-family: var(--font-mono); font-size:var(--fs-xl); font-weight: 600; color: var(--text-primary); }
+.en-phon { font-size:var(--fs-xs); color: var(--text-dim); }
 .en-say {
   margin-left: auto; appearance: none; border: 1px solid var(--border-subtle);
   background: var(--bg-card); color: var(--accent); border-radius: 6px;
   padding: 3px 9px; cursor: pointer; line-height: 1; min-height: 30px;
 }
 .en-say:active { background: var(--accent-soft); }
-.en-mean { margin-top: 5px; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.55; }
+.en-mean { margin-top: 5px; font-size:var(--fs-base); color: var(--text-secondary); line-height: 1.55; }
 .en-pos {
   display: inline-block; margin-right: 6px; padding: 0 4px; border-radius: 3px;
-  font-family: var(--font-mono); font-size: 0.68rem; color: var(--accent);
+  font-family: var(--font-mono); font-size:var(--fs-2xs); color: var(--accent);
   background: var(--accent-soft);
 }
-.en-eg { margin-top: 4px; font-size: 0.78rem; color: var(--text-dim); font-style: italic; line-height: 1.5; }
-.en-sent-en { font-size: 0.86rem; color: var(--text-primary); line-height: 1.5; }
-.en-sent-zh { margin-top: 3px; font-size: 0.76rem; color: var(--text-secondary); }
+.en-eg { margin-top: 4px; font-size:var(--fs-sm); color: var(--text-dim); font-style: italic; line-height: 1.5; }
+.en-sent-en { font-size:var(--fs-base); color: var(--text-primary); line-height: 1.5; }
+.en-sent-zh { margin-top: 3px; font-size:var(--fs-sm); color: var(--text-secondary); }
 /* === 每日残局 === */
 .xq-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.xq-name { font-size: 0.86rem; font-weight: 600; color: var(--text-primary); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.xq-turn { font-size: 0.72rem; color: var(--text-dim); flex: none; }
+.xq-name { font-size:var(--fs-base); font-weight: 600; color: var(--text-primary); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xq-turn { font-size:var(--fs-xs); color: var(--text-dim); flex: none; }
 .xq-turn.is-red { color: var(--expense); }
 .xq-lvs { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
 .xq-tiers { display: flex; gap: 6px; margin-bottom: 8px; }
 .xq-tier {
   flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 4px;
   padding: 7px 4px; border-radius: 8px; cursor: pointer;
-  font-size: 0.74rem; color: var(--text-secondary);
+  font-size:var(--fs-xs); color: var(--text-secondary);
   border: 1px solid var(--border-subtle); background: var(--bg-panel);
 }
 .xq-tier.cur { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
-.xq-tier-n { font-family: var(--font-mono); font-size: 0.64rem; opacity: 0.75; }
-.xq-goal { margin-left: auto; align-self: center; font-size: 0.7rem; color: var(--text-dim); }
+.xq-tier-n { font-family: var(--font-mono); font-size:var(--fs-2xs); opacity: 0.75; }
+.xq-goal { margin-left: auto; align-self: center; font-size:var(--fs-xs); color: var(--text-dim); }
 .xq-lv {
   width: 22px; height: 22px; border-radius: 50%; flex: none; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-size: 0.68rem;
+  font-family: var(--font-mono); font-size:var(--fs-2xs);
   color: var(--text-dim); border: 1px solid var(--border-subtle); background: var(--bg-panel);
 }
 .xq-lv.done { color: var(--success); border-color: color-mix(in srgb, var(--success) 45%, transparent); }
@@ -489,13 +518,13 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .xq-river {
   position: absolute; left: 0; right: 0; top: 44.44%; transform: translateY(-50%);
   display: flex; justify-content: space-evenly; pointer-events: none;
-  font-size: 0.7rem; letter-spacing: 0.28em; color: var(--text-dim); opacity: 0.75;
+  font-size:var(--fs-xs); letter-spacing: 0.28em; color: var(--text-dim); opacity: 0.75;
 }
 .xq-p {
   position: absolute; width: 9.6%; aspect-ratio: 1; transform: translate(-50%, -50%);
   display: flex; align-items: center; justify-content: center;
   border-radius: 50%; border: 1.5px solid; background: var(--bg-card);
-  font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  font-size:var(--fs-sm); font-weight: 600; cursor: pointer;
   box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }
 .xq-p.red { color: var(--expense); border-color: color-mix(in srgb, var(--expense) 55%, transparent); }
@@ -507,8 +536,8 @@ a { color: var(--accent); text-underline-offset: 2px; }
   border-radius: 50%; background: var(--success); opacity: 0.5; pointer-events: none;
 }
 .xq-hint.cap { width: 9%; background: var(--expense); opacity: 0.42; }
-.xq-tip { margin-top: 8px; font-size: 0.75rem; color: var(--text-dim); line-height: 1.55; }
-.xq-done { margin-top: 6px; font-size: 0.82rem; font-weight: 600; color: var(--success); }
+.xq-tip { margin-top: 8px; font-size:var(--fs-xs); color: var(--text-dim); line-height: 1.55; }
+.xq-done { margin-top: 6px; font-size:var(--fs-base); font-weight: 600; color: var(--success); }
 .history-filter.active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 
 /* === Bottom Tab Bar === */
@@ -524,27 +553,34 @@ a { color: var(--accent); text-underline-offset: 2px; }
   flex: 1; display: flex; flex-direction: column; align-items: center;
   gap: 2px; padding:6px 0; border: none; background: transparent;
   color: var(--text-dim); cursor: pointer; transition: color 0.15s;
-  font-size:0.68rem; min-height: 52px;
+  font-size:var(--fs-2xs); min-height: 52px;
 }
 .tab-item:hover { color: var(--text-secondary); }
 .tab-item.active { color: var(--accent); font-weight: 600; }
-.tab-icon { font-size:1.3rem; line-height: 1; }
-.tab-label { font-size:0.68rem; }
+.tab-icon { font-size:var(--fs-2xl); line-height: 1; }
+.tab-label { font-size:var(--fs-2xs); }
 
 /* === Responsive === */
 @media (max-width: 768px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .form-row { flex-direction: column; gap: 0; }
   .stats-row { grid-template-columns: repeat(2, 1fr); }
-  .header-title { font-size:1.1rem; }
-  
+  .header-title { font-size:var(--fs-lg); }
+
+  /* 课表头：窄屏放不下「第 N 周 · M/D - M/D」+ 三个切换按钮并排，
+     标题会被挤成三行。改成上下堆叠：标题一行，按钮一行。 */
+  .course-header { flex-direction: column; align-items: stretch; gap: 10px; }
+  .course-view-toggle { justify-content: flex-start; }
+  .course-view-btn { flex: 1; text-align: center; }
+
   .sync-btn { position: static; margin-top: 12px; }
   .app-container { padding: 12px 12px 76px; }
   .panel { padding:12px; min-height: auto; }
   .task-item { min-height: 52px; }
   .tab-item { min-height: 52px; }
   .btn { min-height: 40px; }
-  .btn-sm { min-height: 32px; }
+  .btn-sm { min-height: 36px; }
+  .course-view-btn { padding:8px 12px; }
   .modal { width: 94%; padding:16px; }
   .wallet-stats-row { grid-template-columns: repeat(2, 1fr); }
   input, select, textarea { font-size: 16px; }
@@ -555,7 +591,9 @@ a { color: var(--accent); text-underline-offset: 2px; }
    没数据时折成一行（标题变暗 + 箭头朝右），点标题展开；
    有数据时默认展开。用户手动点过就记住他的选择。 */
 .daily-section.collapsible > .section-header { cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
-.daily-section.collapsible > .section-header .section-title::after { content: ' ▾'; font-size: 0.62em; opacity: .45; }
+/* 折叠指示符：原来是 0.62em（约 10px，低于 12px 下限）。
+   它是纯装饰，但仍然要能看清，所以用绝对值而不是相对父级的 em。 */
+.daily-section.collapsible > .section-header .section-title::after { content: ' ▾'; font-size:var(--fs-2xs); opacity: .45; }
 .daily-section.collapsible.collapsed > .section-header .section-title::after { content: ' ▸'; }
 .daily-section.collapsible.collapsed > .section-header { opacity: .55; }
 .daily-section.collapsible.collapsed > *:not(.section-header) { display: none !important; }
@@ -597,12 +635,12 @@ a { color: var(--accent); text-underline-offset: 2px; }
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
 }
 .inv-group-num {
-  font-size: 0.72rem; color: var(--text-dim);
+  font-size:var(--fs-xs); color: var(--text-dim);
   font-family: var(--font-mono); font-variant-numeric: tabular-nums;
   text-align: right; white-space: nowrap;
 }
 .inv-group-body { padding: 0 10px 6px; }
-.inv-group-hint { font-size: 0.66rem; color: var(--text-dim); padding: 2px 4px 10px; line-height: 1.7; }
+.inv-group-hint { font-size:var(--fs-2xs); color: var(--text-dim); padding: 2px 4px 10px; line-height: 1.7; }
 .cash-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 8px 10px; border-top: 1px solid var(--border-subtle);
@@ -612,29 +650,29 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .budget-fill.over { background:var(--danger); }
 .cat-row { margin-bottom:10px; }
 .cat-row:last-child { margin-bottom:0; }
-.cat-row-head { display:flex; justify-content:space-between; font-size:0.78rem; margin-bottom:4px; color:var(--text-secondary); }
+.cat-row-head { display:flex; justify-content:space-between; font-size:var(--fs-sm); margin-bottom:4px; color:var(--text-secondary); }
 .cat-row-head .amt { font-family:var(--font-mono); color:var(--text-primary); }
 .cat-bar { height:6px; border-radius:3px; background:var(--bg-hover); overflow:hidden; }
 .cat-bar-fill { height:100%; border-radius:3px; background:var(--accent); }
 .quick-add { display:flex; gap:6px; flex-wrap:wrap; }
-.quick-cat { padding:8px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle); background:var(--bg-card); color:var(--text-secondary); font-size:0.78rem; cursor:pointer; min-height:40px; -webkit-tap-highlight-color:transparent; }
+.quick-cat { padding:8px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle); background:var(--bg-card); color:var(--text-secondary); font-size:var(--fs-sm); cursor:pointer; min-height:40px; -webkit-tap-highlight-color:transparent; }
 .quick-cat.active { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
 /* === 财务洞察 END === */
 
 
 /* === 灵感库（2026-09-16）=== */
-.insp-kind { flex:1; padding:8px 10px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle); background:var(--bg-card); color:var(--text-secondary); font-size:0.78rem; cursor:pointer; min-height:40px; }
+.insp-kind { flex:1; padding:8px 10px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle); background:var(--bg-card); color:var(--text-secondary); font-size:var(--fs-sm); cursor:pointer; min-height:40px; }
 .insp-kind.active { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
 .insp-card { background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius); padding:14px; margin-bottom:10px; }
 .insp-card-head { display:flex; align-items:flex-start; gap:8px; margin-bottom:6px; }
-.insp-card-title { font-size:0.88rem; color:var(--text-primary); flex:1; word-break:break-word; }
-.insp-card-time { font-size:0.65rem; color:var(--text-dim); font-family:var(--font-mono); white-space:nowrap; }
-.insp-card-body { font-size:0.8rem; color:var(--text-secondary); line-height:1.55; white-space:pre-wrap; word-break:break-word; }
+.insp-card-title { font-size:var(--fs-base); color:var(--text-primary); flex:1; word-break:break-word; }
+.insp-card-time { font-size:var(--fs-2xs); color:var(--text-dim); font-family:var(--font-mono); white-space:nowrap; }
+.insp-card-body { font-size:var(--fs-sm); color:var(--text-secondary); line-height:1.55; white-space:pre-wrap; word-break:break-word; }
 .insp-thumb { width:100%; max-height:220px; object-fit:cover; border-radius:var(--radius-sm); margin:8px 0; cursor:pointer; display:block; }
-.insp-tag { font-size:0.65rem; color:var(--accent); background:var(--accent-soft); padding:2px 8px; border-radius:10px; }
-.insp-tagbar-item { font-size:0.72rem; padding:5px 12px; border-radius:14px; border:1px solid var(--border-subtle); background:var(--bg-card); color:var(--text-secondary); cursor:pointer; min-height:32px; }
+.insp-tag { font-size:var(--fs-2xs); color:var(--accent); background:var(--accent-soft); padding:2px 8px; border-radius:10px; }
+.insp-tagbar-item { font-size:var(--fs-xs); padding:5px 12px; border-radius:14px; border:1px solid var(--border-subtle); background:var(--bg-card); color:var(--text-secondary); cursor:pointer; min-height:32px; }
 .insp-tagbar-item.active { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
-.insp-empty { color:var(--text-dim); font-size:0.78rem; text-align:center; padding:28px 10px; }
+.insp-empty { color:var(--text-dim); font-size:var(--fs-sm); text-align:center; padding:28px 10px; }
 .insp-viewer { position:fixed; top:0; left:0; right:0; bottom:0; z-index:300; background:var(--overlay); display:flex; align-items:center; justify-content:center; padding:16px; }
 .insp-viewer img { max-width:100%; max-height:100%; border-radius:var(--radius); }
 /* === 灵感库 END === */
@@ -651,7 +689,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
   box-shadow: var(--shadow-card);
 }
 .wallet-balance-label {
-  font-size:0.78rem;
+  font-size:var(--fs-sm);
   color: var(--text-dim);
   position: relative;
 }
@@ -679,12 +717,12 @@ a { color: var(--accent); text-underline-offset: 2px; }
   text-align: center;
 }
 .wallet-stat-value {
-  font-size:1.1rem;
+  font-size:var(--fs-lg);
   font-weight: 700;
   font-family: var(--font-mono);
 }
 .wallet-stat-label {
-  font-size:0.68rem;
+  font-size:var(--fs-2xs);
   color: var(--text-dim);
   margin-top: 4px;
 }
@@ -708,7 +746,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
   background: transparent;
   border: none;
   color: var(--text-dim);
-  font-size:0.88rem;
+  font-size:var(--fs-base);
   cursor: pointer;
   transition: all 0.2s;
   font-family: var(--font-mono);
@@ -736,7 +774,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size:1rem;
+  font-size:var(--fs-md);
   font-weight: bold;
   flex-shrink: 0;
 }
@@ -763,62 +801,64 @@ a { color: var(--accent); text-underline-offset: 2px; }
 }
 .txn-day[open] > .txn-day-sum::before { transform: rotate(45deg); }
 .txn-day-sum:hover { background: var(--bg-hover); }
-.txn-day-label { flex: 1; font-family: var(--font-mono); font-size: 0.78rem; }
+.txn-day-label { flex: 1; font-family: var(--font-mono); font-size:var(--fs-sm); }
 .txn-day > .wallet-txn-item:not(:last-child) { border-bottom: 1px solid var(--border-subtle); }
 
 
 /* === Course Schedule === */
 .course-view-toggle { display:flex; gap:6px; }
-.course-view-btn { background:var(--bg-card); border:1px solid var(--border-subtle); color:var(--text-secondary); padding:6px 14px; border-radius:6px; font-size:0.8rem; cursor:pointer; transition:.2s; }
+.course-view-btn { background:var(--bg-card); border:1px solid var(--border-subtle); color:var(--text-secondary); padding:6px 14px; border-radius:6px; font-size:var(--fs-sm); cursor:pointer; transition:.2s; }
 .course-view-btn.active { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
 /* AI 报告的周/月粒度切换：沿用课表视图按钮的观感，保持一致 */
-.ai-gran-btn { background:var(--bg-card); border:1px solid var(--border-subtle); color:var(--text-secondary); padding:5px 16px; border-radius:6px; font-size:0.78rem; cursor:pointer; transition:.2s; }
+/* AI 报告的周/月粒度切换：沿用课表视图按钮的观感，保持一致。
+   padding 用 8px 12px 而不是 5px 16px —— 后者高度只有 ~31px，手机上偏难点中。 */
+.ai-gran-btn { background:var(--bg-card); border:1px solid var(--border-subtle); color:var(--text-secondary); padding:8px 14px; border-radius:6px; font-size:var(--fs-sm); cursor:pointer; transition:.2s; min-height:38px; }
 .ai-gran-btn.active { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
 /* 预告视图：明天 + 下周 */
 .forecast-block { margin-bottom: 22px; }
 .forecast-title { display:flex; align-items:baseline; gap:8px; margin-bottom:10px; }
-.forecast-title .ft-main { font-size:1rem; font-weight:600; color:var(--text-primary); }
-.forecast-title .ft-sub { font-size:0.72rem; color:var(--text-dim); font-family:var(--font-mono); }
+.forecast-title .ft-main { font-size:var(--fs-md); font-weight:600; color:var(--text-primary); }
+.forecast-title .ft-sub { font-size:var(--fs-xs); color:var(--text-dim); font-family:var(--font-mono); }
 .forecast-day { margin-bottom:14px; }
-.forecast-day-head { display:flex; align-items:center; gap:8px; font-size:0.78rem; color:var(--text-secondary); margin-bottom:6px; }
+.forecast-day-head { display:flex; align-items:center; gap:8px; font-size:var(--fs-sm); color:var(--text-secondary); margin-bottom:6px; }
 .forecast-day-head .fd-tag { font-family:var(--font-mono); color:var(--accent); }
-.forecast-day-head .fd-none { color:var(--text-dim); font-size:0.72rem; }
-.forecast-row { display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:8px 12px; margin-bottom:6px; font-size:0.8rem; }
-.forecast-row .fr-time { font-family:var(--font-mono); font-size:0.72rem; color:var(--accent); white-space:nowrap; }
+.forecast-day-head .fd-none { color:var(--text-dim); font-size:var(--fs-xs); }
+.forecast-row { display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:8px 12px; margin-bottom:6px; font-size:var(--fs-sm); }
+.forecast-row .fr-time { font-family:var(--font-mono); font-size:var(--fs-xs); color:var(--accent); white-space:nowrap; }
 .forecast-row .fr-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.forecast-row .fr-loc { font-size:0.72rem; color:var(--text-dim); white-space:nowrap; }
-.forecast-off { font-size:0.72rem; color:var(--text-dim); padding:8px 0; }
+.forecast-row .fr-loc { font-size:var(--fs-xs); color:var(--text-dim); white-space:nowrap; }
+.forecast-off { font-size:var(--fs-xs); color:var(--text-dim); padding:8px 0; }
 .course-card { display:flex; gap:12px; align-items:center; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:12px; margin-bottom:10px; }
-.course-time { font-family:var(--font-mono); font-size:0.8rem; color:var(--accent); text-align:center; min-width:48px; line-height:1.3; }
+.course-time { font-family:var(--font-mono); font-size:var(--fs-sm); color:var(--accent); text-align:center; min-width:48px; line-height:1.3; }
 .course-body { flex:1; min-width:0; }
-.course-name { font-size:1rem; color:var(--text-primary); font-weight:600; }
-.course-meta { font-size:0.72rem; color:var(--text-dim); margin-top:3px; }
-.course-countdown { font-size:0.72rem; color:var(--success); white-space:nowrap; }
-.course-empty { text-align:center; color:var(--text-dim); padding:24px 0; font-size:0.88rem; }
-.week-grid { display:grid; grid-template-columns: 52px repeat(7,1fr); gap:4px; font-size:0.72rem; }
+.course-name { font-size:var(--fs-md); color:var(--text-primary); font-weight:600; }
+.course-meta { font-size:var(--fs-xs); color:var(--text-dim); margin-top:3px; }
+.course-countdown { font-size:var(--fs-xs); color:var(--success); white-space:nowrap; }
+.course-empty { text-align:center; color:var(--text-dim); padding:24px 0; font-size:var(--fs-base); }
+.week-grid { display:grid; grid-template-columns: 52px repeat(7,1fr); gap:4px; font-size:var(--fs-xs); }
 .week-corner { }
 .week-head { text-align:center; color:var(--accent); padding:6px 0; font-weight:600; }
 .week-sec { background:var(--bg-card); border-radius:6px; padding:6px 2px; text-align:center; color:var(--text-secondary); line-height:1.2; }
-.week-sec-time { font-size:0.6rem; color:var(--text-dim); font-family:var(--font-mono); }
+.week-sec-time { font-size:var(--fs-2xs); color:var(--text-dim); font-family:var(--font-mono); }
 .week-cell { background:var(--bg-card); border-radius:6px; min-height:46px; padding:4px; }
 .week-cell-course { background:color-mix(in srgb, var(--accent) 8%, transparent); border:1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius:4px; padding:4px; margin-bottom:3px; color:var(--text-primary); line-height:1.2; word-break:break-all; }
-.week-cell-loc { font-size:0.6rem; color:var(--text-dim); }
-.daily-next-class { background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:12px; font-size:0.8rem; color:var(--accent); cursor:pointer; }
+.week-cell-loc { font-size:var(--fs-2xs); color:var(--text-dim); }
+.daily-next-class { background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:12px; font-size:var(--fs-sm); color:var(--accent); cursor:pointer; }
 
 /* === 假期 / 调休补课标注 === */
 .week-head-holiday { color:var(--text-dim); font-weight:500; }
-.week-head-hol-label, .week-head-makeup-label { display:block; font-size:0.6rem; font-weight:600; margin-top:2px; line-height:1.2; }
+.week-head-hol-label, .week-head-makeup-label { display:block; font-size:var(--fs-2xs); font-weight:600; margin-top:2px; line-height:1.2; }
 .week-head-hol-label { color:var(--orange); }
 .week-head-makeup-label { color:var(--accent); }
 .week-cell-holiday { background:repeating-linear-gradient(45deg, color-mix(in srgb, var(--text-dim) 7%, transparent) 0 5px, transparent 5px 10px); }
-.holiday-card { display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:12px; font-size:0.88rem; color:var(--text-primary); }
-.holiday-card .hc-icon { font-size:1.3rem; }
-.holiday-card .hc-sub { font-size:0.72rem; color:var(--text-dim); margin-top:3px; }
-.makeup-bar { font-size:0.75rem; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:var(--radius-sm); padding:8px 10px; margin-bottom:8px; }
+.holiday-card { display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:12px; font-size:var(--fs-base); color:var(--text-primary); }
+.holiday-card .hc-icon { font-size:var(--fs-2xl); }
+.holiday-card .hc-sub { font-size:var(--fs-xs); color:var(--text-dim); margin-top:3px; }
+.makeup-bar { font-size:var(--fs-xs); color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:var(--radius-sm); padding:8px 10px; margin-bottom:8px; }
 .daily-next-class-holiday { background:color-mix(in srgb, var(--orange) 10%, transparent); border-color:color-mix(in srgb, var(--orange) 28%, transparent); color:var(--orange); }
-.forecast-holiday { font-size:0.75rem; color:var(--orange); padding:6px 0; }
-.forecast-day-head .fd-hol { font-size:0.72rem; color:var(--orange); }
-.forecast-day-head .fd-makeup { font-size:0.72rem; color:var(--accent); }
+.forecast-holiday { font-size:var(--fs-xs); color:var(--orange); padding:6px 0; }
+.forecast-day-head .fd-hol { font-size:var(--fs-xs); color:var(--orange); }
+.forecast-day-head .fd-makeup { font-size:var(--fs-xs); color:var(--accent); }
 
 /* === 一个 authored 动效：面板切换时克制入场（指数缓出，从已可见默认态开始）=== */
 @keyframes panelIn {
@@ -830,7 +870,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
 /* === 图标系统：一致描边的内联 SVG，替代 emoji（不再用 Unicode glyph 当图标）=== */
 .icn { width: 1.25em; height: 1.25em; display: inline-block; vertical-align: -0.18em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .tab-item .tab-icon { width: 23px; height: 23px; }
-.tab-label { font-size:0.68rem; }
+.tab-label { font-size:var(--fs-2xs); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
@@ -846,7 +886,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div class="header-title">Nexus Core</div>
     <div class="header-subtitle">个人工作台 · 课表 / 记账 / 随手记</div>
     <div style="display:flex;gap:8px;position:absolute;top:24px;right:0;">
-      <button class="sync-btn" id="theme-toggle" onclick="toggleTheme()" title="切换主题">
+      <button class="sync-btn" id="theme-toggle" onclick="toggleTheme()" aria-label="切换主题">
         <span id="theme-icon" class="icn" style="display:inline-flex;"></span>
       </button>
     </div>
@@ -876,8 +916,8 @@ a { color: var(--accent); text-underline-offset: 2px; }
   <div class="panel active" id="panel-daily">
     <!-- 新容器引导（只在「本机没数据 + 没连服务器」时出现）-->
     <div id="first-run-banner" class="card" style="display:none;padding:14px;margin-bottom:14px;border-color:var(--accent);">
-      <div style="font-size:0.85rem;color:var(--text-primary);margin-bottom:6px;"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><rect x="6.5" y="3" width="11" height="18" rx="2.4"/><path d="M10.5 18.5h3"/></svg> 这台设备上还没有数据</div>
-      <div style="font-size:0.72rem;color:var(--text-secondary);line-height:1.6;margin-bottom:10px;">
+      <div style="font-size:var(--fs-base);color:var(--text-primary);margin-bottom:6px;"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><rect x="6.5" y="3" width="11" height="18" rx="2.4"/><path d="M10.5 18.5h3"/></svg> 这台设备上还没有数据</div>
+      <div style="font-size:var(--fs-xs);color:var(--text-secondary);line-height:1.6;margin-bottom:10px;">
         如果你是从主屏幕图标打开的，那是 iPhone 的正常行为——每个「应用」有自己的独立存储空间，
         和 Safari 里的数据互不相通。这不代表数据丢了：填一次访问令牌，云端数据会全部拉回来。
       </div>
@@ -893,7 +933,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
         <div class="daily-date-big" id="daily-day-num"></div>
         <div class="daily-date-info">
           <div id="daily-month-year"></div>
-          <div id="daily-weekday" style="color: var(--text-dim); font-size:0.78rem;"></div>
+          <div id="daily-weekday" style="color: var(--text-dim); font-size:var(--fs-sm);"></div>
         </div>
       </div>
       <div class="daily-streak-badge" id="daily-streak-badge"></div>
@@ -916,9 +956,9 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div class="daily-section collapsible" id="sec-meals">
       <div class="section-header">
         <span class="section-title">饮食记录</span>
-        <span id="daily-kcal-total" style="font-family: var(--font-mono); font-size:0.78rem; color: var(--orange);"></span>
+        <span id="daily-kcal-total" style="font-family: var(--font-mono); font-size:var(--fs-sm); color: var(--orange);"></span>
       </div>
-      <div id="meal-list" style="font-size:0.8rem;color:var(--text-secondary);line-height:1.9;"></div>
+      <div id="meal-list" style="font-size:var(--fs-sm);color:var(--text-secondary);line-height:1.9;"></div>
       <div style="margin-top:10px;">
         <div id="meal-type-row" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;"></div>
         <div style="display:flex;gap:6px;">
@@ -934,16 +974,16 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div class="daily-section collapsible" id="sec-expense" style="cursor: pointer;" onclick="switchTab('data')">
       <div class="section-header">
         <span class="section-title">今日支出</span>
-        <span style="font-size:0.72rem; color: var(--text-dim);">查看全部 →</span>
+        <span style="font-size:var(--fs-xs); color: var(--text-dim);">查看全部 →</span>
       </div>
       <div style="display: flex; gap: 16px;">
         <div style="flex: 1; text-align: center; padding: 8px; background: var(--bg-card); border-radius: 6px;">
-          <div id="daily-expense-amt" style="font-family: var(--font-mono); font-size:1.1rem; color: var(--expense);">¥0</div>
-          <div style="font-size:0.68rem; color: var(--text-dim);">今日支出</div>
+          <div id="daily-expense-amt" style="font-family: var(--font-mono); font-size:var(--fs-lg); color: var(--expense);">¥0</div>
+          <div style="font-size:var(--fs-2xs); color: var(--text-dim);">今日支出</div>
         </div>
         <div style="flex: 1; text-align: center; padding: 8px; background: var(--bg-card); border-radius: 6px;">
-          <div id="daily-income-amt" style="font-family: var(--font-mono); font-size:1.1rem; color: var(--success);">¥0</div>
-          <div style="font-size:0.68rem; color: var(--text-dim);">今日收入</div>
+          <div id="daily-income-amt" style="font-family: var(--font-mono); font-size:var(--fs-lg); color: var(--success);">¥0</div>
+          <div style="font-size:var(--fs-2xs); color: var(--text-dim);">今日收入</div>
         </div>
       </div>
     </div>
@@ -952,7 +992,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div class="daily-section collapsible" id="sec-english">
       <div class="section-header">
         <span class="section-title">每日英语</span>
-        <span id="daily-en-hint" style="font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);"></span>
+        <span id="daily-en-hint" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-dim);"></span>
       </div>
       <div id="daily-english-body"></div>
     </div>
@@ -961,7 +1001,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div class="daily-section collapsible" id="sec-chess">
       <div class="section-header">
         <span class="section-title">每日残局</span>
-        <span id="daily-chess-hint" style="font-size:0.7rem;color:var(--text-dim);"></span>
+        <span id="daily-chess-hint" style="font-size:var(--fs-xs);color:var(--text-dim);"></span>
       </div>
       <div id="daily-chess-body"></div>
     </div>
@@ -970,14 +1010,14 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div class="daily-section">
       <div class="section-header">
         <span class="section-title">随手记</span>
-        <span id="journal-today-count" style="font-family:var(--font-mono);font-size:0.72rem;color:var(--text-dim);"></span>
+        <span id="journal-today-count" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-dim);"></span>
       </div>
       <textarea id="daily-journal" placeholder="记一句…" style="min-height: 56px;" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter')addJournalItem()"></textarea>
       <div style="display:flex;justify-content:flex-end;margin-top:6px;">
         <button class="btn btn-sm btn-primary" onclick="addJournalItem()">记下</button>
       </div>
-      <div id="journal-today-list" style="margin-top:10px;font-size:0.8rem;color:var(--text-secondary);line-height:1.9;"></div>
-      <div id="journal-sync-hint" style="display:none;font-size:0.68rem;color:var(--warn);margin-top:6px;line-height:1.5;"></div>
+      <div id="journal-today-list" style="margin-top:10px;font-size:var(--fs-sm);color:var(--text-secondary);line-height:1.9;"></div>
+      <div id="journal-sync-hint" style="display:none;font-size:var(--fs-2xs);color:var(--warn);margin-top:6px;line-height:1.5;"></div>
     </div>
 
   </div>
@@ -985,10 +1025,12 @@ a { color: var(--accent); text-underline-offset: 2px; }
 
   <!-- Panel: Courses (课表集成) -->
   <div class="panel" id="panel-courses">
-    <div class="daily-date-header" style="margin-bottom:12px;">
-      <div>
-        <div style="font-size:1.5rem;font-weight:bold;color:var(--accent);margin:4px 0;" id="course-week-label">第 1 周</div>
-        <div style="font-size:0.8rem;color:var(--orange);margin-top:2px;" id="course-season-label"></div>
+    <!-- 课表头：窄屏放不下「第 N 周 · M/D - M/D」和三个切换按钮并排。
+         与其让标题被挤成三行，不如让按钮单独占一行。 -->
+    <div class="daily-date-header course-header" style="margin-bottom:12px;">
+      <div style="min-width:0;">
+        <div style="font-size:var(--fs-xl);font-weight:bold;color:var(--accent);margin:2px 0;" id="course-week-label">第 1 周</div>
+        <div style="font-size:var(--fs-sm);color:var(--orange);margin-top:2px;" id="course-season-label"></div>
       </div>
       <div class="course-view-toggle">
         <button class="course-view-btn active" data-view="day" onclick="switchCourseView('day')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><rect x="3.5" y="5" width="17" height="15.5" rx="2.2"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/></svg> 日</button>
@@ -1001,9 +1043,9 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div id="course-forecast-view" style="display:none;"></div>
 <!-- 课表数据 / 调课更新 -->
     <details style="margin-top:16px;">
-      <summary style="cursor:pointer;font-size:0.72rem;color:var(--text-dim);padding:8px 0;list-style:none;user-select:none;"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.2 5.2l1.8 1.8M17 17l1.8 1.8M18.8 5.2 17 7M7 17l-1.8 1.8"/></svg> 课表数据 · 调课更新</summary>
+      <summary style="cursor:pointer;font-size:var(--fs-xs);color:var(--text-dim);padding:8px 0;list-style:none;user-select:none;"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.2 5.2l1.8 1.8M17 17l1.8 1.8M18.8 5.2 17 7M7 17l-1.8 1.8"/></svg> 课表数据 · 调课更新</summary>
       <div class="card" style="padding:12px;margin-top:6px;">
-        <div style="font-size:0.72rem;color:var(--text-dim);margin-bottom:12px;line-height:1.5;">
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);margin-bottom:12px;line-height:1.5;">
           课表已嵌入本地（来自湖南科技学院教务系统，2026-2027-1 学期）。调课时点此覆盖更新。
         </div>
         <button class="btn btn-primary btn-sm" onclick="importCourses()" style="padding:4px 12px;"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><path d="M12 4v10M8.5 10.5 12 14l3.5-3.5M5 19h14"/></svg> 导入/更新课表</button>
@@ -1025,25 +1067,33 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <!-- Wallet Balance —— 现金和投资分开显示（见 loadWallet 的注释） -->
     <div class="wallet-balance-card" id="wallet-balance-card">
       <!-- 「可用现金」整块可点：进去就是台账浮层里的「流动资金」组，钱分别躺在哪一目了然。
-           改数字的入口挪到组内（点某一项改 / 直接改总数），免得误触。 -->
-      <div class="wallet-balance-label" style="cursor:pointer;" onclick="openInvest('cash')" title="点进去看钱分别在哪">可用现金 <span style="opacity:0.5;">›</span></div>
-      <div class="wallet-balance-amount" id="wallet-balance" style="cursor:pointer;" onclick="openInvest('cash')" title="点进去看每一笔明细">¥ 0.00</div>
-      <div id="wallet-cash-sub" style="font-size:0.66rem;color:var(--text-dim);cursor:pointer;" onclick="openInvest('cash')">点进去看每一笔明细 ›</div>
+           改数字的入口挪到组内（点某一项改 / 直接改总数），免得误触。
+           注：不要用 title 承载说明 —— 手机浏览器不显示 tooltip，
+           说明一律写进下面那行可见小字（#wallet-cash-sub）。 -->
+      <!-- 这三行合并成一个可点区域，而不是各自一个 19px 高的小热区。
+           原来三个 onclick 分开写，「可用现金」那行和下面的小字都只有 ~20px 高，
+           远低于手机上 44px 的舒适点击尺寸，容易点空。
+           现在整块 padding 撑开，点哪都进「流动资金」。 -->
+      <div onclick="openInvest('cash')" style="cursor:pointer;padding:8px 0;min-height:44px;display:flex;flex-direction:column;justify-content:center;">
+        <div class="wallet-balance-label">可用现金 <span style="opacity:0.5;">›</span></div>
+        <div class="wallet-balance-amount" id="wallet-balance">¥ 0.00</div>
+        <div id="wallet-cash-sub" style="font-size:var(--fs-2xs);color:var(--text-dim);">点进去看每一笔明细 ›</div>
+      </div>
       <!-- 投资市值 = 台账里所有持仓的市值之和（点进去看明细 / 收益率 / 回本还差多少）。
            以前这里是个手填的数字，回答不了"赚了还是亏了"；现在改成台账汇总。 -->
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-subtle);cursor:pointer;"
-           onclick="openInvest()" title="看明细 · 收益率 · 还差多少回本">
+           onclick="openInvest()">
         <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
-          <span style="font-size:0.72rem;color:var(--text-dim);">投资市值</span>
-          <span id="wallet-invest" style="font-size:0.9rem;color:var(--text-secondary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;">¥ 0.00</span>
-          <span style="font-size:0.7rem;color:var(--text-dim);">›</span>
+          <span style="font-size:var(--fs-xs);color:var(--text-dim);">投资市值</span>
+          <span id="wallet-invest" style="font-size:var(--fs-md);color:var(--text-secondary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;">¥ 0.00</span>
+          <span style="font-size:var(--fs-xs);color:var(--text-dim);">›</span>
         </div>
-        <div id="wallet-invest-sub" style="font-size:0.68rem;color:var(--text-dim);margin-top:5px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;"></div>
+        <div id="wallet-invest-sub" style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:5px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;"></div>
       </div>
       <!-- 现金 + 投资市值 的总和 -->
       <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px dashed var(--border-subtle);">
-        <span style="font-size:0.72rem;color:var(--text-dim);">总资产</span>
-        <span id="wallet-total" style="font-size:1.15rem;font-weight:700;color:var(--text-primary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;">¥ 0.00</span>
+        <span style="font-size:var(--fs-xs);color:var(--text-dim);">总资产</span>
+        <span id="wallet-total" style="font-size:var(--fs-xl);font-weight:700;color:var(--text-primary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;">¥ 0.00</span>
       </div>
     </div>
 
@@ -1071,15 +1121,15 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div id="budget-section" style="display:none;margin-bottom:16px;">
       <div class="card" style="padding:14px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <span style="font-size:0.88rem;color:var(--text-primary);">本月预算</span>
-          <button class="btn btn-sm" onclick="setBudget()" style="padding:2px 10px;font-size:0.72rem;">设置</button>
+          <span style="font-size:var(--fs-base);color:var(--text-primary);">本月预算</span>
+          <button class="btn btn-sm" onclick="setBudget()" style="padding:2px 10px;font-size:var(--fs-xs);">设置</button>
         </div>
-        <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:0.78rem;">
+        <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:var(--fs-sm);">
           <span id="budget-spent" style="color:var(--expense);">¥0</span>
           <span id="budget-total" style="color:var(--text-dim);">/ ¥0</span>
         </div>
         <div class="budget-bar"><div class="budget-fill" id="budget-fill" style="width:0%;"></div></div>
-        <div id="budget-hint" style="font-size:0.68rem;color:var(--text-dim);margin-top:6px;"></div>
+        <div id="budget-hint" style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:6px;"></div>
       </div>
     </div>
 
@@ -1087,11 +1137,11 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div style="margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
         <span class="section-title">快速记账</span>
-        <span style="font-size:0.68rem;color:var(--text-dim);">点分类 → 输金额</span>
+        <span style="font-size:var(--fs-2xs);color:var(--text-dim);">点分类 → 输金额</span>
       </div>
       <div class="quick-add" id="quick-cats"></div>
       <div id="quick-input-row" style="display:none;margin-top:8px;gap:8px;align-items:center;">
-        <span id="quick-cat-label" style="font-size:0.78rem;color:var(--accent);min-width:48px;"></span>
+        <span id="quick-cat-label" style="font-size:var(--fs-sm);color:var(--accent);min-width:48px;"></span>
         <input type="number" id="quick-amount" placeholder="金额" inputmode="decimal" step="0.01" min="0" style="flex:1;min-width:80px;">
         <button class="btn btn-primary btn-sm" onclick="quickConfirm()">记下</button>
         <button class="btn btn-sm" onclick="quickCancel()">取消</button>
@@ -1119,24 +1169,29 @@ a { color: var(--accent); text-underline-offset: 2px; }
           <option value="生活">生活</option>
           <option value="其他">其他</option>
         </select>
-        <select id="wallet-account" style="width:auto;" title="这笔从哪个账户出/进（让账户余额跟着波动）"></select>
-        <input type="datetime-local" id="wallet-when" style="width: 190px;" title="可以选择过去的日期时间补记">
+        <select id="wallet-account" style="width:auto;" aria-label="账户"></select>
+        <input type="datetime-local" id="wallet-when" style="width: 190px;" aria-label="时间">
         <input type="text" id="wallet-note" placeholder="备注（可选）" style="flex: 1; min-width: 150px;">
         <button class="btn btn-primary" id="wallet-add-btn" onclick="addTransaction()">记一笔</button>
+      </div>
+      <!-- 字段说明写在这里，不用 title：手机浏览器不显示 tooltip。
+           原来「账户」和「时间」两个 title 在手机上等于没说。 -->
+      <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:8px;line-height:1.5;">
+        账户决定余额从哪扣；时间可以改，用来补记以前的账。
       </div>
     </div>
 
     <!-- 交易复盘 (投资思考日记) -->
     <div class="section-header" style="margin-top: 16px;">
       <span class="section-title">交易复盘</span>
-      <span style="font-size:0.72rem;color:var(--text-dim);">记录你的投资思考</span>
+      <span style="font-size:var(--fs-xs);color:var(--text-dim);">记录你的投资思考</span>
     </div>
     <div class="card">
       <textarea id="invest-journal" placeholder="今天对市场/基金/股票有什么想法？记录下来方便以后回顾..." style="min-height:100px;" oninput="saveInvestJournal()"></textarea>
     </div>
     <!-- 历史复盘 -->
     <div class="section-header" style="margin-top:12px;">
-      <span class="section-title" style="font-size:0.78rem;">历史复盘</span>
+      <span class="section-title" style="font-size:var(--fs-sm);">历史复盘</span>
     </div>
     <div id="invest-history-list"></div>
 
@@ -1154,7 +1209,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div style="margin-bottom:16px;">
       <div class="section-header" style="margin-bottom:10px;">
         <span class="section-title">近 6 个月趋势</span>
-        <div style="display:flex;gap:10px;font-size:0.68rem;">
+        <div style="display:flex;gap:10px;font-size:var(--fs-2xs);">
           <span style="color:var(--expense);">■ 支出</span>
           <span style="color:var(--success);">■ 收入</span>
         </div>
@@ -1168,13 +1223,13 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div class="section-header" style="margin-top: 16px;">
       <span class="section-title">交易记录</span>
       <div style="display: flex; gap: 8px; align-items: center;">
-        <select id="wallet-filter" style="width: auto; font-size:0.78rem;" onchange="renderWalletHistory()">
+        <select id="wallet-filter" style="width: auto; font-size:var(--fs-sm);" onchange="renderWalletHistory()">
           <option value="all">全部</option>
           <option value="today">今天</option>
           <option value="week">本周</option>
           <option value="month">本月</option>
         </select>
-        <button class="btn btn-sm btn-danger" onclick="clearWalletHistory()" style="padding: 2px 8px; font-size:0.72rem;">清空</button>
+        <button class="btn btn-sm btn-danger" onclick="clearWalletHistory()" style="padding: 2px 8px; font-size:var(--fs-xs);">清空</button>
       </div>
     </div>
     <div id="wallet-history-list"></div>
@@ -1182,11 +1237,11 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <!-- 每日打卡档案 (原 history 面板内容) -->
     <div class="daily-date-header" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:20px;margin:16px 0;">
       <div>
-        <div style="font-size:1.5rem;font-weight:bold;color:var(--text-primary);margin:4px 0;">每日统计</div>
-        <div style="font-size:0.8rem;color:var(--text-dim);">打卡合集 · <span id="history-year"></span></div>
+        <div style="font-size:var(--fs-3xl);font-weight:bold;color:var(--text-primary);margin:4px 0;">每日统计</div>
+        <div style="font-size:var(--fs-sm);color:var(--text-dim);">打卡合集 · <span id="history-year"></span></div>
       </div>
       <div style="text-align:right;">
-        <div id="history-total-days" style="font-family:var(--font-mono);font-size:2.5rem;color:var(--text-dim);opacity:0.3;">365</div>
+        <div id="history-total-days" style="font-family:var(--font-mono);font-size:var(--fs-hero);color:var(--text-dim);opacity:0.3;">365</div>
       </div>
     </div>
 
@@ -1200,18 +1255,18 @@ a { color: var(--accent); text-underline-offset: 2px; }
 
     <!-- Entries List -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span id="history-entry-count" style="font-size:0.72rem;color:var(--text-dim);"></span>
+      <span id="history-entry-count" style="font-size:var(--fs-xs);color:var(--text-dim);"></span>
     </div>
     <div id="history-entries-list"></div>
 
     <!-- 日记回顾 -->
     <div class="section-header" style="margin-top:20px;">
       <span class="section-title">日记回顾</span>
-      <span id="journal-arch-stats" style="font-size:0.72rem;color:var(--text-dim);"></span>
+      <span id="journal-arch-stats" style="font-size:var(--fs-xs);color:var(--text-dim);"></span>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
       <button class="btn btn-sm" onclick="journalMonthShift(-1)">‹</button>
-      <span id="journal-arch-month" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--accent);"></span>
+      <span id="journal-arch-month" style="font-family:var(--font-mono);font-size:var(--fs-sm);color:var(--accent);"></span>
       <button class="btn btn-sm" onclick="journalMonthShift(1)">›</button>
       <input type="text" id="journal-arch-search" placeholder="搜索全部日记..." style="flex:1;min-width:120px;" oninput="renderJournalArchive()">
     </div>
@@ -1220,7 +1275,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <!-- AI 周报 / 月报（本地 Ollama，经后端 SSE 代理） -->
     <div class="section-header" style="margin-top:20px;">
       <span class="section-title">AI 报告</span>
-      <span id="ai-week-status" style="font-size:0.72rem;color:var(--text-dim);"></span>
+      <span id="ai-week-status" style="font-size:var(--fs-xs);color:var(--text-dim);"></span>
     </div>
     <div class="card" style="padding:12px;">
       <!-- 粒度切换：周报看节奏，月报看趋势。切换后自动回到「当前」，不会停在上周的偏移上 -->
@@ -1230,18 +1285,18 @@ a { color: var(--accent); text-underline-offset: 2px; }
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
         <button class="btn btn-sm" onclick="aiWeekShift(-1)">‹</button>
-        <span id="ai-week-label" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--accent);"></span>
+        <span id="ai-week-label" style="font-family:var(--font-mono);font-size:var(--fs-sm);color:var(--accent);"></span>
         <button class="btn btn-sm" onclick="aiWeekShift(1)">›</button>
         <span style="flex:1;"></span>
-        <input type="text" id="ai-model" placeholder="模型名，如 qwen2.5:7b" style="width:170px;font-size:0.78rem;" onchange="saveAiModel()">
+        <input type="text" id="ai-model" placeholder="模型名，如 qwen2.5:7b" style="width:170px;font-size:var(--fs-sm);" onchange="saveAiModel()">
         <button class="btn btn-primary btn-sm" id="ai-gen-btn" onclick="generateWeeklyReport()"><i data-ic="report" data-size="0.95"></i> 生成周报</button>
       </div>
-      <div id="ai-week-output" style="display:none;white-space:pre-wrap;font-size:0.8rem;line-height:1.8;color:var(--text-primary);background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:12px;max-height:420px;overflow-y:auto;"></div>
+      <div id="ai-week-output" style="display:none;white-space:pre-wrap;font-size:var(--fs-sm);line-height:1.8;color:var(--text-primary);background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:12px;max-height:420px;overflow-y:auto;"></div>
       <!-- 区分两种报告：
            上面「生成」出来的是本机 Ollama 的文本，存在 aiReports 里（可离线看、会同步）；
            下面这个是服务端的静态图文版（带图表、排版），只读。两者不含同一份内容，别混淆。 -->
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle);display:flex;align-items:center;gap:8px;">
-        <span style="flex:1;font-size:0.7rem;color:var(--text-dim);line-height:1.6;">图文版月报（带图表，服务端生成）</span>
+        <span style="flex:1;font-size:var(--fs-xs);color:var(--text-dim);line-height:1.6;">图文版月报（带图表，服务端生成）</span>
         <a class="btn btn-sm" href="/report/" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">查看 ↗</a>
       </div>
     </div>
@@ -1255,31 +1310,33 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div style="margin-top:16px;">
       <div style="display:flex;align-items:center;gap:8px;">
         <i data-ic="cloud" data-size="1"></i>
-        <span style="font-size:0.88rem;color:var(--text-primary);flex:1;">服务器同步</span>
+        <span style="font-size:var(--fs-base);color:var(--text-primary);flex:1;">服务器同步</span>
         <span id="srv-dot" class="srv-dot"></span>
-        <span id="srv-status-text" style="font-size:0.68rem;color:var(--text-dim);">未连接</span>
+        <span id="srv-status-text" style="font-size:var(--fs-2xs);color:var(--text-dim);">未连接</span>
       </div>
-      <div id="health-bar" style="margin-top:8px;font-size:0.7rem;color:var(--text-dim);line-height:1.7;"></div>
+      <div id="health-bar" style="margin-top:8px;font-size:var(--fs-xs);color:var(--text-dim);line-height:1.7;"></div>
       <details style="margin-top:8px;">
-        <summary style="cursor:pointer;font-size:0.72rem;color:var(--text-dim);padding:6px 0;list-style:none;user-select:none;">高级设置</summary>
+        <summary style="cursor:pointer;font-size:var(--fs-xs);color:var(--text-dim);padding:6px 0;list-style:none;user-select:none;">高级设置</summary>
         <div class="card" style="padding:12px;margin-top:6px;">
           <div class="form-group" style="margin-bottom:8px;">
-            <label style="font-size:0.72rem;">服务器地址（留空 = 当前网址）</label>
+            <label style="font-size:var(--fs-xs);">服务器地址（留空 = 当前网址）</label>
             <input type="text" id="cfg-server-base" placeholder="留空即用当前网址" style="width:100%;">
           </div>
           <div class="form-group" style="margin-bottom:8px;">
-            <label style="font-size:0.72rem;">访问令牌</label>
+            <label style="font-size:var(--fs-xs);">访问令牌</label>
             <div style="display:flex;gap:6px;">
               <input type="password" id="cfg-server-token" placeholder="AUTH_TOKEN" style="flex:1;min-width:0;">
-              <button class="btn btn-sm" onclick="copyServerToken()" title="复制令牌，方便粘到另一台设备">复制</button>
+              <button class="btn btn-sm" onclick="copyServerToken()" aria-label="复制令牌到剪贴板">复制</button>
             </div>
+            <!-- 说明放可见处，不用 title（手机不显示 tooltip） -->
+            <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:6px;line-height:1.5;">复制后粘到另一台设备的这个输入框，就能同步。</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-primary btn-sm" onclick="saveServerCfg()">保存并连接</button>
             <button class="btn btn-sm" onclick="syncNow()">立即同步</button>
             <button class="btn btn-sm" onclick="importJournalToServer()">导入本机旧日记</button>
           </div>
-          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:8px;line-height:1.5;">
+          <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:8px;line-height:1.5;">
             任务 / 记账 / 课表 / 习惯等全部数据自动同步到你的服务器，手机电脑保持一致。
           </div>
         </div>
@@ -1291,10 +1348,10 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div style="display:flex;align-items:center;gap:12px;">
         <i data-ic="film" data-size="1.3"></i>
         <div style="flex:1;">
-          <div style="font-size:0.88rem;color:var(--text-primary);">视频收藏</div>
-          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px;" id="video-entry-count">收藏想看的视频</div>
+          <div style="font-size:var(--fs-base);color:var(--text-primary);">视频收藏</div>
+          <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:2px;" id="video-entry-count">收藏想看的视频</div>
         </div>
-        <span style="color:var(--text-dim);font-size:0.78rem;">→</span>
+        <span style="color:var(--text-dim);font-size:var(--fs-sm);">→</span>
       </div>
     </div>
 
@@ -1303,10 +1360,10 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div style="display:flex;align-items:center;gap:12px;">
         <span class="icn" style="width:1.4rem;height:1.4rem;color:var(--accent);"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/></svg></span>
         <div style="flex:1;">
-          <div style="font-size:0.88rem;color:var(--text-primary);">灵感库</div>
-          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px;" id="insp-entry-count">记下想法和素材</div>
+          <div style="font-size:var(--fs-base);color:var(--text-primary);">灵感库</div>
+          <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:2px;" id="insp-entry-count">记下想法和素材</div>
         </div>
-        <span style="color:var(--text-dim);font-size:0.78rem;">→</span>
+        <span style="color:var(--text-dim);font-size:var(--fs-sm);">→</span>
       </div>
     </div>
 
@@ -1316,10 +1373,10 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div style="display:flex;align-items:center;gap:12px;">
         <i data-ic="book" data-size="1.3"></i>
         <div style="flex:1;">
-          <div style="font-size:0.88rem;color:var(--text-primary);">高性价比人生指南</div>
-          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px;">花掉什么、换回什么 —— 可筛选的生活决策库</div>
+          <div style="font-size:var(--fs-base);color:var(--text-primary);">高性价比人生指南</div>
+          <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:2px;">花掉什么、换回什么 —— 可筛选的生活决策库</div>
         </div>
-        <span style="color:var(--text-dim);font-size:0.78rem;">↗</span>
+        <span style="color:var(--text-dim);font-size:var(--fs-sm);">↗</span>
       </div>
     </a>
 
@@ -1331,10 +1388,10 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div style="display:flex;align-items:center;gap:12px;">
         <span class="icn" style="width:1.4rem;height:1.4rem;color:var(--accent);"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><path d="M4 19V5M4 19h16M8 16V9M12.5 16v-4M17 16V7"/></svg></span>
         <div style="flex:1;">
-          <div style="font-size:0.88rem;color:var(--text-primary);">月报 / 周报</div>
-          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px;">记账、投资、任务、日记的趋势汇总</div>
+          <div style="font-size:var(--fs-base);color:var(--text-primary);">月报 / 周报</div>
+          <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:2px;">记账、投资、任务、日记的趋势汇总</div>
         </div>
-        <span style="color:var(--text-dim);font-size:0.78rem;">↗</span>
+        <span style="color:var(--text-dim);font-size:var(--fs-sm);">↗</span>
       </div>
     </a>
 
@@ -1344,10 +1401,10 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div style="display:flex;align-items:center;gap:12px;">
         <i data-ic="library" data-size="1.3"></i>
         <div style="flex:1;">
-          <div style="font-size:0.88rem;color:var(--text-primary);">私人书库</div>
-          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px;">自己放书，干净排版的阅读器</div>
+          <div style="font-size:var(--fs-base);color:var(--text-primary);">私人书库</div>
+          <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:2px;">自己放书，干净排版的阅读器</div>
         </div>
-        <span style="color:var(--text-dim);font-size:0.78rem;">↗</span>
+        <span style="color:var(--text-dim);font-size:var(--fs-sm);">↗</span>
       </div>
     </a>
 
@@ -1355,35 +1412,35 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div style="margin-top:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
         <i data-ic="disk" data-size="1"></i>
-        <span style="font-size:0.88rem;color:var(--text-primary);">数据管理</span>
+        <span style="font-size:var(--fs-base);color:var(--text-primary);">数据管理</span>
       </div>
       <div class="card" style="cursor:pointer;padding:12px;" onclick="exportAllData()">
         <div style="display:flex;align-items:center;gap:10px;">
           <i data-ic="upload" data-size="1"></i>
-          <span style="flex:1;font-size:0.88rem;">导出数据</span>
-          <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
+          <span style="flex:1;font-size:var(--fs-base);">导出数据</span>
+          <span style="color:var(--text-dim);font-size:var(--fs-sm);">→</span>
         </div>
       </div>
       <div class="card" style="cursor:pointer;padding:12px;margin-top:8px;" onclick="importDataPrompt()">
         <div style="display:flex;align-items:center;gap:10px;">
           <span class="icn" style="width:1.1rem;height:1.1rem;color:var(--accent);"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><path d="M12 4v10M8.5 10.5 12 14l3.5-3.5M5 19h14"/></svg></span>
-          <span style="flex:1;font-size:0.88rem;">导入数据</span>
-          <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
+          <span style="flex:1;font-size:var(--fs-base);">导入数据</span>
+          <span style="color:var(--text-dim);font-size:var(--fs-sm);">→</span>
         </div>
       </div>
       <div class="card" style="cursor:pointer;padding:12px;margin-top:8px;" onclick="copyDataToClipboard()">
         <div style="display:flex;align-items:center;gap:10px;">
           <span class="icn" style="width:1.1rem;height:1.1rem;color:var(--accent);"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M5.5 15.5V5.5a2 2 0 0 1 2-2h10"/></svg></span>
-          <span style="flex:1;font-size:0.88rem;">复制数据（手机推荐）</span>
-          <span style="color:var(--text-dim);font-size:0.8rem;">→</span>
+          <span style="flex:1;font-size:var(--fs-base);">复制数据（手机推荐）</span>
+          <span style="color:var(--text-dim);font-size:var(--fs-sm);">→</span>
         </div>
       </div>
     </div>
 
     <!-- 关于 -->
     <div style="margin-top:20px;text-align:center;padding:12px;">
-      <div style="font-size:0.72rem;color:var(--text-dim);">Nexus Core · v2.0</div>
-      <div style="font-size:0.68rem;color:var(--text-dim);margin-top:4px;">个人管理面板</div>
+      <div style="font-size:var(--fs-xs);color:var(--text-dim);">Nexus Core · v2.0</div>
+      <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:4px;">个人管理面板</div>
     </div>
   </div>
 </div>
@@ -1455,7 +1512,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
   <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
     <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
       <span class="icn" style="width:1.3rem;height:1.3rem;color:var(--accent);"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/></svg></span>
-      <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">灵感库</span>
+      <span style="font-size:var(--fs-lg);font-weight:bold;color:var(--text-primary);flex:1;">灵感库</span>
       <button class="btn btn-sm" onclick="inspToggleForm()">+ 新建</button>
       <button class="btn btn-sm" onclick="closeInspiration()" aria-label="关闭"><i data-ic="close" data-size="0.9"></i></button>
     </div>
@@ -1468,7 +1525,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <input id="insp-title" placeholder="标题（可选）" style="width:100%;margin-bottom:8px;">
       <textarea id="insp-content" placeholder="写点什么…" style="width:100%;min-height:80px;margin-bottom:8px;"></textarea>
       <div id="insp-material-fields" style="display:none;">
-        <label style="display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border:1px dashed var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:0.78rem;cursor:pointer;margin-bottom:8px;">
+        <label style="display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border:1px dashed var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:var(--fs-sm);cursor:pointer;margin-bottom:8px;">
           <i data-ic="image" data-size="0.95"></i> 从相册选图
           <input type="file" accept="image/*" onchange="inspPickImage(this)" style="display:none;">
         </label>
@@ -1492,7 +1549,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
   <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
     <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
       <i data-ic="film" data-size="1.1"></i>
-      <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">视频收藏</span>
+      <span style="font-size:var(--fs-lg);font-weight:bold;color:var(--text-primary);flex:1;">视频收藏</span>
       <button class="btn btn-sm" onclick="videoToggleForm()">+ 添加</button>
       <button class="btn btn-sm" onclick="closeVideos()" aria-label="关闭"><i data-ic="close" data-size="0.9"></i></button>
     </div>
@@ -1505,7 +1562,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <button class="btn btn-primary btn-sm" onclick="videoSave()">保存</button>
         <button class="btn btn-sm" onclick="videoToggleForm()">取消</button>
-        <span id="video-fetch-hint" style="font-size:0.68rem;color:var(--text-dim);"></span>
+        <span id="video-fetch-hint" style="font-size:var(--fs-2xs);color:var(--text-dim);"></span>
       </div>
     </div>
 
@@ -1522,7 +1579,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
   <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
     <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
       <i data-ic="bolt" data-size="1.1"></i>
-      <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">全部任务</span>
+      <span style="font-size:var(--fs-lg);font-weight:bold;color:var(--text-primary);flex:1;">全部任务</span>
       <button class="btn btn-sm" onclick="openTaskModal()">+ 新增</button>
       <button class="btn btn-sm" onclick="closeTasks()" aria-label="关闭"><i data-ic="close" data-size="0.9"></i></button>
     </div>
@@ -1549,7 +1606,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
   <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
     <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
       <i data-ic="trend" data-size="1.1"></i>
-      <span style="font-size:1.05rem;font-weight:bold;color:var(--text-primary);flex:1;">资产台账</span>
+      <span style="font-size:var(--fs-lg);font-weight:bold;color:var(--text-primary);flex:1;">资产台账</span>
       <button class="btn btn-sm" id="invest-refresh-btn" onclick="refreshQuotes(true)">刷新行情</button>
       <button class="btn btn-sm" onclick="closeInvest()" aria-label="关闭"><i data-ic="close" data-size="0.9"></i></button>
     </div>
@@ -1567,13 +1624,13 @@ a { color: var(--accent); text-underline-offset: 2px; }
     </div>
     <input type="file" id="invest-shot-input" accept="image/*" multiple style="display:none;" onchange="investPickShots(this)">
     <div id="invest-shot-list"></div>
-    <div style="font-size:0.66rem;color:var(--text-dim);margin-top:8px;line-height:1.8;">
+    <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:8px;line-height:1.8;">
       手机上截好图，从相册一次性选多张传上来，然后<b style="color:var(--text-secondary);">在对话里跟我说一声「传好了」</b>，
       我来认上面的基金名、代码、持有金额和持仓收益，直接建成持仓。
       <br>（服务器跑不动本地视觉模型，所以认图这一步由对话里的 AI 做，图只存在你自己的服务器上。）
     </div>
 
-    <div id="invest-quote-note" style="font-size:0.66rem;color:var(--text-dim);margin-top:16px;line-height:1.8;"></div>
+    <div id="invest-quote-note" style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:16px;line-height:1.8;"></div>
   </div>
 </div>
 
@@ -1583,12 +1640,12 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div class="modal-title" id="invest-edit-title">添加持仓</div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">名称</label>
+      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">名称</label>
       <input id="inv-name" placeholder="例：华安黄金ETF联接C" style="width:100%;">
     </div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">类型</label>
+      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">类型</label>
       <select id="inv-type" onchange="investFormTypeChanged()" style="width:100%;">
         <option value="fund">场外基金（支付宝 / 理财通里买的基金）</option>
         <option value="stock">股票 / 场内 ETF（券商账户里的）</option>
@@ -1599,25 +1656,25 @@ a { color: var(--accent); text-underline-offset: 2px; }
     </div>
 
     <div id="inv-code-row" style="margin-bottom:12px;">
-      <label id="inv-code-label" style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">基金代码（6 位数字）</label>
+      <label id="inv-code-label" style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">基金代码（6 位数字）</label>
       <input id="inv-code" placeholder="例：000217" inputmode="numeric" maxlength="6" style="width:100%;">
-      <div style="font-size:0.66rem;color:var(--text-dim);margin-top:4px;">填了代码才能每天自动更新市值</div>
+      <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:4px;">填了代码才能每天自动更新市值</div>
     </div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">现在值多少钱（持有金额）</label>
+      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">现在值多少钱（持有金额）</label>
       <input type="number" id="inv-value" placeholder="例：4120.30" inputmode="decimal" step="0.01" style="width:100%;">
-      <div style="font-size:0.66rem;color:var(--text-dim);margin-top:4px;">就是产品页面上那个「持有金额」，照抄</div>
+      <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:4px;">就是产品页面上那个「持有金额」，照抄</div>
     </div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">持仓收益（可选）</label>
+      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">持仓收益（可选）</label>
       <input type="number" id="inv-profit" placeholder="例：-379.70（亏了就填负数）" inputmode="decimal" step="0.01" style="width:100%;">
-      <div id="inv-profit-hint" style="font-size:0.66rem;color:var(--text-dim);margin-top:4px;line-height:1.6;"></div>
+      <div id="inv-profit-hint" style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:4px;line-height:1.6;"></div>
     </div>
 
     <div style="margin-bottom:16px;">
-      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">备注（可选）</label>
+      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">备注（可选）</label>
       <input id="inv-note" placeholder="例：2025 年 3 月开始定投" style="width:100%;">
     </div>
 
@@ -1634,23 +1691,23 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div class="modal-title" id="gadget-edit-title">添加一件</div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">名称</label>
+      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">名称</label>
       <input id="gd-name" placeholder="例：机械革命蛟龙16 pro" style="width:100%;">
     </div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">买的时候多少钱</label>
+      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">买的时候多少钱</label>
       <input type="number" id="gd-price" placeholder="例：6479.20" inputmode="decimal" step="0.01" style="width:100%;">
     </div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">购买日期</label>
+      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">购买日期</label>
       <input type="date" id="gd-date" style="width:100%;">
-      <div id="gd-hint" style="font-size:0.66rem;color:var(--text-dim);margin-top:4px;">填了日期才算得出「已用多少天」和日均成本</div>
+      <div id="gd-hint" style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:4px;">填了日期才算得出「已用多少天」和日均成本</div>
     </div>
 
     <div style="margin-bottom:16px;">
-      <label style="font-size:0.72rem;color:var(--text-dim);display:block;margin-bottom:4px;">备注（可选）</label>
+      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">备注（可选）</label>
       <input id="gd-note" placeholder="例：国补买的 / 二手" style="width:100%;">
     </div>
 
@@ -2116,7 +2173,7 @@ function renderCategoryBreakdown() {
   const txns = (Store.get('wallet', {}).transactions || [])
     .filter(t => t.type === 'expense' && dateOf(t.date).startsWith(month));
   if (!txns.length) {
-    el.innerHTML = '<div style="color:var(--text-dim);font-size:0.78rem;text-align:center;padding:8px;">本月还没有支出记录</div>';
+    el.innerHTML = '<div style="color:var(--text-dim);font-size:var(--fs-sm);text-align:center;padding:8px;">本月还没有支出记录</div>';
     return;
   }
   const byCat = {};
@@ -2230,7 +2287,7 @@ function inspPickImage(input) {
   const file = input.files && input.files[0];
   if (!file) return;
   const prev = document.getElementById('insp-preview');
-  prev.innerHTML = '<div style="font-size:0.72rem;color:var(--text-dim);">处理中…</div>';
+  prev.innerHTML = '<div style="font-size:var(--fs-xs);color:var(--text-dim);">处理中…</div>';
   compressImage(file).then(function (dataUrl) {
     prev.innerHTML = '<img src="' + dataUrl + '" style="max-height:140px;border-radius:var(--radius-sm);">';
     return uploadImage(dataUrl, file.name).then(function (r) {
@@ -2375,14 +2432,14 @@ function renderInspirations() {
     const safeLink = safeUrl(it.link);
     const safeImg = safeFileUrl(it.fileUrl);   // 非法地址直接丢弃，不渲染 img
     const img = safeImg ? '<img class="insp-thumb" src="' + escAttr(safeImg) + '" loading="lazy" onclick="inspViewImage(&quot;' + escAttr(safeImg) + '&quot;)">' : '';
-    const link = safeLink ? '<div style="margin-top:6px;"><a href="' + safeLink + '" target="_blank" rel="noopener noreferrer" style="font-size:0.72rem;color:var(--accent);word-break:break-all;">' + escHtml(it.link) + '</a></div>' : '';
+    const link = safeLink ? '<div style="margin-top:6px;"><a href="' + safeLink + '" target="_blank" rel="noopener noreferrer" style="font-size:var(--fs-xs);color:var(--accent);word-break:break-all;">' + escHtml(it.link) + '</a></div>' : '';
     const tagsHtml = (it.tags || []).map(function (t) { return '<span class="insp-tag">#' + escHtml(t) + '</span>'; }).join(' ');
     const kindIco = it.kind === 'material' ? icon('image', 0.85) : icon('thought', 0.85);
     return '<div class="insp-card">' +
-      '<div class="insp-card-head"><span style="font-size:0.85rem;line-height:1;">' + kindIco + '</span>' +
+      '<div class="insp-card-head"><span style="font-size:var(--fs-base);line-height:1;">' + kindIco + '</span>' +
       '<span class="insp-card-title">' + escHtml(it.title || (it.content || '').slice(0, 24) || '(无标题)') + '</span>' +
       '<span class="insp-card-time">' + String(it.createdAt || '').slice(5, 16).replace('T', ' ') + '</span>' +
-      '<button class="btn btn-sm" style="padding:2px 8px;font-size:0.68rem;" onclick="inspDelete(&quot;' + it.id + '&quot;)" aria-label="删除">' + ICON_CLOSE + '</button></div>' +
+      '<button class="btn btn-sm" style="padding:2px 8px;font-size:var(--fs-2xs);" onclick="inspDelete(&quot;' + it.id + '&quot;)" aria-label="删除">' + ICON_CLOSE + '</button></div>' +
       img +
       (it.content ? '<div class="insp-card-body">' + escHtml(it.content) + '</div>' : '') +
       link +
@@ -2558,7 +2615,7 @@ function renderVideos() {
   tags.sort();
   document.getElementById('video-tagbar').innerHTML = ['', ...tags].map(t => {
     const on = _videoTagFilter === t;
-    return `<button class="btn btn-sm" style="font-size:0.68rem;padding:3px 10px;${on ? 'border-color:var(--accent);color:var(--accent);' : ''}" onclick="videoSetTag('${videoEsc(t)}')">${t ? videoEsc(t) : '全部'}</button>`;
+    return `<button class="btn btn-sm" style="font-size:var(--fs-2xs);padding:3px 10px;${on ? 'border-color:var(--accent);color:var(--accent);' : ''}" onclick="videoSetTag('${videoEsc(t)}')">${t ? videoEsc(t) : '全部'}</button>`;
   }).join('');
 
   const kw = document.getElementById('video-search').value.trim().toLowerCase();
@@ -2570,7 +2627,7 @@ function renderVideos() {
     (v.tags || []).join(' ').toLowerCase().indexOf(kw) >= 0);
 
   if (!list.length) {
-    listEl.innerHTML = `<div style="padding:28px 14px;text-align:center;color:var(--text-dim);font-size:0.78rem;line-height:1.8;">${
+    listEl.innerHTML = `<div style="padding:28px 14px;text-align:center;color:var(--text-dim);font-size:var(--fs-sm);line-height:1.8;">${
       all.length ? '没有匹配的记录' : '还没有收藏。<br>点右上角「+ 添加」，把视频链接粘进去就行。'}</div>`;
     return;
   }
@@ -2582,20 +2639,20 @@ function renderVideos() {
         ${site ? icon(site.ic, 1.1) : icon('link', 1.1)}
         <div style="flex:1;min-width:0;">
           <a href="${videoEsc(safeUrl(v.url))}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"
-             style="color:var(--text-primary);font-size:0.86rem;text-decoration:none;display:block;line-height:1.45;">${videoEsc(v.title)}</a>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:0.66rem;color:var(--text-dim);">
+             style="color:var(--text-primary);font-size:var(--fs-base);text-decoration:none;display:block;line-height:1.45;">${videoEsc(v.title)}</a>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:var(--fs-2xs);color:var(--text-dim);">
             ${site ? `<span>${site.label}</span>` : ''}
             ${(v.tags || []).map(t => `<span style="color:var(--accent);">#${videoEsc(t)}</span>`).join('')}
             <span>${fmtMD(new Date(v.ts))}</span>
           </div>
         </div>
-        <span style="font-size:0.72rem;color:var(--text-dim);flex-shrink:0;align-self:center;">›</span>
+        <span style="font-size:var(--fs-xs);color:var(--text-dim);flex-shrink:0;align-self:center;">›</span>
       </summary>
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle);">
-        ${v.note ? `<div style="font-size:0.72rem;color:var(--text-secondary);line-height:1.5;margin-bottom:8px;">${videoEsc(v.note)}</div>` : ''}
+        ${v.note ? `<div style="font-size:var(--fs-xs);color:var(--text-secondary);line-height:1.5;margin-bottom:8px;">${videoEsc(v.note)}</div>` : ''}
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <a href="${videoEsc(safeUrl(v.url))}" target="_blank" rel="noopener noreferrer" class="btn btn-sm">打开链接</a>
-          <button class="btn btn-sm" style="padding:2px 8px;font-size:0.68rem;" onclick="videoDelete('${videoEsc(v.id)}')">删</button>
+          <button class="btn btn-sm" style="padding:2px 8px;font-size:var(--fs-2xs);" onclick="videoDelete('${videoEsc(v.id)}')">删</button>
         </div>
       </div>
     </details>`;
@@ -3689,7 +3746,7 @@ function renderDailyEnglish() {
       '<div class="en-eg">' + escHtml(word.e) + '</div>' +
     '</div>' +
     '<div class="en-block">' +
-      '<div class="en-head"><span style="font-size:0.8rem;color:var(--text-dim);">今日一句</span>' +
+      '<div class="en-head"><span style="font-size:var(--fs-sm);color:var(--text-dim);">今日一句</span>' +
         '<button class="en-say" aria-label="朗读句子" onclick="speakEnSentence()">' + mkIcon('mic', 0.85) + '</button>' +
       '</div>' +
       '<div class="en-sent-en">' + escHtml(sent.en) + '</div>' +
@@ -4199,7 +4256,7 @@ function renderTodayTasks() {
         </div>
       </div>
     </div>
-  `).join('') || '<div style="color:var(--text-dim);font-size:0.8rem;padding:8px;">今天没有到期任务，点「全部 →」安排一个吧</div>';
+  `).join('') || '<div style="color:var(--text-dim);font-size:var(--fs-sm);padding:8px;">今天没有到期任务，点「全部 →」安排一个吧</div>';
 }
 
 // --- Meals ---
@@ -4251,7 +4308,7 @@ function renderMeals() {
   if (sug) {
     const list = mealSuggestions();
     sug.innerHTML = list.length
-      ? '<span style="font-size:0.68rem;color:var(--text-dim);align-self:center;">常吃：</span>' +
+      ? '<span style="font-size:var(--fs-2xs);color:var(--text-dim);align-self:center;">常吃：</span>' +
         list.map(n => '<button class="chip" onclick="quickAddMeal(this.textContent)">' + n + '</button>').join('')
       : '';
   }
@@ -4260,14 +4317,14 @@ function renderMeals() {
   if (listEl) {
     listEl.innerHTML = meals.length
       ? meals.map((m, i) => {
-          const kcal = m.kcal ? ' <span style="color:var(--text-dim);font-size:0.72rem;">' + m.kcal + 'kcal</span>' : '';
+          const kcal = m.kcal ? ' <span style="color:var(--text-dim);font-size:var(--fs-xs);">' + m.kcal + 'kcal</span>' : '';
           return '<div style="display:flex;gap:8px;align-items:baseline;">' +
-            '<span style="color:var(--text-dim);font-size:0.72rem;flex:none;">' + mealTypeLabel(m.type) + '</span>' +
+            '<span style="color:var(--text-dim);font-size:var(--fs-xs);flex:none;">' + mealTypeLabel(m.type) + '</span>' +
             '<span style="flex:1;min-width:0;word-break:break-all;">' + m.name + kcal + '</span>' +
-            '<button class="btn btn-sm" onclick="removeMeal(' + i + ')" style="padding:0 7px;font-size:0.7rem;flex:none;">×</button>' +
+            '<button class="btn btn-sm" onclick="removeMeal(' + i + ')" style="padding:0 7px;font-size:var(--fs-xs);flex:none;">×</button>' +
             '</div>';
         }).join('')
-      : '<span style="color:var(--text-dim);font-size:0.75rem;">今天还没记</span>';
+      : '<span style="color:var(--text-dim);font-size:var(--fs-xs);">今天还没记</span>';
   }
 
   const total = document.getElementById('daily-kcal-total');
@@ -4426,9 +4483,9 @@ function renderJournalToday() {
   if (!list) return;
   list.innerHTML = items.map((it, i) =>
     '<div style="display:flex;gap:8px;align-items:baseline;">' +
-      '<span style="color:var(--text-dim);font-size:0.7rem;flex:none;font-family:var(--font-mono);">' + journalTimeLabel(it.ts) + '</span>' +
+      '<span style="color:var(--text-dim);font-size:var(--fs-xs);flex:none;font-family:var(--font-mono);">' + journalTimeLabel(it.ts) + '</span>' +
       '<span style="flex:1;min-width:0;white-space:pre-wrap;word-break:break-word;">' + escJournalText(it.text) + '</span>' +
-      '<button class="btn btn-sm" onclick="removeJournalItem(' + i + ')" style="padding:0 7px;font-size:0.7rem;flex:none;">×</button>' +
+      '<button class="btn btn-sm" onclick="removeJournalItem(' + i + ')" style="padding:0 7px;font-size:var(--fs-xs);flex:none;">×</button>' +
     '</div>').join('');
 }
 
@@ -4697,7 +4754,7 @@ async function renderJournalArchive() {
   let entries;
   if (journalApiOn()) {
     try { entries = await fetchAllEntries(); }
-    catch (e) { listEl.innerHTML = `<div style="color:var(--text-dim);font-size:0.8rem;padding:8px;">后端连接失败（${e.message}），显示本机数据</div>`;
+    catch (e) { listEl.innerHTML = `<div style="color:var(--text-dim);font-size:var(--fs-sm);padding:8px;">后端连接失败（${e.message}），显示本机数据</div>`;
       entries = localJournalEntries(); }
   } else {
     entries = localJournalEntries();
@@ -4725,7 +4782,7 @@ function localJournalEntries() {
   return Object.entries(j).map(([date, v]) => ({ date: date, content: journalPlainText(date) }));
 }
 function renderJournalArchiveList(el, entries) {
-  if (!entries.length) { el.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:8px;">这个月还没有日记，去「今日」写一篇吧</div>'; return; }
+  if (!entries.length) { el.innerHTML = '<div style="color:var(--text-dim);font-size:var(--fs-sm);padding:8px;">这个月还没有日记，去「今日」写一篇吧</div>'; return; }
   el.innerHTML = entries.map(e => {
     const [y, m, d] = e.date.split('-');
     const text = entryToText(e.content);
@@ -4734,11 +4791,11 @@ function renderJournalArchiveList(el, entries) {
     return `
     <details class="card" style="padding:10px;margin-bottom:8px;">
       <summary style="cursor:pointer;list-style:none;display:flex;gap:8px;align-items:baseline;">
-        <span style="font-family:var(--font-mono);color:var(--accent);font-size:0.8rem;white-space:nowrap;">${m}-${d}</span>
-        <span style="flex:1;font-size:0.78rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escJournalText(preview)}</span>
-        <span style="font-size:0.68rem;color:var(--text-dim);white-space:nowrap;">${text.length}字</span>
+        <span style="font-family:var(--font-mono);color:var(--accent);font-size:var(--fs-sm);white-space:nowrap;">${m}-${d}</span>
+        <span style="flex:1;font-size:var(--fs-sm);color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escJournalText(preview)}</span>
+        <span style="font-size:var(--fs-2xs);color:var(--text-dim);white-space:nowrap;">${text.length}字</span>
       </summary>
-      <div style="white-space:pre-wrap;font-size:0.8rem;color:var(--text-primary);line-height:1.7;padding:10px 2px 2px;border-top:1px solid var(--border-subtle);margin-top:8px;">${escaped}</div>
+      <div style="white-space:pre-wrap;font-size:var(--fs-sm);color:var(--text-primary);line-height:1.7;padding:10px 2px 2px;border-top:1px solid var(--border-subtle);margin-top:8px;">${escaped}</div>
     </details>`;
   }).join('');
 }
@@ -5015,14 +5072,14 @@ function renderAiReports() {
   if (!list) return;
   const reports = Store.get('aiReports', []);
   if (!reports.length) return;
-  list.innerHTML = `<div style="font-size:0.72rem;color:var(--text-dim);margin:10px 0 6px;">往期报告（存于本机）</div>` + reports.map(r => `
+  list.innerHTML = `<div style="font-size:var(--fs-xs);color:var(--text-dim);margin:10px 0 6px;">往期报告（存于本机）</div>` + reports.map(r => `
     <details class="card" style="padding:10px;margin-bottom:8px;">
       <summary style="cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center;">
-        <span style="font-family:var(--font-mono);color:var(--accent);font-size:0.78rem;white-space:nowrap;">${escHtml(r.range)}</span>
-        <span style="flex:1;font-size:0.72rem;color:var(--text-dim);">${escHtml(r.kind || '周报')} · ${escHtml(r.model || '')} · ${escHtml(r.createdAt || '')}</span>
-        <button class="btn btn-sm btn-danger" onclick="event.preventDefault();deleteAiReport('${escAttr(r.id)}')" style="padding:2px 8px;font-size:0.68rem;" aria-label="删除">${ICON_CLOSE}</button>
+        <span style="font-family:var(--font-mono);color:var(--accent);font-size:var(--fs-sm);white-space:nowrap;">${escHtml(r.range)}</span>
+        <span style="flex:1;font-size:var(--fs-xs);color:var(--text-dim);">${escHtml(r.kind || '周报')} · ${escHtml(r.model || '')} · ${escHtml(r.createdAt || '')}</span>
+        <button class="btn btn-sm btn-danger" onclick="event.preventDefault();deleteAiReport('${escAttr(r.id)}')" style="padding:2px 8px;font-size:var(--fs-2xs);" aria-label="删除">${ICON_CLOSE}</button>
       </summary>
-      <div style="white-space:pre-wrap;font-size:0.8rem;color:var(--text-primary);line-height:1.7;padding:10px 2px 2px;border-top:1px solid var(--border-subtle);margin-top:8px;">${escHtml(r.content)}</div>
+      <div style="white-space:pre-wrap;font-size:var(--fs-sm);color:var(--text-primary);line-height:1.7;padding:10px 2px 2px;border-top:1px solid var(--border-subtle);margin-top:8px;">${escHtml(r.content)}</div>
     </details>`).join('');
 }
 function deleteAiReport(id) {
@@ -5057,14 +5114,16 @@ function showPanel(id) {
 }
 
 // === Toast System ===
-function showToast(msg, type = 'info') {
+// durationMs 可选：默认 2000ms 够看一句短提示；
+// 课表点击展开这类要读一行的场景传长一点（手机上读字更慢）。
+function showToast(msg, type = 'info', durationMs = 2000) {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   toast.textContent = msg;
   container.appendChild(toast);
-  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, 2000);
-  setTimeout(() => toast.remove(), 2500);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; }, durationMs);
+  setTimeout(() => toast.remove(), durationMs + 500);
 }
 
 // === Task Management ===
@@ -5361,11 +5420,11 @@ function renderTasks() {
           <div style="flex:1;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;">
             <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px;"></div>
           </div>
-          <span style="font-size:0.68rem;color:var(--text-dim);white-space:nowrap;">☑ ${stDone}/${st.length} ${expanded ? '▲' : '▼'}</span>
+          <span style="font-size:var(--fs-2xs);color:var(--text-dim);white-space:nowrap;">☑ ${stDone}/${st.length} ${expanded ? '▲' : '▼'}</span>
         </div>
         ${expanded ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px;" onclick="event.stopPropagation();">
           ${st.map((s, i) => `
-            <label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:${s.done ? 'var(--text-dim)' : 'var(--text-secondary)'};cursor:pointer;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);color:${s.done ? 'var(--text-dim)' : 'var(--text-secondary)'};cursor:pointer;">
               <input type="checkbox" ${s.done ? 'checked' : ''} onchange="toggleSubtask('${escAttr(t.id)}', ${i})" style="width:auto;" onclick="event.stopPropagation();">
               <span style="${s.done ? 'text-decoration:line-through;' : ''}">${escHtml(s.title)}</span>
             </label>`).join('')}
@@ -5392,7 +5451,7 @@ function renderTasks() {
         <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteTask('${escAttr(t.id)}'); renderAll();">删除</button>
       </div>
     </div>`;
-  }).join('') || '<div style="color: var(--text-dim); font-size:0.8rem; padding: 8px;">暂无任务，点右上角「+ 新增」开始吧！</div>';
+  }).join('') || '<div style="color: var(--text-dim); font-size:var(--fs-sm); padding: 8px;">暂无任务，点右上角「+ 新增」开始吧！</div>';
 }
 
 // 子任务展开状态（内存级，不持久化）
@@ -5591,10 +5650,10 @@ function renderInvestHistory() {
     const preview = text.length > 60 ? text.slice(0, 60) + '...' : text;
     return `<details class="card" style="padding:10px;margin-bottom:8px;">
       <summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-family:var(--font-mono);font-size:0.78rem;color:var(--accent);">${label}</span>
-        <span style="font-size:0.72rem;color:var(--text-dim);">›</span>
+        <span style="font-family:var(--font-mono);font-size:var(--fs-sm);color:var(--accent);">${label}</span>
+        <span style="font-size:var(--fs-xs);color:var(--text-dim);">›</span>
       </summary>
-      <div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.5;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-subtle);white-space:pre-wrap;">${escHtml(text)}</div>
+      <div style="font-size:var(--fs-sm);color:var(--text-secondary);line-height:1.5;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-subtle);white-space:pre-wrap;">${escHtml(text)}</div>
     </details>`;
   }).join('');
 }
@@ -5637,7 +5696,7 @@ function renderHistory() {
   const list = document.getElementById('history-entries-list');
 
   if (dates.length === 0) {
-    list.innerHTML = '<div style="color:var(--text-dim);font-size:0.88rem;padding:24px;text-align:center;">暂无记录，去「每日」页面开始打卡吧</div>';
+    list.innerHTML = '<div style="color:var(--text-dim);font-size:var(--fs-base);padding:24px;text-align:center;">暂无记录，去「每日」页面开始打卡吧</div>';
     return;
   }
 
@@ -5670,16 +5729,16 @@ function renderHistory() {
     return `<details class="card" style="padding:12px;margin-bottom:10px;">
       <summary style="cursor:pointer;list-style:none;display:flex;gap:12px;align-items:flex-start;">
         <div style="text-align:center;min-width:44px;">
-          <div style="font-family:var(--font-mono);font-size:1.1rem;font-weight:bold;color:${isToday ? 'var(--accent)' : 'var(--text-primary)'};">${month} / ${day}</div>
-          <div style="font-size:0.68rem;color:var(--text-dim);">${weekday}</div>
+          <div style="font-family:var(--font-mono);font-size:var(--fs-lg);font-weight:bold;color:${isToday ? 'var(--accent)' : 'var(--text-primary)'};">${month} / ${day}</div>
+          <div style="font-size:var(--fs-2xs);color:var(--text-dim);">${weekday}</div>
         </div>
         <div style="flex:1;min-width:0;">
-          ${badges ? `<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:0.78rem;color:var(--text-secondary);margin-bottom:4px;">${badges}</div>` : ''}
-          ${journalPreview ? `<div style="font-size:0.8rem;color:var(--text-dim);line-height:1.4;margin-top:4px;">${escJournalText(journalPreview)}</div>` : ''}
+          ${badges ? `<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:var(--fs-sm);color:var(--text-secondary);margin-bottom:4px;">${badges}</div>` : ''}
+          ${journalPreview ? `<div style="font-size:var(--fs-sm);color:var(--text-dim);line-height:1.4;margin-top:4px;">${escJournalText(journalPreview)}</div>` : ''}
         </div>
-        <div style="font-size:0.72rem;color:var(--text-dim);flex-shrink:0;">›</div>
+        <div style="font-size:var(--fs-xs);color:var(--text-dim);flex-shrink:0;">›</div>
       </summary>
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle);font-size:0.8rem;line-height:1.7;color:var(--text-secondary);white-space:pre-wrap;">${escJournalText(buildDayDetail(date))}</div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle);font-size:var(--fs-sm);line-height:1.7;color:var(--text-secondary);white-space:pre-wrap;">${escJournalText(buildDayDetail(date))}</div>
     </details>`;
   }).join('');
 }
@@ -5799,7 +5858,7 @@ function renderWalletHistory() {
 
   const list = document.getElementById('wallet-history-list');
   if (filtered.length === 0) {
-    list.innerHTML = '<div style="color: var(--text-dim); font-size:0.8rem; padding: 16px; text-align: center;">暂无交易记录</div>';
+    list.innerHTML = '<div style="color: var(--text-dim); font-size:var(--fs-sm); padding: 16px; text-align: center;">暂无交易记录</div>';
     return;
   }
 
@@ -5825,7 +5884,7 @@ function renderWalletHistory() {
       <details class="txn-day" ${isToday ? 'open' : ''}>
         <summary class="txn-day-sum">
           <span class="txn-day-label" style="color:${isToday ? 'var(--accent)' : 'var(--text-secondary)'};">${dayLabel} ${dateLabel}</span>
-          <span style="font-size:0.72rem;color:var(--text-dim);font-family:var(--font-mono);">
+          <span style="font-size:var(--fs-xs);color:var(--text-dim);font-family:var(--font-mono);">
             ${dayExp > 0 ? `支 ¥${dayExp.toFixed(1)}` : ''} ${dayInc > 0 ? `收 ¥${dayInc.toFixed(1)}` : ''}
           </span>
         </summary>
@@ -5835,14 +5894,14 @@ function renderWalletHistory() {
               ${t.type === 'expense' ? '↘' : '↗'}
             </div>
             <div style="flex: 1; min-width: 0;">
-              <div style="font-size:0.88rem; color: var(--text-primary);">${t.category || '其他'}${t.note ? ' · ' + t.note : ''}</div>
-              <div style="font-size:0.68rem; color: var(--text-dim); font-family: var(--font-mono);">${timeOf(t.date)}</div>
+              <div style="font-size:var(--fs-base); color: var(--text-primary);">${t.category || '其他'}${t.note ? ' · ' + t.note : ''}</div>
+              <div style="font-size:var(--fs-2xs); color: var(--text-dim); font-family: var(--font-mono);">${timeOf(t.date)}</div>
             </div>
-            <div style="font-size:0.88rem; font-weight: bold; color: ${t.type === 'expense' ? 'var(--expense)' : 'var(--success)'}; font-family: var(--font-mono);">
+            <div style="font-size:var(--fs-base); font-weight: bold; color: ${t.type === 'expense' ? 'var(--expense)' : 'var(--success)'}; font-family: var(--font-mono);">
               ${t.type === 'expense' ? '-' : '+'}¥${t.amount.toFixed(2)}
             </div>
-            <button class="btn btn-sm" onclick="editTransaction('${t.id}')" style="padding: 2px 6px; font-size:0.68rem; flex-shrink: 0;" title="改这笔">改</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${t.id}')" style="padding: 2px 6px; font-size:0.68rem; flex-shrink: 0;" title="删这笔" aria-label="删除">${ICON_CLOSE}</button>
+            <button class="btn btn-sm" onclick="editTransaction('${t.id}')" style="padding: 8px 12px; font-size:var(--fs-2xs); flex-shrink: 0;" aria-label="修改这笔">改</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${t.id}')" style="padding: 8px 12px; font-size:var(--fs-2xs); flex-shrink: 0;" aria-label="删除这笔">${ICON_CLOSE}</button>
           </div>
         `).join('')}
       </details>
@@ -6320,7 +6379,7 @@ function renderInvest() {
   if (!items.length) {
     sumEl.innerHTML = '';
     // 没有投资持仓时，总览卡不显示（没有意义），但流动资金和电子产品照样要能看
-    listEl.innerHTML = `<div class="card" style="padding:20px;text-align:center;color:var(--text-dim);font-size:0.8rem;line-height:1.9;">
+    listEl.innerHTML = `<div class="card" style="padding:20px;text-align:center;color:var(--text-dim);font-size:var(--fs-sm);line-height:1.9;">
       还没有投资持仓。<br>
       点右上角「+ 添加持仓」，把产品页面上的<b style="color:var(--text-secondary);">持有金额</b>和
       <b style="color:var(--text-secondary);">持仓收益</b>抄进来，<br>收益率和回本缺口就自动算出来了。
@@ -6338,16 +6397,16 @@ function renderInvest() {
   let html = `<div class="card" style="padding:16px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;">
       <div>
-        <div style="font-size:0.68rem;color:var(--text-dim);margin-bottom:3px;">总市值</div>
-        <div style="font-size:1.45rem;font-weight:700;font-family:var(--font-mono);color:var(--text-primary);font-variant-numeric:tabular-nums;">¥${fmtAmount(s.value)}</div>
+        <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-bottom:3px;">总市值</div>
+        <div style="font-size:var(--fs-3xl);font-weight:700;font-family:var(--font-mono);color:var(--text-primary);font-variant-numeric:tabular-nums;">¥${fmtAmount(s.value)}</div>
       </div>
       <div style="text-align:right;">
-        <div style="font-size:0.68rem;color:var(--text-dim);margin-bottom:3px;">总盈亏</div>
-        <div style="font-size:0.98rem;font-family:var(--font-mono);color:${tone.color};font-variant-numeric:tabular-nums;">${tone.sign}¥${fmtAmount(Math.abs(s.profit))}</div>
-        <div style="font-size:0.72rem;font-family:var(--font-mono);color:${tone.color};font-variant-numeric:tabular-nums;">${tone.sign}${fmtPct(Math.abs(s.rate))}</div>
+        <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-bottom:3px;">总盈亏</div>
+        <div style="font-size:var(--fs-md);font-family:var(--font-mono);color:${tone.color};font-variant-numeric:tabular-nums;">${tone.sign}¥${fmtAmount(Math.abs(s.profit))}</div>
+        <div style="font-size:var(--fs-xs);font-family:var(--font-mono);color:${tone.color};font-variant-numeric:tabular-nums;">${tone.sign}${fmtPct(Math.abs(s.rate))}</div>
       </div>
     </div>
-    <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-dim);margin-top:12px;padding-top:10px;border-top:1px solid var(--border-subtle);">
+    <div style="display:flex;justify-content:space-between;font-size:var(--fs-xs);color:var(--text-dim);margin-top:12px;padding-top:10px;border-top:1px solid var(--border-subtle);">
       <span>总投入成本 <span style="color:var(--text-secondary);font-family:var(--font-mono);">¥${fmtAmount(s.cost)}</span></span>
       <span>${items.length} 笔持仓</span>
     </div>`;
@@ -6356,14 +6415,14 @@ function renderInvest() {
   if (s.cost > 0 && s.need > 0 && s.value > 0) {
     const pct = Math.max(0, Math.min(100, s.value / s.cost * 100));
     html += `<div style="margin-top:12px;">
-      <div style="display:flex;justify-content:space-between;font-size:0.72rem;margin-bottom:2px;">
+      <div style="display:flex;justify-content:space-between;font-size:var(--fs-xs);margin-bottom:2px;">
         <span style="color:var(--text-dim);">回本进度 ${pct.toFixed(1)}%</span>
         <span style="color:var(--expense);font-family:var(--font-mono);">还差 ¥${fmtAmount(s.need)} · 需涨 ${fmtPct(s.need / s.value)}</span>
       </div>
       <div class="budget-bar"><div class="budget-fill over" style="width:${pct}%;"></div></div>
     </div>`;
   } else if (s.cost > 0) {
-    html += `<div style="margin-top:12px;font-size:0.72rem;color:var(--success);">✓ 已经回本，现在整体是赚的</div>`;
+    html += `<div style="margin-top:12px;font-size:var(--fs-xs);color:var(--success);">✓ 已经回本，现在整体是赚的</div>`;
   }
   html += `</div>`;
   sumEl.innerHTML = html;
@@ -6413,7 +6472,7 @@ function investGroupHtml(def, items, quotes) {
   return `<details class="inv-group">
     <summary class="inv-group-sum">
       <span class="inv-group-head">
-        <span style="font-size:0.88rem;color:var(--text-primary);">${def.label}</span>
+        <span style="font-size:var(--fs-base);color:var(--text-primary);">${def.label}</span>
         <span class="inv-group-num">
           ${items.length} 笔 · ¥${fmtAmount(val)}
           ${cost > 0 ? `<span style="color:${tone.color};">${tone.sign}${fmtPct(Math.abs(profit / cost))}</span>` : ''}
@@ -6456,39 +6515,39 @@ function investItemHtml(it, quotes) {
   // 回本那一行
   let back = '';
   if (c.cost > 0 && c.need > 0 && c.value > 0) {
-    back = `<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border-subtle);font-size:0.74rem;color:var(--expense);font-variant-numeric:tabular-nums;">
+    back = `<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border-subtle);font-size:var(--fs-xs);color:var(--expense);font-variant-numeric:tabular-nums;">
       还差 ¥${fmtAmount(c.need)} 回本 · 需涨 ${fmtPct(c.needPct)}`;
     if (c.days === -1) {
-      back += `<div style="color:var(--text-dim);font-size:0.66rem;margin-top:3px;">近一个月是跌的，按现在的走势谈不上还有几天回本</div>`;
+      back += `<div style="color:var(--text-dim);font-size:var(--fs-2xs);margin-top:3px;">近一个月是跌的，按现在的走势谈不上还有几天回本</div>`;
     } else if (c.days > 0) {
       const shown = c.days > 500 ? '500+ ' : c.days + ' ';
-      back += `<div style="color:var(--text-dim);font-size:0.66rem;margin-top:3px;">按近 30 个交易日速度 ≈ 还要 ${shown}个交易日（外推，不是预测）</div>`;
+      back += `<div style="color:var(--text-dim);font-size:var(--fs-2xs);margin-top:3px;">按近 30 个交易日速度 ≈ 还要 ${shown}个交易日（外推，不是预测）</div>`;
     }
     back += `</div>`;
   } else if (c.cost > 0 && c.profit > 0) {
-    back = `<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border-subtle);font-size:0.74rem;color:var(--success);">已回本，比成本多 ¥${fmtAmount(c.profit)}</div>`;
+    back = `<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border-subtle);font-size:var(--fs-xs);color:var(--success);">已回本，比成本多 ¥${fmtAmount(c.profit)}</div>`;
   }
 
   return `<div class="card" style="padding:14px;margin-bottom:10px;">
     <div style="display:flex;align-items:flex-start;gap:8px;">
       <div style="flex:1;min-width:0;">
-        <div style="font-size:0.9rem;color:var(--text-primary);word-break:break-all;">${escHtml(it.name)}</div>
-        <div style="font-size:0.66rem;color:var(--text-dim);margin-top:3px;">${sub}</div>
+        <div style="font-size:var(--fs-md);color:var(--text-primary);word-break:break-all;">${escHtml(it.name)}</div>
+        <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:3px;">${sub}</div>
       </div>
       <button class="btn btn-sm" style="flex:0 0 auto;white-space:nowrap;" onclick="openInvestEdit('${it.id}')">改</button>
       <button class="btn btn-sm" style="flex:0 0 auto;white-space:nowrap;" onclick="deleteInvest('${it.id}')">删</button>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;">
-      <span style="font-size:1.05rem;color:var(--text-primary);">¥${fmtAmount(c.value)}</span>
-      <span style="font-size:0.85rem;color:${c.cost > 0 ? tone.color : 'var(--text-dim)'};">
+      <span style="font-size:var(--fs-lg);color:var(--text-primary);">¥${fmtAmount(c.value)}</span>
+      <span style="font-size:var(--fs-base);color:${c.cost > 0 ? tone.color : 'var(--text-dim)'};">
         ${c.cost > 0 ? `${tone.sign}¥${fmtAmount(Math.abs(c.profit))}（${tone.sign}${fmtPct(Math.abs(c.rate))}）` : '没填成本，算不了收益率'}
       </span>
     </div>
-    <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:var(--text-dim);margin-top:4px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;">
+    <div style="display:flex;justify-content:space-between;font-size:var(--fs-xs);color:var(--text-dim);margin-top:4px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;">
       <span>成本 ¥${fmtAmount(c.cost)}</span>${shareTxt}
     </div>
     ${back}
-    ${it.note ? `<div style="font-size:0.66rem;color:var(--text-dim);margin-top:6px;">${escHtml(it.note)}</div>` : ''}
+    ${it.note ? `<div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:6px;">${escHtml(it.note)}</div>` : ''}
   </div>`;
 }
 
@@ -6504,31 +6563,31 @@ function cashGroupHtml() {
     ? accts.map(a => {
         if (_editingCashId === a.id) {
           return `<div class="cash-row" style="flex-direction:column;align-items:stretch;gap:8px;padding:8px 14px;">
-            <input id="cash-edit-name" value="${escAttr(a.name)}" placeholder="账户名" style="padding:6px 8px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--bg-card);color:var(--text-primary);font-family:var(--font-sans);font-size:0.82rem;">
+            <input id="cash-edit-name" value="${escAttr(a.name)}" placeholder="账户名" style="padding:6px 8px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--bg-card);color:var(--text-primary);font-family:var(--font-sans);font-size:var(--fs-base);">
             <div style="display:flex;gap:8px;align-items:center;">
-              <input id="cash-edit-amount" type="number" step="0.01" min="0" value="${a.amount}" style="width:120px;padding:6px 8px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--bg-card);color:var(--text-primary);font-family:var(--font-mono);font-size:0.82rem;">
+              <input id="cash-edit-amount" type="number" step="0.01" min="0" value="${a.amount}" style="width:120px;padding:6px 8px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--bg-card);color:var(--text-primary);font-family:var(--font-mono);font-size:var(--fs-base);">
               <button class="btn btn-sm btn-primary" onclick="saveCashAccount('${a.id}')">保存</button>
               <button class="btn btn-sm" onclick="cancelCashAccount()">取消</button>
             </div>
           </div>`;
         }
         return `<div class="cash-row">
-          <span style="font-size:0.78rem;color:var(--text-secondary);word-break:break-all;">${escHtml(a.name)}</span>
+          <span style="font-size:var(--fs-sm);color:var(--text-secondary);word-break:break-all;">${escHtml(a.name)}</span>
           <span style="display:flex;align-items:center;gap:8px;flex:0 0 auto;">
-            <span style="font-size:0.84rem;color:var(--text-primary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;">¥${fmtAmount(a.amount)}</span>
-            <button class="btn btn-sm" style="padding:2px 8px;font-size:0.68rem;" onclick="editCashAccount('${a.id}')">改</button>
-            <button class="btn btn-sm" style="padding:2px 8px;font-size:0.68rem;" onclick="deleteCashAccount('${a.id}')" aria-label="删除账户">删</button>
+            <span style="font-size:var(--fs-base);color:var(--text-primary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;">¥${fmtAmount(a.amount)}</span>
+            <button class="btn btn-sm" style="padding:2px 8px;font-size:var(--fs-2xs);" onclick="editCashAccount('${a.id}')">改</button>
+            <button class="btn btn-sm" style="padding:2px 8px;font-size:var(--fs-2xs);" onclick="deleteCashAccount('${a.id}')" aria-label="删除账户">删</button>
           </span>
         </div>`;
       }).join('')
-    : `<div style="font-size:0.72rem;color:var(--text-dim);padding:8px 14px;line-height:1.8;">
+    : `<div style="font-size:var(--fs-xs);color:var(--text-dim);padding:8px 14px;line-height:1.8;">
         还没有明细。点下面的「+ 加一项」，把每张卡、每个钱包记进来，以后就知道钱在哪。
       </div>`;
 
   return `<details class="inv-group" id="cash-group">
     <summary class="inv-group-sum">
       <span class="inv-group-head">
-        <span style="font-size:0.88rem;color:var(--text-primary);">可用现金</span>
+        <span style="font-size:var(--fs-base);color:var(--text-primary);">可用现金</span>
         <span class="inv-group-num" style="color:var(--text-primary);">¥${fmtAmount(total)}</span>
       </span>
     </summary>
@@ -6661,8 +6720,8 @@ function gadgetGroupHtml() {
       return `<div class="card" style="padding:12px;margin-bottom:8px;">
         <div style="display:flex;align-items:flex-start;gap:8px;">
           <div style="flex:1;min-width:0;">
-            <div style="font-size:0.88rem;color:var(--text-primary);word-break:break-all;">${escHtml(g.name)}</div>
-            <div style="font-size:0.66rem;color:var(--text-dim);margin-top:3px;">
+            <div style="font-size:var(--fs-base);color:var(--text-primary);word-break:break-all;">${escHtml(g.name)}</div>
+            <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:3px;">
               ${g.buyDate ? escHtml(g.buyDate) + ' 买的' : '没记购买日期'}${d ? ` · 已用 ${d} 天` : ''}
             </div>
           </div>
@@ -6670,20 +6729,20 @@ function gadgetGroupHtml() {
           <button class="btn btn-sm" style="flex:0 0 auto;white-space:nowrap;" onclick="deleteGadget('${g.id}')">删</button>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;">
-          <span style="font-size:0.95rem;color:var(--text-primary);">¥${fmtAmount(g.price)}</span>
-          ${per ? `<span style="font-size:0.8rem;color:var(--text-secondary);">日均 ¥${per.toFixed(2)}</span>` : ''}
+          <span style="font-size:var(--fs-md);color:var(--text-primary);">¥${fmtAmount(g.price)}</span>
+          ${per ? `<span style="font-size:var(--fs-sm);color:var(--text-secondary);">日均 ¥${per.toFixed(2)}</span>` : ''}
         </div>
-        ${g.note ? `<div style="font-size:0.66rem;color:var(--text-dim);margin-top:5px;">${escHtml(g.note)}</div>` : ''}
+        ${g.note ? `<div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:5px;">${escHtml(g.note)}</div>` : ''}
       </div>`;
     }).join('')
-    : `<div style="font-size:0.72rem;color:var(--text-dim);padding:8px 14px;line-height:1.8;">
+    : `<div style="font-size:var(--fs-xs);color:var(--text-dim);padding:8px 14px;line-height:1.8;">
         还没有记录。点下面「+ 加一件」，把手机、电脑这些记进来，就知道它们每天摊多少钱。
       </div>`;
 
   return `<details class="inv-group">
     <summary class="inv-group-sum">
       <span class="inv-group-head">
-        <span style="font-size:0.88rem;color:var(--text-primary);">电子资产</span>
+        <span style="font-size:var(--fs-base);color:var(--text-primary);">电子资产</span>
         <span class="inv-group-num">
           ${list.length} 件 · ¥${fmtAmount(total)}${daySum ? ` · 日均 ¥${daySum.toFixed(2)}` : ''}
         </span>
@@ -6943,7 +7002,7 @@ function renderShots() {
   const list = loadShots();
 
   if (!list.length) {
-    el.innerHTML = '<div style="font-size:0.72rem;color:var(--text-dim);padding:8px 0;">还没有截图。' +
+    el.innerHTML = '<div style="font-size:var(--fs-xs);color:var(--text-dim);padding:8px 0;">还没有截图。' +
       '点上面的「传截图」按钮，从相册选持仓页面就行。</div>';
     return;
   }
@@ -6959,13 +7018,13 @@ function renderShots() {
     return `<div style="display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);margin-bottom:8px;">
       <img src="${url}" loading="lazy" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:var(--radius-sm);flex:0 0 auto;background:var(--bg-hover);">
       <div style="flex:1;min-width:0;">
-        <div style="font-size:0.74rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.name)}</div>
-        <div style="font-size:0.64rem;color:var(--text-dim);margin-top:3px;">${tag} · ${kb}${fmtAgo(s.ts)}</div>
+        <div style="font-size:var(--fs-xs);color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.name)}</div>
+        <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:3px;">${tag} · ${kb}${fmtAgo(s.ts)}</div>
       </div>
       <button class="btn btn-sm" style="flex:0 0 auto;white-space:nowrap;" onclick="deleteShot('${s.id}')">删</button>
     </div>`;
   }).join('') + (list.length > 12
-    ? `<div style="font-size:0.66rem;color:var(--text-dim);">还有 ${list.length - 12} 张没显示</div>`
+    ? `<div style="font-size:var(--fs-2xs);color:var(--text-dim);">还有 ${list.length - 12} 张没显示</div>`
     : '');
 }
 
@@ -7285,6 +7344,12 @@ const COURSE_SHORT = {
 };
 function shortCourseName(name) { return COURSE_SHORT[name] || name; }
 
+// 课表格子窄，只放得下短名 + 地点；完整课名和地点在这里用 toast 展开。
+// 为什么不用 title：手机浏览器不显示 tooltip，写了等于没写。
+function showCourseFull(name, location) {
+  showToast(location ? (name + ' @ ' + location) : name, 'info', 3500);
+}
+
 let _coursesCache = null, _coursesCacheKey = '';
 function getCourses() {
   const src = Store.get('courses', DEFAULT_COURSES);
@@ -7463,7 +7528,9 @@ function renderCourseWeek(week) {
     days.forEach((d, i) => {
       const hol = holidayForDate(dates[i]);
       const cs = hol ? [] : getCourses().filter(c => c.day === d && c.section === s && courseMatches(c, week));
-      const inner = cs.map(c => `<div class="week-cell-course" title="${c.name} @ ${c.location}">${shortCourseName(c.name)}<br><span class="week-cell-loc">${c.location || ''}</span></div>`).join('');
+      // 课表格子很窄，显示的是短名 + 地点；完整课名用点击展开，不用 title
+      // （手机浏览器不显示 tooltip，写 title 等于丢失信息）。
+      const inner = cs.map(c => `<div class="week-cell-course" onclick="showCourseFull(&quot;${escAttr(c.name)}&quot;,&quot;${escAttr(c.location || '')}&quot;)" role="button" tabindex="0">${shortCourseName(c.name)}<br><span class="week-cell-loc">${c.location || ''}</span></div>`).join('');
       html += `<div class="week-cell${hol ? ' week-cell-holiday' : ''}">${inner}</div>`;
     });
   }

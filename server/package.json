@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node ../tests/xiangqi-moves.test.js && node ../tests/ai-report.test.js",
+    "test": "node ../tests/xiangqi-moves.test.js && node ../tests/ai-report.test.js && node ../tests/mobile-audit.js",
     "test:smoke": "bash ../tests/smoke-server.sh && bash ../tests/smoke-report.sh && bash ../tests/smoke-hardening.sh"
   },
   "dependencies": {

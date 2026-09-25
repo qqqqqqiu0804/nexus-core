@@ -44,3 +44,7 @@ jobs:
       # --- 安全加固回归：错误不泄漏堆栈 / KV 同毫秒不丢写 / 报告预压缩 ---
       - name: 安全加固回归测试
         run: AUTH_TOKEN=ci-test-token PORT=3997 bash tests/smoke-hardening.sh
+
+      # --- 手机端体验审计：根字号 / 字号令牌 / title / viewport ---
+      - name: 手机端体验审计
+        run: node tests/mobile-audit.js
