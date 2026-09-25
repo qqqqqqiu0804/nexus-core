@@ -1237,6 +1237,13 @@ a { color: var(--accent); text-underline-offset: 2px; }
         <button class="btn btn-primary btn-sm" id="ai-gen-btn" onclick="generateWeeklyReport()"><i data-ic="report" data-size="0.95"></i> 生成周报</button>
       </div>
       <div id="ai-week-output" style="display:none;white-space:pre-wrap;font-size:0.8rem;line-height:1.8;color:var(--text-primary);background:var(--bg-deep);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:12px;max-height:420px;overflow-y:auto;"></div>
+      <!-- 区分两种报告：
+           上面「生成」出来的是本机 Ollama 的文本，存在 aiReports 里（可离线看、会同步）；
+           下面这个是服务端的静态图文版（带图表、排版），只读。两者不含同一份内容，别混淆。 -->
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle);display:flex;align-items:center;gap:8px;">
+        <span style="flex:1;font-size:0.7rem;color:var(--text-dim);line-height:1.6;">图文版月报（带图表，服务端生成）</span>
+        <a class="btn btn-sm" href="/report/" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">查看 ↗</a>
+      </div>
     </div>
     <div id="ai-reports-list"></div>
   </div>
@@ -1311,6 +1318,21 @@ a { color: var(--accent); text-underline-offset: 2px; }
         <div style="flex:1;">
           <div style="font-size:0.88rem;color:var(--text-primary);">高性价比人生指南</div>
           <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px;">花掉什么、换回什么 —— 可筛选的生活决策库</div>
+        </div>
+        <span style="color:var(--text-dim);font-size:0.78rem;">↗</span>
+      </div>
+    </a>
+
+    <!-- AI 月报 / 周报（服务端 /report，纯静态只读页）
+         放在「我的」里，和书库、指南并列，手机可直接点进来，不用手输网址。
+         注：报告是 /report 下的静态 HTML，不是主应用的面板，所以用普通外链。 -->
+    <a class="card" id="report-entry" href="/report/" target="_blank" rel="noopener noreferrer"
+       style="cursor:pointer;padding:14px;margin-bottom:16px;display:block;text-decoration:none;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span class="icn" style="width:1.4rem;height:1.4rem;color:var(--accent);"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><path d="M4 19V5M4 19h16M8 16V9M12.5 16v-4M17 16V7"/></svg></span>
+        <div style="flex:1;">
+          <div style="font-size:0.88rem;color:var(--text-primary);">月报 / 周报</div>
+          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:2px;">记账、投资、任务、日记的趋势汇总</div>
         </div>
         <span style="color:var(--text-dim);font-size:0.78rem;">↗</span>
       </div>
@@ -6985,6 +7007,17 @@ function renderSettings() {
 
   // 视频收藏条目数
   updateVideoEntryCount();
+
+  // 月报入口：指向「服务器」而不是「当前页面」。
+  // 原因：这个应用可能从 GitHub Pages / IP / 域名等多个来源打开，
+  // 而报告只存在于服务端。同源时它是相对路径，跨源时必须补上 serverBase，
+  // 否则点过去会 404（在 gh-pages 上必踩）。地址没配就退回相对路径，
+  // 至少同源访问是对的。
+  const rep = document.getElementById('report-entry');
+  if (rep) {
+    const b = serverCfg().base;
+    rep.href = b ? b + '/report/' : '/report/';
+  }
 
   // 服务器连接回填 + 状态
   syncServerFields();
