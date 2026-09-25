@@ -52,3 +52,7 @@ jobs:
       # --- pm2 配置不变量：换机器能不能把服务起回来，全靠这个文件 ---
       - name: pm2 配置测试
         run: node tests/ecosystem-config.test.js
+
+      # --- 六项安全修复的防回归：被改回去就立刻红 ---
+      - name: 安全防回归测试
+        run: node tests/security-regression.test.js
