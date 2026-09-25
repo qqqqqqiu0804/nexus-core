@@ -82,6 +82,27 @@
   /* 常用衍生 */
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --accent-line: color-mix(in srgb, var(--accent) 35%, transparent);
+
+  /*
+   * === 象棋盘专属配色 ===
+   * 全部取自参考图原图实测（sharp 逐像素采样），不是目测。改之前先想清楚：
+   *   - 石面是「灰绿」不是冷灰，用 --bg-panel 会变成网格纸；
+   *   - 刻痕对比度刻意压得极低（亮 #b7baa5 vs 底 #acb099，ΔL≈3%），高了就成了描边格子；
+   *   - 黑子是暖黑 #241a12、红子是朱砂 #a8231f，不能用 --text-primary / --expense，
+   *     后两者是冷灰和粉红，放棋盘上是贴纸感。
+   */
+  --xq-stone: #acb099;        /* 石面亮部 */
+  --xq-stone-dark: #8b9980;   /* 石面暗部 / 边缘 */
+  --xq-groove: #7c816a;       /* 刻痕阴影（凹） */
+  --xq-groove-hi: #b7baa5;    /* 刻痕受光（凸） */
+  --xq-coin-face: #ffe3a3;    /* 棋子面中心（琥珀） */
+  --xq-coin-edge: #e0bc82;    /* 棋子面外沿 */
+  --xq-coin-side: #b8873f;    /* 棋子厚度（侧面） */
+  --xq-coin-rim: #fde2ac;     /* 金色外圈 */
+  --xq-coin-shadow: rgba(38, 46, 32, 0.45);
+  --xq-red-ink: #a8231f;      /* 红方字色（朱砂） */
+  --xq-black-ink: #241a12;    /* 黑方字色（暖黑） */
+  --xq-sel-ring: #ffcf5c;     /* 选中外环 */
 }
 
 /* Light Mode — 纸白 */
@@ -471,73 +492,278 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .en-sent-en { font-size:var(--fs-base); color: var(--text-primary); line-height: 1.5; }
 .en-sent-zh { margin-top: 3px; font-size:var(--fs-sm); color: var(--text-secondary); }
 /* === 每日残局 === */
-.xq-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.xq-name { font-size:var(--fs-base); font-weight: 600; color: var(--text-primary); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.xq-turn { font-size:var(--fs-xs); color: var(--text-dim); flex: none; }
-.xq-turn.is-red { color: var(--expense); }
-.xq-lvs { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
-.xq-tiers { display: flex; gap: 6px; margin-bottom: 8px; }
-.xq-tier {
-  flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 4px;
-  padding: 7px 4px; border-radius: 8px; cursor: pointer;
-  font-size:var(--fs-xs); color: var(--text-secondary);
-  border: 1px solid var(--border-subtle); background: var(--bg-panel);
+/*
+ * 视觉层复刻自参考图（实测数据见 docs/CHESS-UI-REDESIGN.md）。
+ * 三层结构：信息卡 → 关卡导航 → 棋盘 → 操作行。
+ * 手机上从上往下是「看局面 → 选关 → 走子 → 操作」，拇指够得到的顺序。
+ */
+
+/* --- 顶部信息卡：金环头像 + 关卡信息 + 手数，对应参考图的玩家条 --- */
+.xq-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; margin-bottom: 8px;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--xq-stone) 20%, var(--bg-panel)),
+    color-mix(in srgb, var(--xq-stone-dark) 14%, var(--bg-panel)));
+  border: 1px solid color-mix(in srgb, var(--xq-coin-side) 22%, var(--border-subtle));
 }
-.xq-tier.cur { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
-.xq-tier-n { font-family: var(--font-mono); font-size:var(--fs-2xs); opacity: 0.75; }
-.xq-goal { margin-left: auto; align-self: center; font-size:var(--fs-xs); color: var(--text-dim); }
-.xq-lv {
-  width: 22px; height: 22px; border-radius: 50%; flex: none; cursor: pointer;
+/* 金环头像位：纯 CSS 画的金环 + 朱砂「帅」，不引外部图片（守住零依赖） */
+.xq-avatar {
+  width: 44px; height: 44px; flex: none; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-size:var(--fs-2xs);
+  font-size: var(--fs-xl); font-weight: 700; line-height: 1;
+  color: var(--xq-red-ink);
+  background: radial-gradient(circle at 36% 30%, #fff6e2 0%, var(--xq-coin-edge) 68%, var(--xq-coin-side) 100%);
+  box-shadow:
+    0 0 0 2px var(--xq-coin-rim),
+    0 0 0 3px var(--xq-coin-side),
+    0 2px 6px var(--xq-coin-shadow);
+}
+.xq-bar-text { flex: 1 1 auto; min-width: 0; }
+.xq-name {
+  font-size: var(--fs-base); font-weight: 600; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.xq-turn { font-size: var(--fs-xs); color: var(--text-dim); margin-top: 1px; }
+.xq-turn.is-red { color: var(--xq-red-ink); }
+
+/* --- 关卡导航 ---
+ * 三行横向排布：难度切换 / 关卡号 / 操作按钮。
+ * 这三行都是 flex 横排且子项不可折行，所以有两类风险：
+ *
+ * ① 窄屏放不下。实测 375px 与 320px（iPhone SE）都刚好放得下，三连难度各 ~102px、
+ *    五个操作各 ~59px，都在可用宽度内。但这是**当前文案长度**下的结论，
+ *    关卡名一旦变长、或用户把浏览器默认字号调大，就会撑破。所以加上
+ *    flex-wrap: wrap（放不下就换行，而不是溢出）+ min-width: 0（允许容器被压窄）
+ *    + 子项 ellipsis 收口，作为兜底 —— 正常字号下这三条都不会被触发。
+ *
+ * ② 测「窄屏有没有溢出」时别只看截图。Edge headless 这个构建会把 --window-size
+ *    小于 ~500px 的窗口钳到 492px，于是「375px 的截图」其实是在裁一张 492px 宽的
+ *    版心，看起来就像内容溢出被切了。要量真实窄屏版心，用 iframe 指定精确宽度，
+ *    或直接读 innerWidth 核对 —— 不要相信窄窗截图。
+ */
+.xq-lvs { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; min-width: 0; }
+.xq-tiers { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; min-width: 0; }
+.xq-tier {
+  flex: 1 1 0; min-width: 0; min-height: 44px;      /* 铁律：可点元素 ≥44px */
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 7px 4px; border-radius: var(--radius-sm); cursor: pointer;
+  font-size: var(--fs-xs); color: var(--text-secondary);
+  border: 1px solid var(--border-subtle); background: var(--bg-panel);
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.xq-tier.cur {
+  color: var(--xq-coin-side); border-color: var(--xq-coin-side);
+  background: color-mix(in srgb, var(--xq-coin-face) 22%, transparent);
+  font-weight: 600;
+}
+.xq-tier-n { font-family: var(--font-mono); font-size: var(--fs-2xs); opacity: 0.75; }
+.xq-lv {
+  width: 28px; height: 28px; border-radius: 50%; flex: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: var(--fs-2xs);
   color: var(--text-dim); border: 1px solid var(--border-subtle); background: var(--bg-panel);
+  -webkit-tap-highlight-color: transparent;
 }
 .xq-lv.done { color: var(--success); border-color: color-mix(in srgb, var(--success) 45%, transparent); }
-.xq-lv.cur { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); font-weight: 700; }
-.xq-ops { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
-.xq-done.xq-bad { color: var(--expense); }
+.xq-lv.cur {
+  color: var(--xq-coin-side); border-color: var(--xq-coin-side);
+  background: color-mix(in srgb, var(--xq-coin-face) 26%, transparent); font-weight: 700;
+}
+
 /*
- * 棋盘：8 格宽 × 9 格高（格子近似正方），棋子落在**交叉点**上而不是格子里——
- * 这是象棋盘和「棋子阵列」的区别。SVG 画线、DOM 放子，两者共用 0..8 / 0..9 的格子坐标。
+ * --- 操作行 ---
+ * 参考图是「方底 + 金图标 + 下方 12px 标签」的横向排列，这里保留该形制。
+ * 残局模式只保留有意义的 5 个（自由对弈的沙盘/翻转/关闭AI 在闯关里是死按钮，不放）。
+ * grid 五等分：375px 屏上单格 ≈62px，仍然 > 44px，满足触控下限。
+ * 用 minmax(0,1fr) 而不是 1fr —— 1fr 的隐含最小值是 auto（= 内容宽），
+ * 遇到「下一关」这种三字标签格宽撑不住时不会收缩；minmax(0,1fr) 才允许压到 0。
+ * min-width:0 让这个 grid 容器本身也能被父级压窄（窄屏兜底）。
+ */
+.xq-ops {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px; margin-bottom: 8px; min-width: 0;
+}
+.xq-op {
+  min-height: 44px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 1px;
+  padding: 5px 2px; border-radius: var(--radius-sm); cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--xq-coin-side) 26%, var(--border-subtle));
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--xq-coin-face) 14%, var(--bg-panel)),
+    color-mix(in srgb, var(--xq-coin-side) 10%, var(--bg-panel)));
+  color: var(--xq-coin-side); -webkit-tap-highlight-color: transparent;
+}
+.xq-op:disabled { opacity: 0.38; cursor: default; }
+.xq-op-label { font-size: var(--fs-2xs); color: var(--text-secondary); line-height: 1.2; }
+.xq-op:disabled .xq-op-label { color: var(--text-dim); }
+
+/*
+ * --- 棋盘 ---
+ * 8 格宽 × 9 格高，棋子落在**交叉点**上而不是格子里 —— 这是象棋盘和「棋子阵列」的区别。
+ * SVG 画线、DOM 放子，两者共用 0..8 / 0..9 的格子坐标。
+ *
+ * 布局构造（这里绕了几个弯，务必先读懂再改）：
+ *   .xq-board 用 display:flex + padding 定义「石边」，.xq-plane 作为唯一的 flex 子项
+ *   自动撑满内容盒 —— 不写 position:absolute、不写百分比 inset。
+ *
+ *   为什么不那么干（两个都踩过）：
+ *   • 子元素 height:100% + 父元素 aspect-ratio + 百分比 padding → 循环依赖，
+ *     浏览器退化成忽略 padding，坐标面比内容盒高，边线上的棋子被切掉半个。
+ *   • 绝对定位 + inset:7%（百分比）的百分比解析基准是包含块的 padding box，
+ *     和「棋盘外框」不是一回事，实测偏了 6px，0 行的棋子照样被上边框切掉。
+ *   flex 撑满没有这两个问题：内容盒在布局阶段就有确定尺寸，百分比高度不再循环。
+ *
+ * 比例推导（改 padding 就必须重算）：
+ *   坐标面宽 = W − 6%−6% = 0.88W，高 = H − 7%−8% = 0.85H，
+ *   格距比 X:Y = (0.88W/8) : (0.85H/9) = H/W × 0.9659。
+ *   参考图实测 X:Y = 1 : 1.085，反解 H/W = 1.085 × (0.88/0.85) × (9/8) = 1.2637。
+ *   实测 8/10.11 只能得到 1.125（差 3.7%），修正到 8 / 9.75 ——
+ *   这个数字是**量出来的**，不是推的；改 padding 或改棋盘宽度后必须重新量。
+ *   上边距 7% 是下限：0 行棋子中心压在坐标面顶边，半个棋子宽 5.625% 会伸进石边，
+ *   7% > 5.625% 才切不到（实测 clipT 从 −12.9px 变成 +6.8px）。
  */
 .xq-board {
-  position: relative; width: 100%; aspect-ratio: 8 / 9; padding: 6%;
-  background: color-mix(in srgb, var(--bg-panel) 92%, var(--accent) 8%);
-  border: 1px solid var(--border-subtle); border-radius: 10px; box-sizing: border-box;
+  display: flex;
+  position: relative; width: 100%;
+  aspect-ratio: 8 / 9.75;
+  padding: 7% 6% 8%;
+  border-radius: 12px; box-sizing: border-box;
+  background:
+    radial-gradient(125% 85% at 50% 0%,
+      color-mix(in srgb, var(--xq-stone) 94%, #fff) 0%, transparent 68%),
+    linear-gradient(160deg, var(--xq-stone), var(--xq-stone-dark));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.30),
+    inset 0 -2px 7px rgba(0, 0, 0, 0.20),
+    0 2px 8px rgba(0, 0, 0, 0.16);
+  touch-action: manipulation;   /* 去掉手机双击缩放的 300ms 延迟 */
 }
-.xq-plane { position: relative; width: 100%; height: 100%; color: color-mix(in srgb, var(--text-dim) 55%, transparent); }
+/* 坐标面 = 棋盘内容盒，靠 flex 自动撑满，不参与任何百分比高度/偏移的循环计算 */
+.xq-plane { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; }
 /*
- * SVG 必须让开指针：落点就压在线上，否则点空交叉点命中的是 <line>，事件被吃掉。
- * 棋盘的可点击性全靠下面那层 .xq-hit 热区（全 90 个交叉点各一个，铺在最上层）。
+ * 网格 SVG 必须显式给 width/height —— SVG 是「替换元素」，有内禀比例，
+ * 只写 inset:0 它会按 viewBox 的比例自己算高度（实测矮了 45px），网格线与棋子整体错位。
+ * 父元素 .xq-plane 在 flex 布局里已有确定尺寸，百分比高度可以安全解析。
  */
-.xq-plane > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.xq-plane > svg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  display: block; pointer-events: none;
+}
+/*
+ * 棋盘刻痕：同一个 <g> 画两遍（见 xqGridSvg）。
+ * 颜色/线宽只能写在 CSS 里 —— 写成 SVG 的 stroke="var(--x)" 表现属性，
+ * Edge/Safari 解析不了变量会把整条线丢掉，棋盘会变成一张白板。
+ */
+.xq-groove {
+  fill: none; stroke: var(--xq-groove); stroke-width: 1.7;
+  transform: translate(0, 0.009);
+}
+.xq-ridge {
+  fill: none; stroke: var(--xq-groove-hi); stroke-width: 1;
+}
+.xq-groove line, .xq-ridge line { vector-effect: non-scaling-stroke; }
+/*
+ * 交叉点热区。
+ * 尺寸取 16%（> 格距 12.5%）让相邻热区**互相重叠**：手指落在两格中间时，
+ * 后渲染的那个（DOM 顺序靠后）赢，等价于吸附到最近的交叉点。
+ * 为什么不取刚好的 12.5%：390px 屏上 12.5% 只有 36px、375px 屏上 35px，
+ * 都低于 44px 的触控下限，手指会频繁点空。16% 在 375px 屏上约 44px，刚好达标。
+ * 重叠部分由 z-index 自然裁决，不会出现「点不到」的死区。
+ * 必须渲染在棋子之后压在最上层 —— SVG 的线让开了指针，空交叉点底下没有任何元素，
+ * 没有这层就点不动（棋子本身不挂 onclick，避免同一次触摸双触发）。
+ */
 .xq-hit {
-  position: absolute; width: 12.5%; aspect-ratio: 1; transform: translate(-50%, -50%);
+  position: absolute; width: 16%; aspect-ratio: 1; transform: translate(-50%, -50%);
   z-index: 3; cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
+
+/* --- 楚河汉界：半透明胶囊 + 字，对应参考图中部那枚横贯的浅色条 --- */
 .xq-river {
   position: absolute; left: 0; right: 0; top: 44.44%; transform: translateY(-50%);
-  display: flex; justify-content: space-evenly; pointer-events: none;
-  font-size:var(--fs-xs); letter-spacing: 0.28em; color: var(--text-dim); opacity: 0.75;
+  display: flex; justify-content: center; gap: 8%; pointer-events: none;
 }
+.xq-river span {
+  padding: 1px 10px; border-radius: 999px;
+  background: color-mix(in srgb, var(--xq-stone-dark) 50%, transparent);
+  border: 1px solid color-mix(in srgb, var(--xq-groove-hi) 42%, transparent);
+  font-size: var(--fs-xs); letter-spacing: 0.3em; text-indent: 0.3em;
+  color: color-mix(in srgb, var(--xq-groove) 88%, #4e5340);
+}
+
+/*
+ * --- 棋子：三层圆盘 ---
+ * 参考图的立体感来自三层叠加，缺一层就塌：
+ *   ① 金色外圈（border）  ② 琥珀径向渐变的面（background）  ③ 底部厚度色（第一层 box-shadow）
+ * 直径取格距(12.5%)的 0.90 = 11.25%：参考图实测是 0.917，留 2% 手感余量避免相邻子黏连。
+ * pointer-events: none —— 落子统一走 .xq-hit，避免同一次触摸双触发。
+ */
 .xq-p {
-  position: absolute; width: 9.6%; aspect-ratio: 1; transform: translate(-50%, -50%);
+  position: absolute; width: 11.25%; aspect-ratio: 1; transform: translate(-50%, -50%);
   display: flex; align-items: center; justify-content: center;
-  border-radius: 50%; border: 1.5px solid; background: var(--bg-card);
-  font-size:var(--fs-sm); font-weight: 600; cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  border-radius: 50%;
+  font-size: var(--fs-lg); font-weight: 700; line-height: 1;
+  pointer-events: none;
+  border: 1.5px solid var(--xq-coin-rim);
+  background: radial-gradient(circle at 34% 28%,
+    var(--xq-coin-face) 0%, #ffdb9b 40%, var(--xq-coin-edge) 76%, var(--xq-coin-side) 100%);
+  box-shadow:
+    0 2px 0 var(--xq-coin-side),
+    0 3px 7px var(--xq-coin-shadow),
+    inset 0 -2px 4px rgba(140, 96, 32, 0.32),
+    inset 0 1px 2px rgba(255, 255, 255, 0.55);
 }
-.xq-p.red { color: var(--expense); border-color: color-mix(in srgb, var(--expense) 55%, transparent); }
-.xq-p.black { color: var(--text-primary); border-color: color-mix(in srgb, var(--text-primary) 40%, transparent); }
-.xq-p.sel { box-shadow: 0 0 0 2px var(--accent), 0 1px 3px rgba(0,0,0,0.2); }
-.xq-p.last { box-shadow: 0 0 0 2px color-mix(in srgb, var(--orange) 60%, transparent); }
+/* 内圈刻线：参考图每枚子都有一圈细环 */
+.xq-p::after {
+  content: ''; position: absolute; inset: 9%;
+  border-radius: 50%; border: 1px solid currentColor; opacity: 0.42;
+}
+.xq-p.red { color: var(--xq-red-ink); }
+.xq-p.black { color: var(--xq-black-ink); }
+/*
+ * 选中 / 上一步：用独立的 ::before 外环，不去覆盖 box-shadow。
+ * 覆盖 box-shadow 会把「厚度 + 落地阴影」一起吃掉，棋子会瞬间变平。
+ */
+.xq-p.sel::before, .xq-p.last::before {
+  content: ''; position: absolute; inset: -16%; border-radius: 50%;
+  border: 2px solid var(--xq-sel-ring);
+  box-shadow: 0 0 8px rgba(255, 207, 92, 0.6);
+}
+.xq-p.last::before {
+  border-color: color-mix(in srgb, var(--orange) 72%, transparent);
+  box-shadow: none; opacity: 0.85;
+}
+
+/* --- 落点提示 --- */
 .xq-hint {
   position: absolute; width: 4.6%; aspect-ratio: 1; transform: translate(-50%, -50%);
-  border-radius: 50%; background: var(--success); opacity: 0.5; pointer-events: none;
+  border-radius: 50%; background: var(--xq-black-ink); opacity: 0.32; pointer-events: none;
 }
-.xq-hint.cap { width: 9%; background: var(--expense); opacity: 0.42; }
-.xq-tip { margin-top: 8px; font-size:var(--fs-xs); color: var(--text-dim); line-height: 1.55; }
-.xq-done { margin-top: 6px; font-size:var(--fs-base); font-weight: 600; color: var(--success); }
+.xq-hint.cap {
+  width: 11.25%; background: none; opacity: 1;
+  border: 2px dashed color-mix(in srgb, var(--xq-red-ink) 80%, transparent);
+}
+.xq-tip { margin-top: 8px; font-size: var(--fs-xs); color: var(--text-dim); line-height: 1.55; }
+.xq-done { margin-top: 6px; font-size: var(--fs-base); font-weight: 600; color: var(--success); }
+.xq-done.xq-bad { color: var(--danger); }
+.xq-side { min-width: 0; }
+/*
+ * --- 响应式 ---
+ * 手机（默认）：单列，棋盘满宽 —— 这是主要场景，其余断点都是为了让手机端不变差而存在。
+ * ≥560px：棋盘限宽居中。平板/桌面上棋盘若拉到 900px 宽，单枚棋子会被放大到 110px，
+ *         失去「盘」的比例感，且眼睛在盘面上来回移动的距离过远，反而比手机更难下。
+ * ≥900px：棋盘与讲解左右分栏（.xq-wrap），把纵向空间省下来给棋盘。
+ */
+@media (min-width: 560px) {
+  .xq-board { max-width: 420px; margin-inline: auto; }
+  .xq-ops { max-width: 420px; margin-inline: auto; }
+}
+@media (min-width: 900px) {
+  .xq-wrap { display: grid; grid-template-columns: 420px 1fr; gap: 16px; align-items: start; }
+  .xq-board, .xq-ops { margin-inline: 0; }
+}
 .history-filter.active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 
 /* === Bottom Tab Bar === */
@@ -3778,6 +4004,14 @@ let _xqState = null;
 
 // 棋盘底图：10 条横线 + 9 条竖线（中段断开成楚河汉界）+ 两处九宫斜线。
 // 坐标与棋子层共用 0..8 / 0..9，所以线正好穿过棋子圆心。
+//
+// 刻痕效果：同一条线画两遍 —— 深色（凹槽）下移 0.009，亮色（受光棱）留在原位。
+// 实测参考图的网格线对比度极低（亮 #b7baa5 vs 底色 #acb099，ΔL≈3%）：
+// 单画一条深色线会变成「网格纸」，单画一条亮线会变成「描边」，必须成对。
+//
+// 注意：颜色写在 CSS 类里，不写 stroke="var(--xq-groove)"。
+// SVG 的**表现属性**（presentation attribute）在 Edge/Safari 上解析不了 CSS 变量，
+// 会让整条线变成 none —— 也就是「线彻底消失」。必须走 CSS 规则，别贪这一行的方便。
 function xqGridSvg() {
   const parts = [];
   for (let y = 0; y <= 9; y++) parts.push('<line x1="0" y1="' + y + '" x2="8" y2="' + y + '"/>');
@@ -3787,9 +4021,10 @@ function xqGridSvg() {
   }
   parts.push('<line x1="3" y1="0" x2="5" y2="2"/><line x1="5" y1="0" x2="3" y2="2"/>');
   parts.push('<line x1="3" y1="7" x2="5" y2="9"/><line x1="5" y1="7" x2="3" y2="9"/>');
+  const d = parts.join('');
   return '<svg viewBox="-0.015 -0.015 8.03 9.03" preserveAspectRatio="none" aria-hidden="true">' +
-    '<g fill="none" stroke="currentColor" stroke-width="1" vector-effect="non-scaling-stroke">' +
-    parts.join('') + '</g></svg>';
+    '<g class="xq-groove">' + d + '</g>' +
+    '<g class="xq-ridge">' + d + '</g></svg>';
 }
 
 // 某一方是否还有合法着法。没有 = 被将死或困毙（中国象棋两者都判负）。
@@ -4027,22 +4262,34 @@ function renderDailyChess() {
   const status = st.done === 'win' ? '已通关'
     : '第 ' + (st.used + 1) + ' 手 / 共 ' + lv.m + ' 手';
 
+  // 操作行：图标 + 标签。对应参考图的六按钮形制，但只保留残局模式下有意义的五个
+  // （沙盘/翻转/关闭AI 是自由对弈概念，放这里就是死按钮，不如不放）。
+  // 上一关/下一关原来是 bar 里的 ‹ ›，挪下来是因为拇指在屏幕下半区，
+  // 放在棋盘下方比顶部更好按 —— 这是手机端优先的直接结果。
+  const opBtn = function (icon, label, onclick, disabled) {
+    return '<button class="xq-op" onclick="' + onclick + '"' + (disabled ? ' disabled' : '') +
+      ' aria-label="' + label + '">' + mkIcon(icon, 1.15) +
+      '<span class="xq-op-label">' + label + '</span></button>';
+  };
+
   let html = '<div class="xq-bar">' +
-    '<button class="btn btn-sm" onclick="xqLevel(-1)"' + (_xqLevel ? '' : ' disabled') + '>‹</button>' +
-    '<span class="xq-name">第 ' + (_xqLevel + 1) + ' 关 · ' + escHtml(lv.s) + '</span>' +
-    '<span class="xq-turn' + (st.turn === 'r' ? ' is-red' : '') + '">' + status + '</span>' +
-    '<button class="btn btn-sm" onclick="xqLevel(1)"' + (_xqLevel < XIANGQI_LEVELS.length - 1 ? '' : ' disabled') + '>›</button>' +
+    '<span class="xq-avatar" aria-hidden="true">帅</span>' +
+    '<span class="xq-bar-text">' +
+      '<div class="xq-name">第 ' + (_xqLevel + 1) + ' 关 · ' + escHtml(lv.s) + '</div>' +
+      '<div class="xq-turn' + (st.turn === 'r' ? ' is-red' : '') + '">' + escHtml(status) + '</div>' +
+    '</span>' +
     '</div>' +
     '<div class="xq-tiers">' + chips + '</div>' +
     '<div class="xq-lvs">' + grid + '</div>' +
     '<div class="xq-ops">' +
-      '<button class="btn btn-sm" onclick="xqHint()"' + (st.done ? ' disabled' : '') + '>' + mkIcon('thought', 0.8) + '提示</button>' +
-      '<button class="btn btn-sm" onclick="xqUndo()"' + (st.history.length ? '' : ' disabled') + '>悔棋</button>' +
-      '<button class="btn btn-sm" onclick="xqReset()">重摆</button>' +
-      '<span class="xq-goal">' + lv.m + ' 步内将死黑方</span>' +
+      opBtn('thought', '提示', 'xqHint()', !!st.done) +
+      opBtn('undo', '悔棋', 'xqUndo()', !st.history.length) +
+      opBtn('redo', '重摆', 'xqReset()', false) +
+      opBtn('prev', '上一关', 'xqLevel(-1)', !_xqLevel) +
+      opBtn('next', '下一关', 'xqLevel(1)', _xqLevel >= XIANGQI_LEVELS.length - 1) +
     '</div>';
 
-  html += '<div class="xq-board"><div class="xq-plane">' + xqGridSvg() +
+  html += '<div class="xq-wrap"><div class="xq-board"><div class="xq-plane">' + xqGridSvg() +
     '<div class="xq-river"><span>楚 河</span><span>汉 界</span></div>';
 
   // 可走落点画在棋子下面：空点直接可见，可吃子的位置露出偏红的圈
@@ -4073,8 +4320,10 @@ function renderDailyChess() {
         '" onclick="xqTap(' + x + ',' + y + ')"></div>';
     }
   }
-  html += '</div></div>';
+  html += '</div></div>';   // .xq-board / .xq-plane
 
+  // 结果 + 讲解放在棋盘右侧（≥900px 时），手机上自动落到棋盘下方
+  html += '<div class="xq-side">';
   if (st.done === 'win') {
     html += '<div class="xq-done">' + mkIcon('check', 0.85) + ' 通关！' +
       (lv.m > 1 ? ' ' + lv.m + ' 步杀。' : '') + '</div>';
@@ -4084,6 +4333,7 @@ function renderDailyChess() {
 
   const tipText = lv.tip || (tier.hint + '。' + (lv.m > 1 ? '出自对局：' + lv.s : ''));
   html += '<div class="xq-tip">' + mkIcon('thought', 0.8) + ' ' + escHtml(tipText) + '</div>';
+  html += '</div></div>';   // .xq-side / .xq-wrap
   box.innerHTML = html;
 }
 
@@ -5795,7 +6045,12 @@ const ICONSET = {
   play:    '<circle cx="12" cy="12" r="8.5"/><path d="M10 8.5l5 3.5-5 3.5z"/>',
   link:    '<path d="M9 15l6-6M10 7.5 11.5 6a4 4 0 0 1 5.7 5.7L15.7 13M14 16.5 12.5 18a4 4 0 0 1-5.7-5.7L8.3 11"/>',
   pin:     '<path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/>',
-  close:   '<path d="M6 6l12 12M18 6L6 18"/>'
+  close:   '<path d="M6 6l12 12M18 6L6 18"/>',
+  // 象棋操作行专用（对应参考图的图标语义）
+  undo:    '<path d="M4 9h11a5 5 0 0 1 0 10h-5"/><path d="M8 5 4 9l4 4"/>',
+  redo:    '<path d="M20 9H9a5 5 0 0 0 0 10h5"/><path d="M16 5l4 4-4 4"/>',
+  prev:    '<path d="M15 5 8 12l7 7"/>',
+  next:    '<path d="M9 5l7 7-7 7"/>'
 };
 const ICON_CLOSE = mkIcon('close', 0.9);
 function mkIcon(name, size, accent) {
