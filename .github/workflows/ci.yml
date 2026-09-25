@@ -48,3 +48,7 @@ jobs:
       # --- 手机端体验审计：根字号 / 字号令牌 / title / viewport ---
       - name: 手机端体验审计
         run: node tests/mobile-audit.js
+
+      # --- pm2 配置不变量：换机器能不能把服务起回来，全靠这个文件 ---
+      - name: pm2 配置测试
+        run: node tests/ecosystem-config.test.js

@@ -30,9 +30,13 @@ if (!TOKEN) {
   console.error('[启动失败] 请设置 AUTH_TOKEN 环境变量（自己编一个长随机串）');
   process.exit(1);
 }
-// GitHub Pages 的页面是 HTTPS，调本机 HTTP API 属于跨域，需要后端明确放行
-// 允许的来源，逗号分隔可配多个：Pages 页面、服务器 IP、域名（HTTP/HTTPS）都算跨域来源
-const CORS_ORIGINS = (process.env.CORS_ORIGIN || 'https://qqqqqqiu0804.github.io')
+// CORS 白名单：逗号分隔可配多个。
+// 只有「从 A 域名打开的页面去调 B 域名的 API」才算跨域，同源访问根本不受影响。
+// 主入口是 https://nexus.kotete.xyz（手机直接打开它，同源，用不到 CORS），
+// 下面这些是「从别的域名/IP 打开页面但连这台服务器」的场景。
+// 2026-09-26 移除了 https://qqqqqqiu0804.github.io —— GitHub Pages 已不再使用。
+// 若哪天又用 Pages 部署前端，把它加回 CORS_ORIGIN 环境变量即可，不用改代码。
+const CORS_ORIGINS = (process.env.CORS_ORIGIN || 'https://nexus.kotete.xyz')
   .split(',').map(s => s.trim()).filter(Boolean);
 // SSE 端点要手动写响应头，这里挑出与请求匹配的来源
 function allowedOrigin(req) {

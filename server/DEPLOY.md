@@ -119,39 +119,55 @@ cd nexus-core/server
 npm install --omit=dev
 ```
 
-### 4.1 用 ecosystem 文件管理配置（别把 token 写进命令行历史）
+### 4.1 配置：仓库里的 ecosystem.config.js + 本地 .env
 
-创建 `~/nexus-core/server/ecosystem.config.js`：
+**配置文件本身已经入库**（`nexus-core/ecosystem.config.js`），你不必再手写。
+密钥不写在配置文件里，而是放在**不入库**的 `server/.env`：
 
-```js
-module.exports = {
-  apps: [{
-    name: 'nexus-api',
-    script: 'server.js',
-    env: {
-      PORT: 3458,   # 后端 Node 进程；Nginx 对外监听 3457 并反代到这里
-      AUTH_TOKEN: '把这里换成你自己的长随机串',
-      CORS_ORIGIN: 'https://qqqqqqiu0804.github.io'
-    }
-  }]
-};
+```bash
+cd ~/nexus-core/server
+cp .env.example .env          # 模板里 AUTH_TOKEN 是空的
+```
+
+然后编辑 `server/.env`，只填一行：
+
+```ini
+AUTH_TOKEN=<64位随机十六进制>
 ```
 
 生成一个靠谱的 token：
 
 ```bash
-openssl rand -hex 32        # 复制输出，粘到上面 AUTH_TOKEN
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# 或
+openssl rand -hex 32
 ```
+
+可选（不写就用配置文件里的默认值）：
+
+```ini
+PORT=3458
+CORS_ORIGIN=https://nexus.kotete.xyz,https://kotete.xyz,http://kotete.xyz:908,https://kotete.xyz:908,http://8.134.190.49:908
+```
+
+> 加载优先级：`server/.env` > shell 环境变量 > `ecosystem.config.js` 默认值。
+> 如果三者都拿不到 `AUTH_TOKEN`，**进程会拒绝启动**并打印上面那条生成命令 ——
+> 这是有意的：带着空 token 跑起来等于没有鉴权。
 
 ### 4.2 启动 + 开机自启
 
 ```bash
-chmod 600 ecosystem.config.js      # 里面是密钥，收紧权限
+cd ~/nexus-core
+chmod 600 server/.env               # 里面是密钥，收紧权限
 pm2 start ecosystem.config.js
 pm2 save                            # 记住当前进程列表
 pm2 startup                         # 按提示复制粘贴它输出的那行 sudo 命令
-pm2 logs nexus-api --lines 20       # 看启动日志
+pm2 logs nexus-api --lines 20       # 看启动日志，应看到「月报预压缩: N 份」
 ```
+
+> ⚠️ **端口别搞混**：Node 后端是 **3458**，Nginx 对外监听 **3457** 再反代到 3458。
+> 曾经因为这两个数写反导致过一次排查。
+
 
 ### 4.3 本机自测
 
@@ -352,7 +368,7 @@ pm2 start nexus-api
 - [ ] `sudo reboot` 后，服务自动恢复（`pm2 list` 显示 online）
 - [ ] `date` 显示 Asia/Shanghai（+8）
 - [ ] 备份脚本跑通，`~/backups` 里有文件，且**做过一次恢复演练**
-- [ ] AUTH_TOKEN 不在 git 仓库里（只存在于 `ecosystem.config.js`，且 `chmod 600`）
+- [ ] AUTH_TOKEN 不在 git 仓库里（只存在于 `server/.env`，且 `chmod 600`；`git check-ignore server/.env` 应有输出）
 - [ ] SSH 密码登录已关闭，root 不能直接登录
 - [ ] 防火墙只放行了必要端口（22 / 3457；3458 为内部端口，未对外放行）
 

@@ -5,6 +5,10 @@ server/node_modules/
 # 凭证脚本（含令牌，禁止入库）
 .ghproxy-cred.sh
 
+# 环境变量（含 AUTH_TOKEN，禁止入库）
+# 模板是 server/.env.example（可入库，只放键名不放值）
+.env
+
 # 临时 / 工作产物（非源码）
 .tmp-test/
 *.bak
@@ -14,11 +18,13 @@ server/node_modules/
 _facts/
 _shots/
 
-# 运行时数据
-server/journal.db
-server/journal.db-wal
-server/journal.db-shm
-server/data/
-
 # 本地数据库 / 文件备份（修复前快照，不入库）
 .backup-db/
+
+# ─────────────────────────────────────────────────────────────
+# 注：server/ 下的规则（*.db、data/、server/.env）在 server/.gitignore 里，
+# 那边是「相对 server/ 目录」的，比在根写 server/xxx 更不容易误伤
+# （例如 docs/ 下如果出现 .db 文件不该被忽略）。
+# 2026-09-26 去掉了根文件里重复的 server/journal.db* 等条目 ——
+# 两处都写同样规则，改了一处会以为生效、其实被另一处覆盖。
+# ─────────────────────────────────────────────────────────────

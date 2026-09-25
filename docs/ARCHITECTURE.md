@@ -84,12 +84,22 @@ nexus-core 是个**手机优先**的个人工作台。用户用手机浏览器�
 | 回源 | `8.134.190.49:443`，Nginx（`/etc/nginx/sites-enabled/nexus`） |
 | 证书 | Let's Encrypt（`acme.sh` 自动续期） |
 | 反代 | Nginx `location /` → `proxy_pass http://127.0.0.1:3458` |
-| 进程 | **pm2**，进程名 `nexus-api` |
+| 进程 | **pm2**，进程名 `nexus-api`，配置来自仓库里的 `ecosystem.config.js` |
 | 端口 | **Nginx 外部 3457 / Node 内部 3458**（这两个数不要混） |
 | 机器 | 阿里云 2C2G，广州，hostname `iZ7xv0wsl39ujt87g37ae3Z` |
 
-> ⚠️ **注意**：线上**没有** `ecosystem.config.js` 文件。pm2 是当年用 CLI `--env` 起的，
-> 配置只存在于 `/root/.pm2/dump.pm2`。这是已知脆弱点（见第五节）。
+环境变量（`PORT` / `AUTH_TOKEN` / `CORS_ORIGIN`）的来源与优先级：
+
+```
+server/.env（不入库，chmod 600）  >  shell 环境变量  >  ecosystem.config.js 里的默认值
+```
+
+> ✅ **2026-09-26 已修复**：过去线上**没有** `ecosystem.config.js`，pm2 是当年用
+> CLI `--env` 起的，配置只活在 `/root/.pm2/dump.pm2` 里 —— 换机器或重装 pm2 就丢
+> 环境变量。现在仓库里有了正式配置文件，密钥走 `.env`（`server/.env.example` 是
+> 可入库的空模板）。加载时若拿不到 `AUTH_TOKEN` 会**直接拒绝启动**并打印生成命令，
+> 而不是带着空 token 跑起来。
+
 
 ---
 
@@ -309,9 +319,8 @@ videos, investments, investShots, gadgets
 
 | 项 | 状态 |
 |---|---|
-| **`AUTH_TOKEN` 仍是泄漏过的那个值** | 用户选择「先不动」。`/root/.pm2/dump.pm2` 里仍是 `3137...5650`。**建议尽快轮换** |
-| 线上无 `ecosystem.config.js` | 配置只在 pm2 dump 里。换机器/重装 pm2 会丢环境变量 |
-| `https://qqqqqqiu0804.github.io` 仍在 `CORS_ORIGIN` | 用户已不用 GH Pages，可移除（**功能上无害**，删掉只是更干净） |
+| **`AUTH_TOKEN` 仍是泄漏过的那个值** | 用户选择「暂不轮换」。`server/.env` 与 `/root/.pm2/dump.pm2` 里都还是 `3137...5650`。**建议尽快轮换**；轮换只需改 `server/.env` 一行 + `pm2 restart nexus-api` |
+| `https://qqqqqqiu0804.github.io` 仍在**线上 pm2 环境**里 | 新配置的默认值和 `server.js` 的代码默认值都已移除；但线上进程仍是旧 env 起的，要等按 `ecosystem.config.js` 重新注册后才真正生效（**功能上无害**，删掉只是更干净） |
 | `deploy.sh:155` 读 `.env` 拿端口 | 该文件不存在，恒回退硬编码 `3458`。恰好等于真实值所以「蒙对」，改端口会误报 |
 | `entries.updated_at` 用 `datetime('now','localtime')` | 依赖服务器时区。阿里云默认 UTC 的话展示时间会偏 8 小时（冲突判定用 `client_ts`，**不影响收敛**） |
 | `parseStamp` 解析空格分隔日期 | Safari 对 `"2026-09-26 10:00"` 解析可能失败（Chrome/Firefox 宽松）。未在 Safari 实测 |

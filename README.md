@@ -197,19 +197,23 @@ bash server/deploy.sh             # 真部署
 nexus-core/
 ├── index.html          # 整个前端（单文件）
 ├── README.md           # 你正在看的
+├── ecosystem.config.js # pm2 配置（端口/内存上限/重启策略；密钥走 server/.env）
 ├── report/             # 月报页 / 周报页（静态 HTML，丢进来即可）
 ├── tests/
 │   ├── xiangqi-moves.test.js   # 象棋走法校验器（62 项）
 │   ├── ai-report.test.js       # AI 报告范围/汇总/转义（31 项）
+│   ├── mobile-audit.js         # 手机端体验审计（字号/根字号/title/viewport，5 项）
+│   ├── ecosystem-config.test.js# pm2 配置不变量（17 项）
 │   ├── smoke-server.sh         # 后端冒烟：gzip / ETag / 鉴权
-│   └── smoke-report.sh         # 月报路由冒烟：/report + 路径穿越防护
+│   ├── smoke-report.sh         # 月报路由冒烟：/report + 路径穿越防护
+│   └── smoke-hardening.sh      # 安全加固回归：不泄堆栈 / KV 同毫秒不丢写
 ├── tools/              # 象棋题库生成
 └── server/
     ├── server.js       # Express + SQLite 后端
     ├── deploy.sh       # 安全部署（先验证再重启，失败即中止）
     ├── README.md       # 后端说明 + API 一览
     ├── DEPLOY.md       # 从买服务器到上线的作战手册
-    ├── ecosystem.config.js   # pm2 配置（PORT / AUTH_TOKEN / CORS）
+    ├── .env.example    # 环境变量模板（可入库；真实 .env 不入库）
     └── journal.db      # SQLite 数据文件（备份 = 复制它）
 ```
 
