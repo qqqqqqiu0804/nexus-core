@@ -771,6 +771,9 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .course-view-toggle { display:flex; gap:6px; }
 .course-view-btn { background:var(--bg-card); border:1px solid var(--border-subtle); color:var(--text-secondary); padding:6px 14px; border-radius:6px; font-size:0.8rem; cursor:pointer; transition:.2s; }
 .course-view-btn.active { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+/* AI 报告的周/月粒度切换：沿用课表视图按钮的观感，保持一致 */
+.ai-gran-btn { background:var(--bg-card); border:1px solid var(--border-subtle); color:var(--text-secondary); padding:5px 16px; border-radius:6px; font-size:0.78rem; cursor:pointer; transition:.2s; }
+.ai-gran-btn.active { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
 /* 预告视图：明天 + 下周 */
 .forecast-block { margin-bottom: 22px; }
 .forecast-title { display:flex; align-items:baseline; gap:8px; margin-bottom:10px; }
@@ -1213,12 +1216,17 @@ a { color: var(--accent); text-underline-offset: 2px; }
     </div>
     <div id="journal-archive-list"></div>
 
-    <!-- AI 周报（本地 Ollama，经后端 SSE 代理） -->
+    <!-- AI 周报 / 月报（本地 Ollama，经后端 SSE 代理） -->
     <div class="section-header" style="margin-top:20px;">
-      <span class="section-title">AI 周报</span>
+      <span class="section-title">AI 报告</span>
       <span id="ai-week-status" style="font-size:0.72rem;color:var(--text-dim);"></span>
     </div>
     <div class="card" style="padding:12px;">
+      <!-- 粒度切换：周报看节奏，月报看趋势。切换后自动回到「当前」，不会停在上周的偏移上 -->
+      <div class="ai-gran-toggle" style="display:flex;gap:6px;margin-bottom:10px;">
+        <button class="ai-gran-btn active" data-gran="week" onclick="aiSetGranularity('week')">周报</button>
+        <button class="ai-gran-btn" data-gran="month" onclick="aiSetGranularity('month')">月报</button>
+      </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
         <button class="btn btn-sm" onclick="aiWeekShift(-1)">‹</button>
         <span id="ai-week-label" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--accent);"></span>
@@ -4138,13 +4146,13 @@ function renderTodayTasks() {
 
   const REC = { daily: '每天', weekly: '每周', monthly: '每月' };
   listEl.innerHTML = dueToday.map(t => `
-    <div class="task-item" onclick="completeTask('${t.id}')">
+    <div class="task-item" onclick="completeTask('${escAttr(t.id)}')">
       <div class="task-check"></div>
       <div class="task-info">
-        <div class="task-title">${t.title}</div>
+        <div class="task-title">${escHtml(t.title)}</div>
         <div class="task-meta">
           ${t.recurrence && t.recurrence !== 'none' ? `<span>${REC[t.recurrence] || ''}循环</span>` : ''}
-          ${t.deadline ? `<span>截止 ${t.deadline}${t.deadline < today ? ' · 已逾期' : ''}</span>` : ''}
+          ${t.deadline ? `<span>截止 ${escHtml(t.deadline)}${t.deadline < today ? ' · 已逾期' : ''}</span>` : ''}
         </div>
       </div>
     </div>
@@ -4697,31 +4705,73 @@ function renderJournalArchiveList(el, entries) {
 // 边读边解帧、边往页面上追加 token——打字机效果不需要任何库。
 let _aiWeekOffset = 0;
 let _aiGenerating = false;
+// 报告粒度：'week' 周报（默认，兼容旧行为）| 'month' 月报
+// 初始值在启动时从 Store 读回（见 boot 序列），不在这里读——
+// 否则每次 renderAiWeek 都会把用户刚切的选择覆盖掉。
+let _aiGranularity = 'week';
 
 function mondayOf(d) { const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); return x; }
+
+// 周报范围：offset 为第几周（0=本周，-1=上周）
 function aiWeekRange(offset) {
   const m = mondayOf(new Date());
   m.setDate(m.getDate() + offset * 7);
   const e = new Date(m); e.setDate(e.getDate() + 6);
-  return { start: localDate(m), end: localDate(e) };
+  return { start: localDate(m), end: localDate(e), label: null };
 }
+
+// 月报范围：offset 为第几月（0=本月，-1=上月）。
+// 注意用「下月 0 日」拿当月最后一天，比手写 28/30/31 判断稳妥（闰年也对）。
+function aiMonthRange(offset) {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+  const mm = String(first.getMonth() + 1).padStart(2, '0');
+  return { start: localDate(first), end: localDate(last), label: `${first.getFullYear()} 年 ${mm} 月` };
+}
+
+// 按当前粒度取范围——所有下游（标签、收集、生成）都走这里，不再各自判断
+function aiReportRange(offset) {
+  return _aiGranularity === 'month' ? aiMonthRange(offset) : aiWeekRange(offset);
+}
+// 跨度改为「周 / 月」两种，导航按钮语义随之变化
 function aiWeekShift(d) { _aiWeekOffset += d; renderAiWeek(); }
+function aiSetGranularity(g) {
+  if (_aiGranularity === g) return;
+  _aiGranularity = g;
+  _aiWeekOffset = 0;        // 切换粒度后回到「当前」，否则 3 月前的周偏移套到月报上会跳到很久以前
+  Store.set('aiGranularity', g);   // 记住选择，刷新后不用重新点
+  renderAiWeek();
+}
 function saveAiModel() {
   Store.set('aiModel', document.getElementById('ai-model').value.trim());
   showToast('模型已保存', 'info');
 }
 
 function renderAiWeek() {
-  const range = aiWeekRange(_aiWeekOffset);
+  const range = aiReportRange(_aiWeekOffset);
   const labelEl = document.getElementById('ai-week-label');
-  if (labelEl) labelEl.textContent = `${range.start} ~ ${range.end}`;
+  if (labelEl) {
+    labelEl.textContent = _aiGranularity === 'month'
+      ? range.label
+      : `${range.start} ~ ${range.end}`;
+  }
+  // 粒度切换按钮的选中态
+  document.querySelectorAll('.ai-gran-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.gran === _aiGranularity);
+  });
+  const genBtn = document.getElementById('ai-gen-btn');
+  if (genBtn) genBtn.textContent = _aiGranularity === 'month' ? '生成月报' : '生成周报';
   const modelEl = document.getElementById('ai-model');
   if (modelEl && document.activeElement !== modelEl) modelEl.value = Store.get('aiModel', '');
   renderAiReports();
 }
 
-// 收集一周数据（全部来自 localStorage：前端是数据真相源，后端只当 AI 网关）
-function collectWeekData(range) {
+// 收集一段时间的数据（全部来自 localStorage：前端是数据真相源，后端只当 AI 网关）
+// 周报/月报共用这一个函数——跨度由 range 决定，逻辑完全一致。
+// 月报跨度可达 31 天，所以做了两处降载：日记按天截断更短，任务标题取更多条。
+function collectRangeData(range) {
+  const isMonth = _aiGranularity === 'month';
   const dates = [];
   const d = new Date(range.start + 'T00:00:00');
   const end = new Date(range.end + 'T00:00:00');
@@ -4730,13 +4780,17 @@ function collectWeekData(range) {
   const dailyLog = Store.get('dailyLog', {});
   const WD = ['日','一','二','三','四','五','六'];
 
+  // 月报的日记总长度会很夸张（31 天 × 每天上千字），必须比周报截得更紧，
+  // 否则光日记就把 Ollama 的上下文吃掉，模型反而看不到任务和收支。
+  const diaryCap = isMonth ? 400 : 1200;
+
   const days = dates.map(date => {
     const log = dailyLog[date] || {};
     const txns = (Store.get('wallet', { transactions: [] }).transactions || []).filter(t => dateOf(t.date) === date);
     const expense = txns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     const incomeTx = txns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     let diary = journalPlainText(date);
-    if (diary.length > 1200) diary = diary.slice(0, 1200) + '…(截断)';
+    if (diary.length > diaryCap) diary = diary.slice(0, diaryCap) + '…(截断)';
     return {
       date, weekday: '周' + WD[new Date(date + 'T00:00:00').getDay()],
       tasksDone: (Store.get('completionLog', {})[date]) || 0,
@@ -4759,28 +4813,105 @@ function collectWeekData(range) {
   });
   const incomeTotal = days.reduce((s, x) => s + x.income, 0);
   const expenseTotal = days.reduce((s, x) => s + x.expense, 0);
-  return { range: `${range.start} ~ ${range.end}`, days, completedTasks: completedTitles.slice(0, 40), expenseByCategory: cat, incomeTotal: Math.round(incomeTotal * 10) / 10, expenseTotal: Math.round(expenseTotal * 10) / 10 };
+
+  // 月度汇总：让模型（和看的人）一眼看到趋势，而不是自己去加 31 个数
+  const activeDays = days.filter(x => x.tasksDone > 0).length;
+  const spendingDays = days.filter(x => x.expense > 0).length;
+  const summary = {
+    天数: dates.length,
+    有任务完成的天数: activeDays,
+    有支出的天数: spendingDays,
+    任务完成总数: days.reduce((s, x) => s + x.tasksDone, 0),
+    日均支出: spendingDays ? Math.round(expenseTotal / spendingDays * 10) / 10 : 0
+  };
+
+  return {
+    kind: isMonth ? '月报' : '周报',
+    range: `${range.start} ~ ${range.end}`,
+    days,
+    completedTasks: completedTitles.slice(0, isMonth ? 80 : 40),
+    expenseByCategory: cat,
+    incomeTotal: Math.round(incomeTotal * 10) / 10,
+    expenseTotal: Math.round(expenseTotal * 10) / 10,
+    summary
+  };
+}
+// 兼容旧名（旧代码/旧报告调用它）
+function collectWeekData(range) { return collectRangeData(range); }
+
+// 不依赖 AI 的纯统计渲染——Ollama 没开时也能拿到一份能看的月报。
+// 这是有意的：算力在你自己 PC 上，不保证随时可用，但数据一直在。
+function renderStatsOnlyReport(data) {
+  const L = [];
+  L.push(`📊 完成情况`);
+  L.push(`  · ${data.summary.任务完成总数} 项任务完成，其中 ${data.summary.有任务完成的天数}/${data.summary.天数} 天有产出`);
+  L.push(`  · 日均完成 ${(data.summary.任务完成总数 / data.summary.天数).toFixed(1)} 项`);
+  L.push('');
+  L.push(`💰 收支`);
+  L.push(`  · 支出合计 ¥${data.expenseTotal}，收入合计 ¥${data.incomeTotal}`);
+  L.push(`  · 有支出的天数 ${data.summary.有支出的天数} 天，日均 ¥${data.summary.日均支出}`);
+  const cats = Object.entries(data.expenseByCategory).sort((a, b) => b[1] - a[1]);
+  if (cats.length) {
+    L.push(`  · 分类（从多到少）：`);
+    cats.forEach(([k, v]) => {
+      const pct = data.expenseTotal ? Math.round(v / data.expenseTotal * 100) : 0;
+      L.push(`      ${k}：¥${v}（${pct}%）`);
+    });
+  }
+  L.push('');
+  L.push(`📔 日记`);
+  const withDiary = data.days.filter(d => d.diary);
+  L.push(`  · ${withDiary.length}/${data.days.length} 天有记录`);
+  L.push('');
+  L.push(`📌 已完成的任务（${data.completedTasks.length} 项）`);
+  data.completedTasks.slice(0, 20).forEach(t => L.push(`  · ${t}`));
+  if (data.completedTasks.length > 20) L.push(`  …还有 ${data.completedTasks.length - 20} 项`);
+  return L.join('\n');
 }
 
 async function generateWeeklyReport() {
   if (_aiGenerating) { showToast('正在生成中，稍等', 'info'); return; }
-  if (!journalApiOn()) { showToast('AI 周报需要本地后端：先在「我的」配置并启动 server', 'warning'); return; }
+
+  const isMonth = _aiGranularity === 'month';
+  const noun = isMonth ? '月报' : '周报';
   const model = Store.get('aiModel', '') || 'qwen2.5:7b';
-  const range = aiWeekRange(_aiWeekOffset);
-  const data = collectWeekData(range);
-  const user = `以下是我（一名学生）${data.range} 一周的真实数据，请生成一份周报，包含四部分，用 emoji 小标题（纯文本，不要 markdown 表格）：
+  const range = aiReportRange(_aiWeekOffset);
+  const data = collectRangeData(range);
+
+  const status = document.getElementById('ai-week-status');
+  const out = document.getElementById('ai-week-output');
+  const btn = document.getElementById('ai-gen-btn');
+
+  // 没配后端 = 不能走 AI，但统计部分依然可以给——别让人白点一次
+  if (!journalApiOn()) {
+    out.style.display = 'block';
+    out.textContent = renderStatsOnlyReport(data);
+    status.textContent = '仅统计（未配置后端，无 AI 评述）';
+    showToast('未配置后端，已输出纯统计数据', 'warning');
+    return;
+  }
+
+  const prompts = isMonth
+    ? `以下是我（一名学生）${data.range} 这一个月（跨度 ${data.days.length} 天）的真实数据，请生成一份月报，包含五部分，用 emoji 小标题（纯文本，不要 markdown 表格）：
+📊 完成情况（量化+点评，注意 summary 里的「有任务完成的天数」，坚持度看这个）
+💰 收支观察（分类花销占比是否合理，对比 summary 的日均支出）
+📔 日记亮点（引用 2-3 句原文，不要超过 3 句）
+📈 趋势与模式（这个月哪些天在做、哪些天断了，有没有可识别的规律）
+💡 下月建议（3-4 条，具体可执行，不要空话）
+
+注意：数据跨 31 天，日记已按天截断。请抓主要矛盾，不要逐天罗列。`
+    : `以下是我（一名学生）${data.range} 一周的真实数据，请生成一份周报，包含四部分，用 emoji 小标题（纯文本，不要 markdown 表格）：
 📊 完成情况（量化+点评）
 💰 收支观察（分类花销是否合理）
 📔 日记亮点（引用 1-2 句原文）
-💡 下周建议（2-3 条，具体可执行，不要空话）
+💡 下周建议（2-3 条，具体可执行，不要空话）`;
+
+  const user = `${prompts}
 
 数据（JSON）：
 ${JSON.stringify(data)}`;
 
   _aiGenerating = true;
-  const btn = document.getElementById('ai-gen-btn');
-  const status = document.getElementById('ai-week-status');
-  const out = document.getElementById('ai-week-output');
   btn.disabled = true;
   status.textContent = '收集数据 → 请求 Ollama…';
   out.style.display = 'block';
@@ -4790,7 +4921,9 @@ ${JSON.stringify(data)}`;
     const { base } = journalApiCfg();
     const resp = await fetch(`${base}/api/ai/weekly`, {
       method: 'POST', headers: journalHeaders(),
-      body: JSON.stringify({ model, user, system: '你是学生的个人周报助手。语言简洁具体，不说空话套话，引用数据要忠实于输入。' })
+      body: JSON.stringify({ model, user, system: isMonth
+        ? '你是学生的个人月度复盘助手。语言简洁具体，不说空话套话，引用数据要忠实于输入。'
+        : '你是学生的个人周报助手。语言简洁具体，不说空话套话，引用数据要忠实于输入。' })
     });
     if (!resp.ok || !resp.body) throw new Error('HTTP ' + resp.status);
 
@@ -4814,18 +4947,20 @@ ${JSON.stringify(data)}`;
     }
     if (content.trim()) {
       const reports = Store.get('aiReports', []);
-      reports.unshift({ id: 'r' + Date.now(), range: data.range, model, createdAt: new Date().toLocaleString('zh-CN'), content });
+      reports.unshift({ id: 'r' + Date.now(), kind: data.kind, range: data.range, model, createdAt: new Date().toLocaleString('zh-CN'), content });
       Store.set('aiReports', reports.slice(0, 30));
       status.textContent = '已保存 ✓';
-      showToast('周报已生成并保存', 'success');
+      showToast(`${noun}已生成并保存`, 'success');
       renderAiReports();
     } else if (status.textContent !== '出错') {
       status.textContent = '未产生内容';
     }
   } catch (e) {
-    status.textContent = '失败';
-    out.textContent = '⚠ ' + e.message;
-    showToast('生成失败：' + e.message, 'error');
+    // AI 挂了也要把统计留住——算力在你自己 PC 上，Ollama 没开是常态，
+    // 但「这个月花了多少、完成了多少」这种汇总不该因此拿不到。
+    status.textContent = 'AI 失败，已输出统计';
+    out.textContent = renderStatsOnlyReport(data) + `\n\n⚠ AI 生成失败：${e.message}`;
+    showToast('AI 生成失败：' + e.message, 'error');
   } finally {
     _aiGenerating = false;
     btn.disabled = false;
@@ -4837,12 +4972,12 @@ function renderAiReports() {
   if (!list) return;
   const reports = Store.get('aiReports', []);
   if (!reports.length) return;
-  list.innerHTML = `<div style="font-size:0.72rem;color:var(--text-dim);margin:10px 0 6px;">往期周报（存于本机）</div>` + reports.map(r => `
+  list.innerHTML = `<div style="font-size:0.72rem;color:var(--text-dim);margin:10px 0 6px;">往期报告（存于本机）</div>` + reports.map(r => `
     <details class="card" style="padding:10px;margin-bottom:8px;">
       <summary style="cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center;">
-        <span style="font-family:var(--font-mono);color:var(--accent);font-size:0.78rem;white-space:nowrap;">${r.range}</span>
-        <span style="flex:1;font-size:0.72rem;color:var(--text-dim);">${r.model} · ${r.createdAt}</span>
-        <button class="btn btn-sm btn-danger" onclick="event.preventDefault();deleteAiReport('${r.id}')" style="padding:2px 8px;font-size:0.68rem;" aria-label="删除">${ICON_CLOSE}</button>
+        <span style="font-family:var(--font-mono);color:var(--accent);font-size:0.78rem;white-space:nowrap;">${escHtml(r.range)}</span>
+        <span style="flex:1;font-size:0.72rem;color:var(--text-dim);">${escHtml(r.kind || '周报')} · ${escHtml(r.model || '')} · ${escHtml(r.createdAt || '')}</span>
+        <button class="btn btn-sm btn-danger" onclick="event.preventDefault();deleteAiReport('${escAttr(r.id)}')" style="padding:2px 8px;font-size:0.68rem;" aria-label="删除">${ICON_CLOSE}</button>
       </summary>
       <div style="white-space:pre-wrap;font-size:0.8rem;color:var(--text-primary);line-height:1.7;padding:10px 2px 2px;border-top:1px solid var(--border-subtle);margin-top:8px;">${escHtml(r.content)}</div>
     </details>`).join('');
@@ -5020,35 +5155,6 @@ function updateStreak() {
   }
 }
 
-// === Bounty System ===
-
-
-
-
-
-
-
-
-
-
-// === Achievement System ===
-
-
-
-
-// === Pomodoro System ===
-
-
-
-
-
-
-
-
-
-
-
-
 // === Task Modal ===
 function openTaskModal(editId = null) {
   const modal = document.getElementById('task-modal');
@@ -5143,12 +5249,6 @@ function renderAll() {
   renderAiWeek();
   renderScheduleModeButtons();}
 
-// 等级/积分展示现统一由 renderSettings() 渲染到「我的」面板（原 dashboard 面板已移除）
-function updateDashboard() {
-  renderSettings();
-}
-
-
 
 // 全部任务浮层：原本是底部导航的「任务」tab。那个 tab 装的是低频的管理动作
 // （增删改、筛排序），而每天勾选用的「今日任务」已经在今日面板里了 —— 降级成
@@ -5204,6 +5304,8 @@ function renderTasks() {
   });
 
   const list = document.getElementById('all-tasks-list');
+  // 所有插值点都走 escHtml/escAttr：任务标题可能来自课表粘贴、聊天记录粘贴，
+  // 未转义时一个 < 就能破坏结构，甚至执行脚本（标题还会经 /api/kv 同步到所有设备）。
   list.innerHTML = filtered.map(t => {
     const st = t.subtasks || [];
     const stDone = st.filter(s => s.done).length;
@@ -5212,7 +5314,7 @@ function renderTasks() {
     if (st.length) {
       const pct = Math.round(stDone / st.length * 100);
       progressHtml = `
-        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;" onclick="event.stopPropagation(); toggleSubtaskView('${t.id}')">
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;" onclick="event.stopPropagation(); toggleSubtaskView('${escAttr(t.id)}')">
           <div style="flex:1;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;">
             <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:2px;"></div>
           </div>
@@ -5221,30 +5323,30 @@ function renderTasks() {
         ${expanded ? `<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px;" onclick="event.stopPropagation();">
           ${st.map((s, i) => `
             <label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:${s.done ? 'var(--text-dim)' : 'var(--text-secondary)'};cursor:pointer;">
-              <input type="checkbox" ${s.done ? 'checked' : ''} onchange="toggleSubtask('${t.id}', ${i})" style="width:auto;" onclick="event.stopPropagation();">
-              <span style="${s.done ? 'text-decoration:line-through;' : ''}">${s.title}</span>
+              <input type="checkbox" ${s.done ? 'checked' : ''} onchange="toggleSubtask('${escAttr(t.id)}', ${i})" style="width:auto;" onclick="event.stopPropagation();">
+              <span style="${s.done ? 'text-decoration:line-through;' : ''}">${escHtml(s.title)}</span>
             </label>`).join('')}
         </div>` : ''}`;
     } else if (t.status === 'active') {
       progressHtml = `<span>进度 ${t.progress || 0}%</span>`;
     }
     return `
-    <div class="task-item ${t.status === 'completed' ? 'completed' : ''}" onclick="${t.status === 'completed' ? '' : `completeTask('${t.id}')`}">
+    <div class="task-item ${t.status === 'completed' ? 'completed' : ''}" onclick="${t.status === 'completed' ? '' : `completeTask('${escAttr(t.id)}')`}">
       <div class="task-check ${t.status === 'completed' ? 'checked' : ''}">${t.status === 'completed' ? '✓' : ''}</div>
       <div class="task-info">
-        <div class="task-title">${t.title}</div>
+        <div class="task-title">${escHtml(t.title)}</div>
         <div class="task-meta">
           <span class="badge badge-${getTypeColor(t.type)}">${getTypeLabel(t.type)}</span>
           <span class="badge badge-${getPriorityColor(t.priority)}">${getPriorityLabel(t.priority)}</span>
-          ${t.course ? `<span class="badge" style="background:color-mix(in srgb, var(--accent) 12%, transparent);border:1px solid color-mix(in srgb, var(--accent) 40%, transparent);color:var(--accent);">${t.course}</span>` : ''}
+          ${t.course ? `<span class="badge" style="background:color-mix(in srgb, var(--accent) 12%, transparent);border:1px solid color-mix(in srgb, var(--accent) 40%, transparent);color:var(--accent);">${escHtml(t.course)}</span>` : ''}
           ${t.recurrence && t.recurrence !== 'none' ? `<span class="badge" style="background:rgba(255,200,0,0.1);border:1px solid rgba(255,200,0,0.35);color:var(--warn);">${{daily:'每天',weekly:'每周',monthly:'每月'}[t.recurrence] || ''}循环</span>` : ''}
-          ${t.deadline ? `<span>截止 ${t.deadline}</span>` : ''}
+          ${t.deadline ? `<span>截止 ${escHtml(t.deadline)}</span>` : ''}
           ${progressHtml}
         </div>
       </div>
       <div class="task-actions">
-        <button class="btn btn-sm" onclick="event.stopPropagation(); openTaskModal('${t.id}')">编辑</button>
-        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteTask('${t.id}'); renderAll();">删除</button>
+        <button class="btn btn-sm" onclick="event.stopPropagation(); openTaskModal('${escAttr(t.id)}')">编辑</button>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteTask('${escAttr(t.id)}'); renderAll();">删除</button>
       </div>
     </div>`;
   }).join('') || '<div style="color: var(--text-dim); font-size:0.8rem; padding: 8px;">暂无任务，点右上角「+ 新增」开始吧！</div>';
@@ -7508,9 +7610,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   boot('配置迁移', migrateLegacyConfig);
   boot('默认数据', initData);
   boot('模板迁移', migrateDailyTemplatesToTasks);
-  boot('渲染', renderAll);
+  boot('渲染', renderAll);          // renderAll 内部已包含 renderSettings（原「仪表盘」步骤）
   safe('图标水合', hydrateIcons);
-  boot('仪表盘', updateDashboard);
+  // 报告粒度偏好：在 renderAll 之后读回，避免与用户的切换操作互相覆盖
+  safe('AI 粒度偏好', () => { _aiGranularity = Store.get('aiGranularity', 'week') === 'month' ? 'month' : 'week'; renderAiWeek(); });
 
   safe('同步初始化', () => KVSync.init());      // 内部会在短暂延迟后自动拉取一次
   safe('日记补推', () => {

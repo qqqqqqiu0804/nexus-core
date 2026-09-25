@@ -1,0 +1,38 @@
+name: CI
+
+# 这个项目刻意没有构建步骤（git pull 即部署）。
+# CI 也只做「跑测例 + 语法检查」，不引入任何需要构建的东西。
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Node 22（node:sqlite 需要 22+）
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # --- 后端语法检查（不需要装依赖）---
+      - name: 后端语法检查
+        run: node --check server/server.js
+
+      # --- 两套测例都从 index.html 抽真实代码跑 ---
+      - name: 象棋走法校验器测例
+        run: node tests/xiangqi-moves.test.js
+
+      - name: AI 报告（周/月）范围与转义测例
+        run: node tests/ai-report.test.js
+
+      # --- 后端冒烟：真起服务，验 gzip / ETag / 鉴权 ---
+      - name: 安装后端依赖
+        run: cd server && npm ci
+
+      - name: 后端冒烟测试
+        run: AUTH_TOKEN=ci-test-token PORT=3999 bash tests/smoke-server.sh

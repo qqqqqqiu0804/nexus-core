@@ -4,7 +4,8 @@
   "description": "日记后端：Express + SQLite（Node 内置 node:sqlite），单人使用",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node ../tests/xiangqi-moves.test.js && node ../tests/ai-report.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

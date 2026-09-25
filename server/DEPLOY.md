@@ -129,7 +129,7 @@ module.exports = {
     name: 'nexus-api',
     script: 'server.js',
     env: {
-      PORT: 3457,
+      PORT: 3458,   # 后端 Node 进程；Nginx 对外监听 3457 并反代到这里
       AUTH_TOKEN: '把这里换成你自己的长随机串',
       CORS_ORIGIN: 'https://qqqqqqiu0804.github.io'
     }
@@ -156,10 +156,10 @@ pm2 logs nexus-api --lines 20       # 看启动日志
 ### 4.3 本机自测
 
 ```bash
-curl -i http://localhost:3457/api/entries
+curl -i http://localhost:3458/api/entries
 # 期望：HTTP/1.1 401 Unauthorized（说明服务活着，且鉴权生效）
 
-curl -H "Authorization: Bearer <你的token>" http://localhost:3457/api/entries
+curl -H "Authorization: Bearer <你的token>" http://localhost:3458/api/entries
 # 期望：200 + JSON
 ```
 
@@ -169,18 +169,23 @@ curl -H "Authorization: Bearer <你的token>" http://localhost:3457/api/entries
 
 服务在本机通了，但外面连不上——**99% 是安全组/防火墙没放行**。
 
+> **放行哪个端口？** 只需要放行 **Nginx 监听的 3457**。
+> 后端 Node 的 **3458 只在服务器内部用**（Nginx 反代到 `127.0.0.1:3458`），
+> **不要**在安全组/ufw 里放行 3458——那会让后端绕过 Nginx 直接暴露在公网。
+> 若你已按备案后的方案改成 443（标准 HTTPS），就放行 443。
+
 **① 云控制台的安全组/防火墙**（这一步在网页上做）：
 
 ```
 轻量应用服务器控制台 → 防火墙 → 添加规则
-协议 TCP，端口 3457，来源 0.0.0.0/0，备注 nexus-api
+协议 TCP，端口 3457，来源 0.0.0.0/0，备注 nexus-nginx（备案后改 443）
 ```
 
 **② 服务器自己的防火墙**（如果你开了 ufw）：
 
 ```bash
 sudo ufw allow 22/tcp
-sudo ufw allow 3457/tcp
+sudo ufw allow 3457/tcp        # 只放 Nginx；3458 是内部端口，不放行
 sudo ufw enable
 sudo ufw status
 ```
@@ -188,11 +193,12 @@ sudo ufw status
 **③ 从本机（不是服务器）测试**：
 
 ```bash
-curl -i http://<公网IP>:3457/api/entries     # 期望 401
+curl -i http://<公网IP>:3457/api/entries     # 期望 401（走 Nginx）
 ```
 
 手机浏览器打开 `http://<公网IP>:3457` → **应该能看到整个工作台**（服务端托管的 `../index.html`，同源、无跨域问题）。
 
+> 想在服务器上直接测后端本身（绕过 Nginx）时，用 `http://localhost:3458`。
 > `401` 是**好消息**：说明网络通了、服务在跑、鉴权在工作。400/500 才要查。
 
 ---
@@ -244,7 +250,7 @@ sudo certbot certonly --manual --preferred-challenges dns -d nexus.你的域名.
 
 ```nginx
 server {
-    listen 3457 ssl http2;                       # 非标端口 + HTTPS；备案后改 443
+    listen 3457 ssl http2;                       # Nginx 对外；非标端口 + HTTPS；备案后改 443
     server_name nexus.你的域名.com;
 
     ssl_certificate     /etc/letsencrypt/live/nexus.你的域名.com/fullchain.pem;
@@ -253,7 +259,7 @@ server {
     client_max_body_size 10m;                    # 日记批量导入可能较大
 
     location / {
-        proxy_pass http://127.0.0.1:3457;        # 把端口腾出来给 Nginx，后端改 3458
+        proxy_pass http://127.0.0.1:3458;        # 后端 Node 在 3458；写 3457 会变成 Nginx 代理自己（死循环）
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -348,7 +354,7 @@ pm2 start nexus-api
 - [ ] 备份脚本跑通，`~/backups` 里有文件，且**做过一次恢复演练**
 - [ ] AUTH_TOKEN 不在 git 仓库里（只存在于 `ecosystem.config.js`，且 `chmod 600`）
 - [ ] SSH 密码登录已关闭，root 不能直接登录
-- [ ] 防火墙只放行了必要端口（22 / 3457）
+- [ ] 防火墙只放行了必要端口（22 / 3457；3458 为内部端口，未对外放行）
 
 ---
 
@@ -379,7 +385,7 @@ pm2 start nexus-api
 |---|---|---|
 | 外部访问超时 | 安全组没放行端口 | 控制台防火墙规则 |
 | 401 | token 不对/没带 header | `curl -H "Authorization: Bearer xxx"` |
-| 服务起了又挂 | 内存不足 / 端口占用 | `pm2 logs`、`free -h`、`ss -tlnp \| grep 3457` |
+| 服务起了又挂 | 内存不足 / 端口占用 | `pm2 logs`、`free -h`、`ss -tlnp \| grep -E "3457|3458"` |
 | 改了代码不生效 | 忘了重启 | `pm2 restart nexus-api` |
 | 数据库锁住 | 两个进程同时开同一个 db | 确认只有一个 `nexus-api` 在跑 |
 | 时间差 8 小时 | 服务器时区是 UTC | `sudo timedatectl set-timezone Asia/Shanghai` |

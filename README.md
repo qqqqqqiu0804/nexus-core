@@ -75,7 +75,7 @@
 | POST / GET / DELETE | `/api/files` | 图片上传（仅 PNG/JPG/WebP，拒绝 SVG 等可执行类型）/ 读取 / 删除 |
 | GET | `/api/health` | 备份状态（最近备份时间、份数、库体积） |
 | GET | `/api/link-title?url=` | 代抓网页标题（白名单域名，视频收藏用） |
-| POST | `/api/ai/weekly` | AI 周报（SSE，转发到 Ollama） |
+| POST | `/api/ai/weekly` | AI 周报 / 月报（SSE，转发到 Ollama） |
 
 ---
 
@@ -88,6 +88,39 @@ AUTH_TOKEN=随便编一个长随机串 npm start
 ```
 
 然后开 **http://localhost:3000** —— 后端顺手把 `../index.html` 也托管了，同源访问，所有功能可用。
+
+---
+
+## AI 报告（周报 / 月报）
+
+「我的」面板 → **AI 报告**，可切换 **周报 / 月报**，左右箭头翻期。
+
+- **数据来源**：全部来自 localStorage（含 `completedArchive` 的任务历史），
+  前端是数据真相源，**后端只当 AI 网关**。
+- **算力在你自己的电脑上**。后端通过 `OLLAMA_URL`（默认 `http://localhost:11434`）转发到
+  Ollama。服务器是 2C2G，跑不动 7B 模型——分工是「服务器管数据，PC 管算力」。
+  也就是说：**手机在外网时，AI 报告需要你家里电脑开着并连上 Ollama**。
+- **Ollama 没开也有兜底**：只要后端在跑，生成失败时会自动退回一份**纯统计报告**
+  （完成数、收支分类占比、日记覆盖天数、任务清单），不依赖任何模型。
+- 报告存在本机 `aiReports`（最多 30 份），可回看、可删。
+
+> 月报跨 31 天，日记会**按天截断到 400 字**（周报是 1200 字），
+> 否则光日记就吃满上下文，模型反而看不到任务和收支。
+
+---
+
+## 测试
+
+```bash
+cd server && npm test          # 象棋测例 + AI 报告测例
+bash tests/smoke-server.sh     # 后端冒烟（gzip / ETag / 鉴权，真起服务）
+```
+
+两套前端测例都用同一个套路：**直接从 `index.html` 抽取真实代码段求值**，
+测的是同一份实现，不是复制品。所以改了 `index.html` 就不可能「测过了但还是坏的」。
+
+CI（`.github/workflows/ci.yml`）在每次推送时跑全部测例 + 后端冒烟 + 语法检查。
+**CI 里没有任何构建步骤**——这个项目不该有构建步骤。
 
 想单独开前端也可以（直接双击 `index.html`），但**必须走 HTTP(S)** 才能连后端；`file://` 下浏览器会拦跨域请求。
 
@@ -112,6 +145,12 @@ AUTH_TOKEN=随便编一个长随机串 npm start
 - **手机优先**。她主要在手机上用，电脑只是顺带。
 - **不做"看起来完整"的功能**。日程的时间分配、睡眠记录、习惯打卡都曾写出来过，四天零数据 → 直接整块删掉，连同 CSS 和历史记录里的引用一起清干净。**判断一个功能该不该留，看数据，不看当初的设计文档。**
 - **记录类功能的第一原则是降低门槛**：饮食不强迫你算卡路里，随手记不要求你写一段话。写不出来的功能等于不存在。
+- **单文件前端就该配 gzip + ETag**。400 KB 冷启动下载在移动网络上很浪费，gzip 后约 125 KB（省 ~68%），
+  二次访问走 `If-None-Match` 直接 304 零传输。用 Node 内置 `zlib`，**不引入 `compression` 包**——
+  守住「零多余依赖」。压缩在启动时算一次并缓存，不要每请求压。
+- **所有插值到 innerHTML 的用户数据必须过 `escHtml` / `escAttr`**。
+  任务标题、课程名这些能粘贴进来的字段都算用户数据；漏一个就是存储型 XSS，
+  而且会经 `/api/kv` 同步到所有设备。
 
 ---
 
@@ -121,6 +160,11 @@ AUTH_TOKEN=随便编一个长随机串 npm start
 nexus-core/
 ├── index.html          # 整个前端（单文件）
 ├── README.md           # 你正在看的
+├── tests/
+│   ├── xiangqi-moves.test.js   # 象棋走法校验器（62 项）
+│   ├── ai-report.test.js       # AI 报告范围/汇总/转义（31 项）
+│   └── smoke-server.sh         # 后端冒烟：gzip / ETag / 鉴权
+├── tools/              # 象棋题库生成
 └── server/
     ├── server.js       # Express + SQLite 后端
     ├── README.md       # 后端说明 + API 一览
@@ -128,3 +172,13 @@ nexus-core/
     ├── ecosystem.config.js   # pm2 配置（PORT / AUTH_TOKEN / CORS）
     └── journal.db      # SQLite 数据文件（备份 = 复制它）
 ```
+
+### 端口约定
+
+| 角色 | 端口 | 说明 |
+|---|---|---|
+| Nginx（对外） | **3457** | 安全组/防火墙只需放行这个（备案后改 443） |
+| Node 后端（内部） | **3458** | 只监听回环，`proxy_pass` 到这里；**不要对外放行** |
+
+> ⚠️ 这里曾有个坑：`DEPLOY.md` 曾把 `listen` 和 `proxy_pass` 都写成 3457，
+> **照抄会让 Nginx 代理自己，形成死循环**。现已修正，改配置前请对照上表。

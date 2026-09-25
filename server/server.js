@@ -17,6 +17,7 @@
  */
 const path = require('path');
 const fs = require('fs');
+const zlib = require('zlib');
 const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
@@ -110,7 +111,52 @@ const app = express();
 app.use(express.json({ limit: '12mb' })); // 图片 base64 上传需要更大的体积上限
 app.use(cors({ origin: CORS_ORIGINS })); // 白名单内多个来源；同源访问不受影响
 // 只托管前端单文件——不把整个仓库目录（含 journal.db）暴露成静态资源
-app.get(['/', '/index.html'], (req, res) => res.sendFile(path.join(__dirname, '..', 'index.html')));
+//
+// 单文件前端 400 KB+，冷启动全量下载在移动网络上很浪费，而 gzip 后只有约 124 KB（省约 69%）。
+// 这里用 Node 内置 zlib，**不引入 compression 包**（守住「零多余依赖」的红线）。
+// 关键：gzip 在启动时算一次并缓存，绝对不要每请求压缩——2C2G 的 CPU 不该耗在这。
+const INDEX_HTML_PATH = path.join(__dirname, '..', 'index.html');
+let _htmlCache = null;   // { raw: Buffer, gz: Buffer, etag: string }
+function indexHtml() {
+  if (_htmlCache) return _htmlCache;
+  const raw = fs.readFileSync(INDEX_HTML_PATH);
+  _htmlCache = {
+    raw,
+    gz: zlib.gzipSync(raw, { level: 6 }),
+    // ETag 用内容哈希：文件一改，哈希就变，浏览器自然拿到新版
+    etag: '"' + crypto.createHash('sha1').update(raw).digest('hex').slice(0, 20) + '"'
+  };
+  return _htmlCache;
+}
+// 文件更新后（git pull）需要让缓存失效。pm2 restart 会重建进程，所以正常部署无需手动调；
+// 但开发时热改 index.html 想立刻生效，可以走下面这个 fs.watch。
+if (process.env.NODE_ENV !== 'production') {
+  try { fs.watch(INDEX_HTML_PATH, () => { _htmlCache = null; }); } catch { /* 平台不支持就算了 */ }
+}
+
+app.get(['/', '/index.html'], (req, res) => {
+  let c;
+  try { c = indexHtml(); }
+  catch (e) { res.status(500).send('index.html 读取失败'); return; }
+
+  res.setHeader('ETag', c.etag);
+  // no-cache ≠ 不缓存：是「每次都回源协商」。命中则 304 零字节，
+  // 既省流量又保证 git pull 后用户立刻看到新版（不会卡在旧界面）。
+  res.setHeader('Cache-Control', 'no-cache');
+
+  if (req.get('If-None-Match') === c.etag) { res.status(304).end(); return; }
+
+  const wantsGzip = /\bgzip\b/.test(req.get('Accept-Encoding') || '');
+  if (wantsGzip) {
+    res.setHeader('Content-Encoding', 'gzip');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Vary', 'Accept-Encoding');   // 让中间层按编码区分缓存
+    res.end(c.gz);
+    return;
+  }
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.end(c.raw);
+});
 
 // GET /api/files/:id —— 读图（**故意放在鉴权之前**（**免鉴权**：<img> 标签没法带 Authorization 头，
 // 靠 32 位十六进制随机 id 当能力凭证；这也意味着拿到链接的人能看到图）
@@ -125,13 +171,28 @@ app.get('/api/files/:id', (req, res) => {
   res.sendFile(p);
 });
 
+// 恒定时间比较：字符串 !== 会在首个不同字节处短路返回，
+// 理论上是可利用的时序侧信道（可逐字节爆破 token）。
+// 实测跨公网时延抖动远超单字符比较的纳秒差，现实中难以利用——
+// 但改用 timingSafeEqual 成本极低，顺手把审计红灯消掉。
+// 注意 lengths 不等时也不能直接 return false：那样长度信息会泄漏。
+function safeTokenEqual(a, b) {
+  const ba = Buffer.from(String(a == null ? '' : a), 'utf8');
+  const bb = Buffer.from(String(b == null ? '' : b), 'utf8');
+  if (ba.length !== bb.length) {
+    crypto.timingSafeEqual(ba, ba);   // 仍然做一次等长比较，抹平时间差
+    return false;
+  }
+  return crypto.timingSafeEqual(ba, bb);
+}
+
 // 鉴权中间件：只保护 /api/*，静态文件不拦
 app.use('/api', (req, res, next) => {
   // 公开只读接口放行：给站点 htt.kotete.xyz 读「切片 / 物料」用。
   // 这里放行的只是路径前缀，具体能读哪些 key 由下面 /api/public/:key 的硬编码白名单决定。
   if (req.path.startsWith('/public/')) return next();
   const auth = req.get('Authorization') || '';
-  if (auth !== `Bearer ${TOKEN}`) {
+  if (!safeTokenEqual(auth, `Bearer ${TOKEN}`)) {
     return res.status(401).json({ error: '未授权：token 缺失或不正确' });
   }
   next();
