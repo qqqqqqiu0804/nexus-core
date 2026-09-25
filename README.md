@@ -113,22 +113,55 @@ AUTH_TOKEN=随便编一个长随机串 npm start
 
 ```bash
 cd server && npm test          # 象棋测例 + AI 报告测例
-bash tests/smoke-server.sh     # 后端冒烟（gzip / ETag / 鉴权，真起服务）
+cd server && npm run test:smoke # 后端冒烟 + 月报路由冒烟（真起服务）
 ```
 
 两套前端测例都用同一个套路：**直接从 `index.html` 抽取真实代码段求值**，
 测的是同一份实现，不是复制品。所以改了 `index.html` 就不可能「测过了但还是坏的」。
 
-CI（`.github/workflows/ci.yml`）在每次推送时跑全部测例 + 后端冒烟 + 语法检查。
+冒烟测试（`smoke-server.sh` / `smoke-report.sh`）会真的把服务起起来，验证
+gzip 编解码、ETag 304、鉴权矩阵，以及 `/report` 的**路径穿越防护**。
+
+CI（`.github/workflows/ci.yml`）在每次推送时跑全部测例 + 两套冒烟 + 语法检查。
 **CI 里没有任何构建步骤**——这个项目不该有构建步骤。
 
 想单独开前端也可以（直接双击 `index.html`），但**必须走 HTTP(S)** 才能连后端；`file://` 下浏览器会拦跨域请求。
 
 ---
 
+## 月报页
+
+`/report` 下放**只读的静态报告页**，专为手机浏览器看：
+
+| 路径 | 说明 |
+|---|---|
+| `/report` | 报告列表（按文件名倒序） |
+| `/report/2026-09.html` | 具体某期报告 |
+
+放一个新的报告 = 往 `report/` 目录丢一个 `.html`，不用改代码（服务会读目录）。
+
+设计要点：
+
+- 走和 `index.html` 一样的**启动时预压缩 + ETag 协商**（gzip 后约省 67%）
+- **文件名白名单** `^[A-Za-z0-9._-]+\.html$`，杜绝 `../` 穿越读到 `journal.db`
+- 页面本身**不含任何用户数据查询接口**，是纯静态展示，因此不需要鉴权
+  （和 `/api/files/:id` 同样的取舍：能拿到 URL 的人就能看到）
+
+---
+
 ## 部署
 
 从买机器到 HTTPS 上线的完整流程（含踩过的坑）在 **[server/DEPLOY.md](./server/DEPLOY.md)**，后端本身的说明在 **[server/README.md](./server/README.md)**。
+
+一键安全部署（**先验证再重启**，测试挂了就中止、线上保持旧版本）：
+
+```bash
+bash server/deploy.sh --dry-run   # 先看会做什么
+bash server/deploy.sh             # 真部署
+```
+
+脚本会：备份（含数据库）→ `git pull`（fast-forward only）→ `npm ci` → 跑全部测试
+→ 检查 Nginx 端口自环 → `pm2 restart` → 线上验证 → **打印回滚命令**。
 
 几个反复踩过、值得记一笔的：
 
@@ -151,6 +184,10 @@ CI（`.github/workflows/ci.yml`）在每次推送时跑全部测例 + 后端冒�
 - **所有插值到 innerHTML 的用户数据必须过 `escHtml` / `escAttr`**。
   任务标题、课程名这些能粘贴进来的字段都算用户数据；漏一个就是存储型 XSS，
   而且会经 `/api/kv` 同步到所有设备。
+- **不对外暴露技术栈**。`app.disable('x-powered-by')` —— 默认的 `X-Powered-By: Express`
+  等于给攻击者一张匹配已知 CVE 的清单，关掉零成本。
+- **静态文件路由一律用文件名白名单**，不拼路径。`report/` 只接受
+  `^[A-Za-z0-9._-]+\.html$`，这样 `../` 穿越拿不到 `journal.db`。
 
 ---
 
@@ -160,13 +197,16 @@ CI（`.github/workflows/ci.yml`）在每次推送时跑全部测例 + 后端冒�
 nexus-core/
 ├── index.html          # 整个前端（单文件）
 ├── README.md           # 你正在看的
+├── report/             # 月报页 / 周报页（静态 HTML，丢进来即可）
 ├── tests/
 │   ├── xiangqi-moves.test.js   # 象棋走法校验器（62 项）
 │   ├── ai-report.test.js       # AI 报告范围/汇总/转义（31 项）
-│   └── smoke-server.sh         # 后端冒烟：gzip / ETag / 鉴权
+│   ├── smoke-server.sh         # 后端冒烟：gzip / ETag / 鉴权
+│   └── smoke-report.sh         # 月报路由冒烟：/report + 路径穿越防护
 ├── tools/              # 象棋题库生成
 └── server/
     ├── server.js       # Express + SQLite 后端
+    ├── deploy.sh       # 安全部署（先验证再重启，失败即中止）
     ├── README.md       # 后端说明 + API 一览
     ├── DEPLOY.md       # 从买服务器到上线的作战手册
     ├── ecosystem.config.js   # pm2 配置（PORT / AUTH_TOKEN / CORS）

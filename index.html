@@ -1115,6 +1115,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
           <option value="购物">购物</option>
           <option value="娱乐">娱乐</option>
           <option value="学习">学习</option>
+          <option value="学杂">学杂</option>
           <option value="生活">生活</option>
           <option value="其他">其他</option>
         </select>
@@ -2027,7 +2028,7 @@ function topCategories() {
   const freq = {};
   txns.forEach(t => { if (t.category) freq[t.category] = (freq[t.category] || 0) + 1; });
   const used = Object.entries(freq).sort((a, b) => b[1] - a[1]).map(x => x[0]);
-  const fallback = ['餐饮', '交通', '购物', '学习', '医疗', '娱乐'];
+  const fallback = ['餐饮', '交通', '购物', '学习', '学杂', '娱乐'];
   return [...new Set(used.concat(fallback))].slice(0, 6);
 }
 
@@ -5450,7 +5451,7 @@ function setWalletType(type) {
   if (type === 'income') {
     cat.innerHTML = '<option value="工资">工资</option><option value="兼职">兼职</option><option value="生活费">生活费</option><option value="理财">理财</option><option value="其他">其他</option>';
   } else {
-    cat.innerHTML = '<option value="餐饮">餐饮</option><option value="交通">交通</option><option value="购物">购物</option><option value="娱乐">娱乐</option><option value="学习">学习</option><option value="生活">生活</option><option value="其他">其他</option>';
+    cat.innerHTML = '<option value="餐饮">餐饮</option><option value="交通">交通</option><option value="购物">购物</option><option value="娱乐">娱乐</option><option value="学习">学习</option><option value="学杂">学杂</option><option value="生活">生活</option><option value="其他">其他</option>';
   }
 }
 

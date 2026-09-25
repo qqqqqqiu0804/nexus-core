@@ -108,6 +108,9 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // ===== 应用 =====
 const app = express();
+// 默认会带 `X-Powered-By: Express`，等于对外广播后端技术栈，方便攻击者匹配已知 CVE。
+// 一行关掉，零成本。
+app.disable('x-powered-by');
 app.use(express.json({ limit: '12mb' })); // 图片 base64 上传需要更大的体积上限
 app.use(cors({ origin: CORS_ORIGINS })); // 白名单内多个来源；同源访问不受影响
 // 只托管前端单文件——不把整个仓库目录（含 journal.db）暴露成静态资源
@@ -151,6 +154,92 @@ app.get(['/', '/index.html'], (req, res) => {
     res.setHeader('Content-Encoding', 'gzip');
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Vary', 'Accept-Encoding');   // 让中间层按编码区分缓存
+    res.end(c.gz);
+    return;
+  }
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.end(c.raw);
+});
+
+// GET /report —— 个人月报（只读页，给手机浏览器看）
+//
+// 与 index.html 一样走「启动时预压缩 + ETag 协商」，理由相同：报告页带内联 CSS/JS，体积不小，
+// 移动网络下 gzip 收益明显。同样**不引入 compression 包**。
+//
+// 安全：文件名白名单（只允许 [A-Za-z0-9._-]），杜绝 ../ 穿越读到 journal.db。
+// 这个页面是纯静态展示、不含任何用户数据查询接口，所以与 /api 不同，不需要鉴权。
+const REPORT_DIR = path.join(__dirname, '..', 'report');
+const REPORT_NAME_RE = /^[A-Za-z0-9._-]+\.html$/;
+const _reportCache = new Map();   // name -> { raw, gz, etag }
+
+function reportFile(name) {
+  if (_reportCache.has(name)) return _reportCache.get(name);
+  const raw = fs.readFileSync(path.join(REPORT_DIR, name));
+  const entry = {
+    raw,
+    gz: zlib.gzipSync(raw, { level: 6 }),
+    etag: '"' + crypto.createHash('sha1').update(raw).digest('hex').slice(0, 20) + '"'
+  };
+  _reportCache.set(name, entry);
+  return entry;
+}
+
+app.get('/report', (_req, res) => {
+  const dir = REPORT_DIR;
+  let names = [];
+  try {
+    names = fs.readdirSync(dir)
+      .filter(n => REPORT_NAME_RE.test(n))
+      .sort()
+      .reverse();   // 文件名带日期，倒序 = 最新的在前
+  } catch { /* 目录不存在时给个空列表 */ }
+
+  const items = names.map(n => {
+    const label = n.replace(/\.html$/, '');
+    return `<li><a href="/report/${encodeURIComponent(n)}">${label}</a></li>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nexus 报告</title>
+<style>
+body{margin:0;background:#0f1115;color:#e8eaf0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;padding:40px 20px;line-height:1.7}
+.w{max-width:560px;margin:0 auto}
+h1{font-size:24px;margin:0 0 6px}
+p.s{color:#6b7285;font-size:13px;margin:0 0 26px}
+ul{list-style:none;padding:0;margin:0}
+li{margin-bottom:10px}
+a{display:block;background:#171a21;border:1px solid rgba(255,255,255,.08);border-radius:14px;
+  padding:15px 18px;color:#e8eaf0;text-decoration:none;font-size:15px;transition:.2s}
+a:hover{border-color:rgba(91,155,245,.5);background:#1d212a}
+.empty{color:#6b7285;font-size:14px}
+</style></head><body><div class="w">
+<h1>Nexus 报告</h1>
+<p class="s">按时间倒序 · 点击查看</p>
+<ul>${items || '<li class="empty">还没有报告</li>'}</ul>
+</div></body></html>`;
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.end(html);
+});
+
+app.get('/report/:name', (req, res) => {
+  const name = req.params.name;
+  if (!REPORT_NAME_RE.test(name)) { res.status(400).send('非法文件名'); return; }
+
+  let c;
+  try { c = reportFile(name); }
+  catch { res.status(404).send('报告不存在'); return; }
+
+  res.setHeader('ETag', c.etag);
+  res.setHeader('Cache-Control', 'no-cache');
+  if (req.get('If-None-Match') === c.etag) { res.status(304).end(); return; }
+
+  if (/\bgzip\b/.test(req.get('Accept-Encoding') || '')) {
+    res.setHeader('Content-Encoding', 'gzip');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Vary', 'Accept-Encoding');
     res.end(c.gz);
     return;
   }

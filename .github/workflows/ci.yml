@@ -36,3 +36,7 @@ jobs:
 
       - name: 后端冒烟测试
         run: AUTH_TOKEN=ci-test-token PORT=3999 bash tests/smoke-server.sh
+
+      # --- 月报页冒烟：验 /report 路由 / gzip / ETag / 路径穿越 ---
+      - name: 月报路由冒烟测试
+        run: AUTH_TOKEN=ci-test-token PORT=3998 bash tests/smoke-report.sh

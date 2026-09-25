@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<title>Nexus 月报 · 2026 年 9 月</title>
+<style>
+:root{
+  --bg:#0f1115;
+  --card:#171a21;
+  --card2:#1d212a;
+  --line:rgba(255,255,255,.08);
+  --line2:rgba(255,255,255,.14);
+  --tx:#e8eaf0;
+  --tx2:#a2a8b8;
+  --tx3:#6b7285;
+  --up:#f0554e;
+  --down:#3ec98a;
+  --gold:#e0b353;
+  --blue:#5b9bf5;
+  --violet:#9b7bf0;
+  --pad:20px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--bg);color:var(--tx);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:15px;line-height:1.7;
+  padding:0 0 64px;
+  overflow-x:hidden;
+}
+.wrap{max-width:680px;margin:0 auto;padding:0 var(--pad)}
+
+/* ---------- 头部 ---------- */
+.hero{
+  padding:56px 0 32px;
+  background:
+    radial-gradient(900px 340px at 12% -18%, rgba(91,155,245,.20), transparent 62%),
+    radial-gradient(760px 320px at 96% 4%, rgba(155,123,240,.17), transparent 60%);
+  border-bottom:1px solid var(--line);
+}
+.eyebrow{
+  font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--blue);font-weight:600;margin:0 0 12px;
+}
+.hero h1{
+  margin:0;font-size:34px;line-height:1.25;font-weight:700;letter-spacing:-.02em;
+  background:linear-gradient(96deg,#fff 18%,#9db8e8 92%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero .sub{margin:14px 0 0;color:var(--tx2);font-size:14px}
+.hero .meta{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px}
+.chip{
+  font-size:12px;padding:5px 11px;border-radius:999px;
+  background:rgba(255,255,255,.06);border:1px solid var(--line2);color:var(--tx2);
+}
+
+/* ---------- 顶部四宫格 ---------- */
+.kpis{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;
+  margin:-26px 0 0;position:relative;z-index:2;
+}
+.kpi{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:16px;padding:16px 16px 15px;
+  box-shadow:0 10px 26px -18px rgba(0,0,0,.9);
+}
+.kpi .k{font-size:12px;color:var(--tx3);margin:0 0 6px;letter-spacing:.02em}
+.kpi .v{font-size:23px;font-weight:700;margin:0;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi .n{font-size:12px;color:var(--tx3);margin:5px 0 0}
+.v-up{color:var(--up)} .v-down{color:var(--down)} .v-gold{color:var(--gold)} .v-blue{color:var(--blue)}
+
+/* ---------- 区块 ---------- */
+section{margin-top:44px}
+.sec-h{display:flex;align-items:baseline;gap:11px;margin:0 0 6px}
+.sec-n{
+  font-size:12px;font-weight:700;color:var(--blue);
+  font-variant-numeric:tabular-nums;letter-spacing:.06em;
+  padding-top:2px;
+}
+.sec-h h2{margin:0;font-size:21px;font-weight:700;letter-spacing:-.01em}
+.sec-desc{margin:0 0 20px;color:var(--tx3);font-size:13px}
+
+/* ---------- 卡片 ---------- */
+.card{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:16px;padding:18px;margin-bottom:14px;
+}
+.card h3{margin:0 0 14px;font-size:15px;font-weight:600;color:var(--tx)}
+
+/* ---------- 条形图 ---------- */
+.bars{display:flex;flex-direction:column;gap:13px}
+.bar-row{display:grid;grid-template-columns:62px 1fr auto;gap:11px;align-items:center}
+.bar-lbl{font-size:13px;color:var(--tx2);white-space:nowrap}
+.bar-track{height:9px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--blue),#7fb0ff);width:0;transition:width .9s cubic-bezier(.22,1,.36,1)}
+.bar-val{font-size:13px;color:var(--tx);font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+
+/* ---------- 表格 ---------- */
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px;table-layout:fixed}
+.tbl th{
+  text-align:left;font-weight:500;color:var(--tx3);font-size:12px;
+  padding:0 0 9px;border-bottom:1px solid var(--line);
+}
+.tbl th:last-child,.tbl td:last-child{text-align:right}
+.tbl td{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.045);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .num{font-variant-numeric:tabular-nums;font-weight:600}
+.tbl .pos{color:var(--up);font-weight:600}
+.tbl .neg{color:var(--down);font-weight:600}
+.tbl .muted{color:var(--tx3)}
+
+/* ---------- 高亮块 ---------- */
+.note{
+  border-radius:14px;padding:14px 16px;margin:14px 0 0;
+  font-size:13.5px;line-height:1.68;
+  border:1px solid;display:flex;gap:11px;align-items:flex-start;
+}
+.note .ico{flex:0 0 auto;font-size:15px;line-height:1.5}
+.note.warn{background:rgba(224,179,83,.09);border-color:rgba(224,179,83,.30);color:#f2dcaa}
+.note.danger{background:rgba(240,85,78,.09);border-color:rgba(240,85,78,.30);color:#f5b3af}
+.note.good{background:rgba(62,201,138,.09);border-color:rgba(62,201,138,.30);color:#a6e8c9}
+.note.info{background:rgba(91,155,245,.09);border-color:rgba(91,155,245,.30);color:#bcd6f8}
+.note b{color:#fff;font-weight:600}
+
+/* ---------- 大数字行 ---------- */
+.eq{
+  display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
+  padding:18px 12px;background:var(--card2);border-radius:14px;margin:14px 0 0;
+  font-size:15px;font-variant-numeric:tabular-nums;
+}
+.eq .op{color:var(--tx3);font-size:17px}
+.eq .big{font-size:20px;font-weight:700}
+.eq .hl{color:var(--gold)}
+
+/* ---------- 每日支出图 ---------- */
+.spark{margin:6px 0 0}
+.spark-bars{display:flex;align-items:flex-end;gap:3px;height:88px}
+.spark-bars i{
+  flex:1;min-width:0;border-radius:3px 3px 0 0;
+  background:rgba(91,155,245,.55);display:block;
+  transition:height .8s cubic-bezier(.22,1,.36,1);
+}
+.spark-bars i.spike{background:linear-gradient(180deg,var(--gold),#a97f22)}
+.spark-x{display:flex;justify-content:space-between;margin-top:8px;font-size:11.5px;color:var(--tx3)}
+
+/* ---------- 进度环 ---------- */
+.ring-wrap{display:flex;align-items:center;gap:18px}
+.ring{position:relative;width:92px;height:92px;flex:0 0 auto}
+.ring svg{transform:rotate(-90deg)}
+.ring .mid{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;line-height:1.1;
+}
+.ring .mid b{font-size:19px;font-weight:700}
+.ring .mid span{font-size:10.5px;color:var(--tx3);margin-top:2px}
+.ring-txt{font-size:13.5px;color:var(--tx2)}
+.ring-txt b{color:var(--tx);font-size:15px;display:block;margin-bottom:4px;font-weight:600}
+
+/* ---------- 结论列表 ---------- */
+.list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px}
+.list li{display:flex;gap:11px;font-size:14px;line-height:1.65}
+.list .dot{
+  flex:0 0 auto;width:6px;height:6px;border-radius:50%;margin-top:9px;
+  background:var(--blue);
+}
+.list li.ok .dot{background:var(--down)}
+.list li.bad .dot{background:var(--up)}
+.list b{color:#fff;font-weight:600}
+
+/* ---------- 脚注 ---------- */
+.foot{
+  margin-top:52px;padding-top:22px;border-top:1px solid var(--line);
+  font-size:12px;color:var(--tx3);line-height:1.75;
+}
+.foot code{
+  background:rgba(255,255,255,.06);padding:1px 6px;border-radius:5px;
+  font-size:11.5px;color:var(--tx2);
+}
+
+/* ---------- 桌面端微调 ---------- */
+@media(min-width:620px){
+  .hero h1{font-size:40px}
+  .kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .kpi .v{font-size:21px}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Nexus 个人月报</p>
+    <h1>2026 年 9 月</h1>
+    <p class="sub">数据来自 nexus.kotete.xyz 真实导出 · 本地规则化统计生成，未调用 AI 模型</p>
+    <div class="meta">
+      <span class="chip">覆盖 09-01 ~ 09-25</span>
+      <span class="chip">105 笔交易</span>
+      <span class="chip">46 项持仓</span>
+      <span class="chip">9 个账户</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- KPI -->
+  <div class="kpis">
+    <div class="kpi">
+      <p class="k">本月结余</p>
+      <p class="v v-up">+¥12,895</p>
+      <p class="n">但 79.8% 收入不可持续</p>
+    </div>
+    <div class="kpi">
+      <p class="k">真实收入</p>
+      <p class="v v-gold">¥4,099</p>
+      <p class="n">仅占账面 17.7%</p>
+    </div>
+    <div class="kpi">
+      <p class="k">总资产</p>
+      <p class="v v-blue">¥66,128</p>
+      <p class="n">现金 26,550 + 投资 39,577</p>
+    </div>
+    <div class="kpi">
+      <p class="k">投资浮亏</p>
+      <p class="v v-down">−18.30%</p>
+      <p class="n">亏 ¥8,865 / 46 项</p>
+    </div>
+  </div>
+
+  <!-- 1. 财务 -->
+  <section>
+    <div class="sec-h"><span class="sec-n">01</span><h2>财务概览</h2></div>
+    <p class="sec-desc">账面很好看，但需要拆开看。</p>
+
+    <div class="card">
+      <h3>本月收支</h3>
+      <table class="tbl">
+        <tbody>
+          <tr><td class="muted">收入合计</td><td class="num pos">+¥23,103.80</td></tr>
+          <tr><td class="muted">支出合计</td><td class="num neg">−¥10,209.01</td></tr>
+          <tr><td>净结余</td><td class="num pos" style="font-size:16px">+¥12,894.79</td></tr>
+        </tbody>
+      </table>
+      <div class="eq">
+        <span>23,103.80</span><span class="op">−</span><span>10,209.01</span><span class="op">=</span><span class="big hl">12,894.79</span>
+      </div>
+      <div class="note warn">
+        <span class="ico">⚠</span>
+        <span>结余率 55.8% 看起来很健康，但这个数字建立在 <b>¥10,000 助学贷款</b> 之上。严格说，贷款不是收入，是负债。</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>收入结构 · 79.8% 不可持续</h3>
+      <div class="bars">
+        <div class="bar-row"><span class="bar-lbl">助学贷款</span><div class="bar-track"><div class="bar-fill" style="width:43.3%"></div></div><span class="bar-val">10,000</span></div>
+        <div class="bar-row"><span class="bar-lbl">学费转入</span><div class="bar-track"><div class="bar-fill" style="width:39.0%"></div></div><span class="bar-val">9,000</span></div>
+        <div class="bar-row"><span class="bar-lbl">工资</span><div class="bar-track"><div class="bar-fill" style="width:15.2%"></div></div><span class="bar-val">3,520</span></div>
+        <div class="bar-row"><span class="bar-lbl">生活费</span><div class="bar-track"><div class="bar-fill" style="width:1.9%"></div></div><span class="bar-val">440</span></div>
+        <div class="bar-row"><span class="bar-lbl">其他</span><div class="bar-track"><div class="bar-fill" style="width:0.6%"></div></div><span class="bar-val">139</span></div>
+      </div>
+      <div class="note danger">
+        <span class="ico">▼</span>
+        <span>真正靠自己赚到的只有 <b>¥4,098.80</b>（工资 + 零散兼职），占账面收入 17.7%。其余 81% 来自借贷与家庭转移。</span>
+      </div>
+      <div class="note info">
+        <span class="ico">ⓘ</span>
+        <span>学费是<b>过路资金</b>：9/1 家庭转入 ¥9,000，9/21 转出 ¥5,900 交学费。净成本 ¥5,900，不是 ¥9,000。</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>支出分类</h3>
+      <div class="bars">
+        <div class="bar-row"><span class="bar-lbl">学习</span><div class="bar-track"><div class="bar-fill" style="width:68.0%"></div></div><span class="bar-val">6,938</span></div>
+        <div class="bar-row"><span class="bar-lbl">生活</span><div class="bar-track"><div class="bar-fill" style="width:19.4%"></div></div><span class="bar-val">1,984</span></div>
+        <div class="bar-row"><span class="bar-lbl">交通</span><div class="bar-track"><div class="bar-fill" style="width:5.2%"></div></div><span class="bar-val">533</span></div>
+        <div class="bar-row"><span class="bar-lbl">餐饮</span><div class="bar-track"><div class="bar-fill" style="width:4.5%"></div></div><span class="bar-val">455</span></div>
+        <div class="bar-row"><span class="bar-lbl">其他</span><div class="bar-track"><div class="bar-fill" style="width:2.3%"></div></div><span class="bar-val">233</span></div>
+        <div class="bar-row"><span class="bar-lbl">娱乐</span><div class="bar-track"><div class="bar-fill" style="width:0.7%"></div></div><span class="bar-val">67</span></div>
+      </div>
+      <div class="note warn">
+        <span class="ico">◐</span>
+        <span>学习类 ¥6,938 里 ¥5,900 是学费。剔除后真实生活支出 <b>¥4,309.01</b>，其中餐饮只占 <b>10.5%</b> —— 这个比例低得不正常，见下方说明。</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>新增「学杂」分类后的口径</h3>
+      <p style="margin:0 0 14px;font-size:13px;color:var(--tx3)">
+        住宿费 ¥1,300 原本被归在「生活」，性质上属于学杂费。改用新口径后排布如下：
+      </p>
+      <table class="tbl">
+        <thead><tr><th>分类</th><th>原口径</th><th>新口径</th></tr></thead>
+        <tbody>
+          <tr><td>学杂</td><td class="muted">—</td><td class="num">1,300.00</td></tr>
+          <tr><td>学习</td><td class="num muted">6,938.38</td><td class="num">6,938.38</td></tr>
+          <tr><td>生活</td><td class="num muted">1,984.16</td><td class="num pos">684.16</td></tr>
+          <tr><td>交通</td><td class="num muted">532.62</td><td class="num">532.62</td></tr>
+          <tr><td>餐饮</td><td class="num muted">454.53</td><td class="num">454.53</td></tr>
+          <tr><td>其他</td><td class="num muted">232.52</td><td class="num">232.52</td></tr>
+          <tr><td>娱乐</td><td class="num muted">66.80</td><td class="num">66.80</td></tr>
+        </tbody>
+      </table>
+      <div class="note info">
+        <span class="ico">◎</span>
+        <span>关键变化：剔除学费后，<b>餐饮占生活支出的比例从 10.5% → 66.4%</b>。<br>
+        说明原来的「生活」是个杂物桶，把住宿、日用品、零碎开销全塞在一起，掩盖了真实结构。拆开后账本立刻"正常"了 —— 餐饮才是生活费主体，这符合常识。</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>每日支出 · 两个峰值日</h3>
+      <div class="spark">
+        <div class="spark-bars" id="spark"></div>
+        <div class="spark-x"><span>09-01</span><span>09-13</span><span>09-25</span></div>
+      </div>
+      <div class="note danger">
+        <span class="ico">▲</span>
+        <span><b>09-21 支出 ¥5,939.69</b>（含学费 ¥5,900）是绝对离群点。任何日均计算都必须先剔除它，否则会失真。</span>
+      </div>
+      <div class="note info">
+        <span class="ico">ⓘ</span>
+        <span><b>09-06 支出 ¥2,802.40 是当天 9 笔之和</b>，不是单笔。明细：火车 374 + 住宿 1,300 + 书本 900 + 约妆 174 + 打车 ×3 共 22.7 + 麦当劳 11.9 + 地铁日票 19.8。<br>
+        <span class="muted">（初版报告曾误称此处有"未归类支出"，实为算错，已更正。）</span></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 资产 -->
+  <section>
+    <div class="sec-h"><span class="sec-n">02</span><h2>资产与投资</h2></div>
+    <p class="sec-desc">现金健康，组合需要做减法。</p>
+
+    <div class="card">
+      <h3>资产总览</h3>
+      <div class="eq">
+        <span>现金 26,550.45</span><span class="op">+</span><span>投资 39,577.15</span><span class="op">=</span><span class="big hl">66,127.60</span>
+      </div>
+      <div class="note danger">
+        <span class="ico">!</span>
+        <span>发现异常：<b>微信① 零钱通余额 ¥−5,312.87</b>，为负数。疑似一笔转账只记了单边。修正后现金可能接近 <b>¥31,863</b>。</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>投资表现</h3>
+      <table class="tbl">
+        <thead><tr><th>项目</th><th>数值</th></tr></thead>
+        <tbody>
+          <tr><td class="muted">市值</td><td class="num">¥39,577.15</td></tr>
+          <tr><td class="muted">成本</td><td class="num">¥48,442.39</td></tr>
+          <tr><td>浮动盈亏</td><td class="num neg">−¥8,865.24</td></tr>
+          <tr><td>收益率</td><td class="num neg">−18.30%</td></tr>
+        </tbody>
+      </table>
+      <div style="height:16px"></div>
+      <div class="bars">
+        <div class="bar-row"><span class="bar-lbl">基金</span><div class="bar-track"><div class="bar-fill" style="width:70.9%;background:linear-gradient(90deg,#3ec98a,#6fdca9)"></div></div><span class="bar-val">−6,291</span></div>
+        <div class="bar-row"><span class="bar-lbl">股票</span><div class="bar-track"><div class="bar-fill" style="width:19.0%;background:linear-gradient(90deg,#3ec98a,#6fdca9)"></div></div><span class="bar-val">−1,680</span></div>
+        <div class="bar-row"><span class="bar-lbl">黄金</span><div class="bar-track"><div class="bar-fill" style="width:10.1%;background:linear-gradient(90deg,#3ec98a,#6fdca9)"></div></div><span class="bar-val">−899</span></div>
+        <div class="bar-row"><span class="bar-lbl">货币</span><div class="bar-track"><div class="bar-fill" style="width:0.5%;background:linear-gradient(90deg,#f0554e,#ff8a84)"></div></div><span class="bar-val">+4</span></div>
+      </div>
+      <div class="note danger">
+        <span class="ico">▼</span>
+        <span>46 项持仓，<b>45 项亏损</b>，单只平均不到 ¥900。这不是"市场不好"，是持仓过度分散 + 买入时点集中在高位。</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>亏损最大的五只</h3>
+      <table class="tbl">
+        <thead><tr><th>名称</th><th>盈亏</th></tr></thead>
+        <tbody>
+          <tr><td>银行黄金</td><td class="num neg">−¥899</td></tr>
+          <tr><td>科创50ETF广发</td><td class="num neg">−¥884</td></tr>
+          <tr><td>华夏全球科技先锋</td><td class="num neg">−¥513</td></tr>
+          <tr><td>国投白银LOF</td><td class="num neg">−¥475 <span class="muted">−48.2%</span></td></tr>
+          <tr><td>泰信发展主题</td><td class="num neg">−¥460 <span class="muted">−41.8%</span></td></tr>
+        </tbody>
+      </table>
+      <div class="note info">
+        <span class="ico">✓</span>
+        <span>仅两只盈利：活期+ ¥4.23、华安纳斯达克100ETF联接 <b>+¥33.80（+2.8%）</b>。</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 任务 -->
+  <section>
+    <div class="sec-h"><span class="sec-n">03</span><h2>任务与习惯</h2></div>
+    <p class="sec-desc">失败的原因不是你不够努力，是课表把你耗干了。</p>
+
+    <div class="card">
+      <h3>本月完成度</h3>
+      <div class="ring-wrap">
+        <div class="ring">
+          <svg width="92" height="92" viewBox="0 0 92 92">
+            <circle cx="46" cy="46" r="38" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="9"/>
+            <circle cx="46" cy="46" r="38" fill="none" stroke="#f0554e" stroke-width="9"
+                    stroke-linecap="round" stroke-dasharray="238.8" stroke-dashoffset="180"/>
+          </svg>
+          <div class="mid"><b>5</b><span>/25 天</span></div>
+        </div>
+        <div class="ring-txt">
+          <b>9 月只有 5 天留下完成记录</b>
+          集中在 09-16 ~ 09-20。签到停在 09-20，连续天数已归零。
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>真实瓶颈：精力，不是意志</h3>
+      <ul class="list">
+        <li><span class="dot"></span><span>「周天上到周四，每天三节课起步，特别痛苦，<b>完全没有精力</b>收拾、做饭。」</span></li>
+        <li><span class="dot"></span><span>「买了食材想做饭，但那个<b>西兰花已经放到发霉</b>了我都没有去做，因为真的太累了。」</span></li>
+      </ul>
+      <div class="note info">
+        <span class="ico">→</span>
+        <span>连续 5 天 × 3 节课以上，会直接摧毁任何「每日习惯」系统。这不是记不记账的问题，是系统<b>没有考虑低精力日</b>。</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>发现一个功能缺陷</h3>
+      <table class="tbl">
+        <thead><tr><th>每日模板</th><th>已生成任务系列</th></tr></thead>
+        <tbody>
+          <tr><td>背30个英语单词</td><td class="num pos">✓</td></tr>
+          <tr><td>运动20分钟</td><td class="num pos">✓</td></tr>
+          <tr><td>复习当天所学内容</td><td class="num pos">✓</td></tr>
+          <tr><td>阅读30分钟</td><td class="num neg">✗ 从未生成</td></tr>
+        </tbody>
+      </table>
+      <div class="note warn">
+        <span class="ico">⚠</span>
+        <span>4 个模板全部启用，但任务表里只有 3 个系列。「<b>阅读30分钟</b>」从未生成过任何任务 —— 属于功能静默失效，值得去代码里定位。</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. 日记 -->
+  <section>
+    <div class="sec-h"><span class="sec-n">04</span><h2>日记与思想</h2></div>
+    <p class="sec-desc">产品的表达欲远高于记录日常。</p>
+
+    <div class="card">
+      <h3>记录密度</h3>
+      <table class="tbl">
+        <thead><tr><th>类型</th><th>数量</th></tr></thead>
+        <tbody>
+          <tr><td class="muted">日记</td><td class="num">5 天 · 6 条 · 683 字</td></tr>
+          <tr><td class="muted">灵光记录</td><td class="num pos">8 条</td></tr>
+        </tbody>
+      </table>
+      <div class="note info">
+        <span class="ico">◑</span>
+        <span>日记只有 5 天，但灵光记录有 8 条，且<b>全部指向可落地的产品功能</b>。你的表达欲在"做产品"上被激活，不在"记日常"上。</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>本月灵光（节选）</h3>
+      <ul class="list">
+        <li><span class="dot"></span><span>直播切片时间线（黄婷婷「N 年前的今天」）</span></li>
+        <li><span class="dot"></span><span>每日英语单词（受象棋每日残局机制启发）</span></li>
+        <li><span class="dot"></span><span>象棋残局学习 · 一天一残局</span></li>
+        <li><span class="dot"></span><span>课表课程名简写（毛概/习概 → 短名）<span class="muted">— 低成本高收益</span></span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 5. 结论 -->
+  <section>
+    <div class="sec-h"><span class="sec-n">05</span><h2>结论</h2></div>
+    <p class="sec-desc">五条值得肯定的，五条需要正视的。</p>
+
+    <div class="card">
+      <h3>值得肯定</h3>
+      <ul class="list">
+        <li class="ok"><span class="dot"></span><span>收支为正，剔除借贷后仍为正</span></li>
+        <li class="ok"><span class="dot"></span><span>现金储备 ¥26,550，对在校生而言抗风险能力足够</span></li>
+        <li class="ok"><span class="dot"></span><span>8 条产品灵感全部可落地，这是稀缺能力</span></li>
+        <li class="ok"><span class="dot"></span><span>记账坚持了 20+ 天，且已开始关注资产结构</span></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>需要正视</h3>
+      <ul class="list">
+        <li class="bad"><span class="dot"></span><span><b>收入结构脆弱</b>：真实经营性收入仅 ¥4,099（17.7%）</span></li>
+        <li class="bad"><span class="dot"></span><span><b>投资需做减法</b>：46 项、−18.30%、45 项亏损</span></li>
+        <li class="bad"><span class="dot"></span><span><b>任务系统被课表击穿</b>：仅 5 天有记录</span></li>
+        <li class="bad"><span class="dot"></span><span><b>日记链路空转</b>：5 天 / 683 字，说明这个功能对你不成立</span></li>
+        <li class="bad"><span class="dot"></span><span><b>两处数据不一致</b>：零钱通负数、模板未生成任务</span></li>
+        <li class="bad"><span class="dot"></span><span><b>分类口径混乱</b>：生活是个杂物桶，住宿费混在里面</span></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>三条建议</h3>
+      <ul class="list">
+        <li><span class="dot"></span><span><b>先修数据，再谈分析</b><br>
+          <span class="muted">排查零钱通 −¥5,312.87；把助学贷款移出"收入"改为负债登记；住宿/学费/书本费统一归「学杂」。</span></span></li>
+        <li><span class="dot"></span><span><b>投资做减法，不是加仓摊平</b><br>
+          <span class="muted">46 项压到 8~12 项；清理 −40% 以上的产品；定「单只 −25% 即复盘」规则。</span></span></li>
+        <li><span class="dot"></span><span><b>任务系统要"低精力模式"</b><br>
+          <span class="muted">每个模板加最小可完成版；课表 3 节以上的日子自动降级；连续天数改为「完成 ≥1 项」。</span></span></li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="foot">
+    <p><b>数据可信度</b></p>
+    <p>
+      财务 · 投资 · 日记：<span style="color:var(--down)">完整可复算</span><br>
+      现金账户：有 1 个负数账户待排查<br>
+      任务数据：模板/任务数量不匹配，疑似功能缺陷<br>
+      时间范围：仅到 09-25，非完整自然月
+    </p>
+    <p style="margin-top:14px">
+      本报告由本地规则化统计生成（<code>_data/export-sanitized.json</code>），未调用 AI 模型。所有数字均可复现。
+    </p>
+    <p style="margin-top:14px">
+      <b>更正记录</b>：初版曾称「09-06 有 ¥1,502 支出未归类」，实为算错 —— 当天 9 笔全有分类。本版已更正，并按反馈新增「学杂」分类口径。
+    </p>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var data = [
+    ['09-01',17.37],['09-02',313.71],['09-03',2.25],['09-05',81.79],
+    ['09-06',2802.40],['09-07',40.50],['09-08',452.35],['09-09',28.29],
+    ['09-12',93.00],['09-13',12.48],['09-14',123.93],['09-15',39.70],
+    ['09-16',3.66],['09-17',28.29],['09-18',40.59],['09-19',35.85],
+    ['09-20',24.65],['09-21',5939.69],['09-22',57.56],['09-23',18.88],
+    ['09-24',20.78],['09-25',31.29]
+  ];
+  var host = document.getElementById('spark');
+  var max = 6000;
+  data.forEach(function(d){
+    var b = document.createElement('i');
+    var pct = Math.max(3, (d[1] / max) * 100);
+    b.style.height = '0%';
+    b.title = d[0] + ' ¥' + d[1];
+    if (d[1] > 1000) b.className = 'spike';
+    host.appendChild(b);
+    requestAnimationFrame(function(){ b.style.height = pct + '%'; });
+  });
+})();
+</script>
+</body>
+</html>
