@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "node ../tests/xiangqi-moves.test.js && node ../tests/ai-report.test.js",
-    "test:smoke": "bash ../tests/smoke-server.sh && bash ../tests/smoke-report.sh"
+    "test:smoke": "bash ../tests/smoke-server.sh && bash ../tests/smoke-report.sh && bash ../tests/smoke-hardening.sh"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -168,7 +168,8 @@ app.get(['/', '/index.html'], (req, res) => {
 //
 // 安全：文件名白名单（只允许 [A-Za-z0-9._-]），杜绝 ../ 穿越读到 journal.db。
 // 这个页面是纯静态展示、不含任何用户数据查询接口，所以与 /api 不同，不需要鉴权。
-const REPORT_DIR = path.join(__dirname, '..', 'report');
+// REPORT_DIR 可用环境变量覆盖：测试要造隔离的报告目录，不应污染仓库里的 report/。
+const REPORT_DIR = path.resolve(process.env.REPORT_DIR || path.join(__dirname, '..', 'report'));
 const REPORT_NAME_RE = /^[A-Za-z0-9._-]+\.html$/;
 const _reportCache = new Map();   // name -> { raw, gz, etag }
 
@@ -177,11 +178,26 @@ function reportFile(name) {
   const raw = fs.readFileSync(path.join(REPORT_DIR, name));
   const entry = {
     raw,
+    // 与 index.html 一致，启动时预压缩。
+    // 别按需 gzipSync：Node 是单线程，请求内同步压缩一个大 HTML 会把
+    // 整个事件循环卡住，期间连 /api/* 都停摆 —— 是个现成的 DoS 放大点。
     gz: zlib.gzipSync(raw, { level: 6 }),
     etag: '"' + crypto.createHash('sha1').update(raw).digest('hex').slice(0, 20) + '"'
   };
   _reportCache.set(name, entry);
   return entry;
+}
+
+// 启动时把所有报告预压缩进缓存（懒压缩的阻塞问题见上）。
+function warmReportCache() {
+  let n = 0;
+  try {
+    for (const name of fs.readdirSync(REPORT_DIR)) {
+      if (!REPORT_NAME_RE.test(name)) continue;
+      try { reportFile(name); n++; } catch { /* 单个文件坏了不影响其它 */ }
+    }
+  } catch { /* 目录不存在就是没报告，正常 */ }
+  if (n) console.log(`  月报预压缩: ${n} 份`);
 }
 
 app.get('/report', (_req, res) => {
@@ -288,15 +304,20 @@ app.use('/api', (req, res, next) => {
 });
 
 // 小工具：包一层 try/catch，数据库出错统一返回 500，不让进程崩
+// 错误信息不在响应里回显细节：这个服务曾经在 NODE_ENV 未设时把
+// 完整的 SyntaxError 堆栈（含 node_modules 绝对路径、依赖行号）回给调用方，
+// 等于免费给攻击者一份内部目录结构 + 依赖版本清单，用来精确匹配已知 CVE。
+// 只回一句固定的 'internal error'，真正的堆栈留在服务端日志里。
+const internalError = (res) => res.status(500).json({ error: 'internal error' });
 const wrap = fn => (req, res) => {
   try { res.json(fn(req, res)); }
-  catch (e) { console.error(e); res.status(500).json({ error: String(e.message || e) }); }
+  catch (e) { console.error('[wrap]', e); internalError(res); }
 };
 
 // 异步版：抓外部页面这类要 await 的路由用它（wrap 直接 res.json(Promise) 会序列化成 {}）
 const wrapAsync = fn => async (req, res) => {
   try { res.json(await fn(req, res)); }
-  catch (e) { console.error(e); res.status(500).json({ error: String(e.message || e) }); }
+  catch (e) { console.error('[wrapAsync]', e); internalError(res); }
 };
 
 // ===== 日记 API =====
@@ -422,10 +443,15 @@ app.put('/api/kv', wrap(req => {
       if (!k || typeof v !== 'object' || v === null) continue;
       const ts = Number(v.updatedAt) || 0;
       const cur = kvStmts.get.get(k);
-      if (!cur || ts > Number(cur.updated_at)) {
+      // 相等时间戳也算「服务端更新」，必须是 >= 而不是 >。
+      // 原来 > / < 两个分支都不覆盖 ts === cur.updated_at：
+      // 那种情况下什么都没写，却照样返回 ok:true —— 前端以为成功了不重试，
+      // 也在 conflicts 里找不到这个键不会收敛，数据就这样静默丢了。
+      // 前端 updatedAt 用的是 Date.now()（毫秒），同毫秒双写并非天方夜谭。
+      if (!cur || ts >= Number(cur.updated_at)) {
         kvStmts.put.run(k, JSON.stringify(v.value ?? null), ts);
         applied.push(k);
-      } else if (ts < Number(cur.updated_at)) {
+      } else {
         // 服务端更新 → 回给前端，让前端更新本地（前端负责收敛）
         try { conflicts[k] = { value: JSON.parse(cur.value), updatedAt: Number(cur.updated_at) }; }
         catch { /* 服务端数据坏了，忽略此键 */ }
@@ -491,33 +517,64 @@ function decodeEntities(s) {
 
 // 带超时 + 读取上限的取文，避免大页面把内存吃满
 // extraHeaders 可选：东方财富的净值文件带不带 Referer 结果不同（不带会返回空）
-async function fetchCapped(url, capBytes, timeoutMs, extraHeaders) {
+//
+// 重定向必须手动跟随并在每一跳重新校验：fetch 的 redirect:'follow' 只在
+// 首跳前跑过一次调用方的 host 白名单，一旦对方 302 到 http://127.0.0.1/...
+// 就会直接把内网内容抓回来（条件性 SSRF，需要白名单站点上有开放重定向）。
+// 这里每跳都问一次 validateHop，问不过就立刻断，不回传任何内容。
+async function fetchCapped(url, capBytes, timeoutMs, extraHeaders, validateHop) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const MAX_HOPS = 5;
   try {
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      redirect: 'follow',
-      headers: Object.assign(
-        { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9' },
-        extraHeaders || {}
-      )
-    });
-    if (!res.ok || !res.body) return { status: res.status, text: '', finalUrl: res.url };
-    const reader = res.body.getReader();
-    const chunks = [];
-    let total = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.length;
-      chunks.push(Buffer.from(value));
-      if (total >= capBytes) { try { await reader.cancel(); } catch {} break; }
+    let current = url;
+    for (let hop = 0; hop <= MAX_HOPS; hop++) {
+      const res = await fetch(current, {
+        signal: ctrl.signal,
+        redirect: 'manual',
+        headers: Object.assign(
+          { 'User-Agent': UA, 'Accept-Language': 'zh-CN,zh;q=0.9' },
+          extraHeaders || {}
+        )
+      });
+      // 3xx：取 Location，校验后再来一轮
+      if (res.status >= 300 && res.status < 400) {
+        const loc = res.headers.get('location');
+        if (!loc) return { status: res.status, text: '', finalUrl: current };
+        let next;
+        try { next = new URL(loc, current).href; } catch { return { status: res.status, text: '', finalUrl: current }; }
+        if (validateHop && !validateHop(next)) return { status: res.status, text: '', finalUrl: current, blocked: true };
+        current = next;
+        continue;
+      }
+      if (!res.ok || !res.body) return { status: res.status, text: '', finalUrl: current };
+      const reader = res.body.getReader();
+      const chunks = [];
+      let total = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.length;
+        chunks.push(Buffer.from(value));
+        if (total >= capBytes) { try { await reader.cancel(); } catch {} break; }
+      }
+      return { status: res.status, text: Buffer.concat(chunks).toString('utf8'), finalUrl: current };
     }
-    return { status: res.status, text: Buffer.concat(chunks).toString('utf8'), finalUrl: res.url };
+    return { status: 508, text: '', finalUrl: current, error: 'too_many_redirects' };
   } finally {
     clearTimeout(timer);
   }
+}
+
+// 跳转目标校验：协议必须是 http(s)，且（可选）host 仍在白名单内。
+function hopGuard(allowHosts) {
+  return (href) => {
+    let u;
+    try { u = new URL(href); } catch { return false; }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    if (allowHosts && !linkHostAllowed(u.hostname)) return false;
+    return true;
+  };
 }
 
 // B 站页面给无 Cookie 的请求返回 412（风控），所以走它的公开 view 接口拿标题。
@@ -525,7 +582,8 @@ async function fetchCapped(url, capBytes, timeoutMs, extraHeaders) {
 async function bilibiliTitle(url) {
   let finalUrl = url;
   if (/^https?:\/\/b23\.tv\//i.test(url)) {
-    const r = await fetchCapped(url, 1, 6000);
+    // 短链跳转也在白名单内（b23.tv → bilibili.com），跳出去就断
+    const r = await fetchCapped(url, 1, 6000, null, hopGuard(true));
     if (r.finalUrl) finalUrl = r.finalUrl;
   }
   const m = finalUrl.match(/\/(BV[0-9A-Za-z]{10})/) || finalUrl.match(/[?&]bvid=(BV[0-9A-Za-z]{10})/i);
@@ -554,7 +612,8 @@ app.get('/api/link-title', wrapAsync(async req => {
   }
 
   try {
-    const r = await fetchCapped(u.href, 200 * 1024, 8000);
+    // 这是唯一由用户直接给 URL 的抓取路径，跳转必须逐跳复查白名单
+    const r = await fetchCapped(u.href, 200 * 1024, 8000, null, hopGuard(true));
     let t = '';
     const og = r.text.match(/<meta[^>]+(?:property|name)=["']og:title["'][^>]*>/i);
     if (og) {
@@ -855,6 +914,21 @@ app.post('/api/ai/weekly', async (req, res) => {
   res.end();
 });
 
+// 兜底错误处理：必须放在所有路由之后。
+// 没有它的时候，Express 默认错误页在 NODE_ENV!=production 下会把
+// body-parser 的 SyntaxError 堆栈（含绝对路径）原样回给客户端。
+app.use((err, _req, res, _next) => {
+  console.error('[global]', err);
+  if (res.headersSent) return;
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({ error: status === 400 ? 'bad request' : 'internal error' });
+});
+
+// 兜底：任何漏网的 async 未捕获拒绝在 Node 22 默认是 exit(1)，
+// 一旦发生整个服务会重启（pm2 会拉起，但期间请求全失败）。
+// 记日志即可 —— 不 exit，让当前进程继续服务。
+process.on('unhandledRejection', (r) => { console.error('[unhandledRejection]', r); });
+
 app.listen(PORT, () => {
   console.log(`[nexus-core server] 已启动 → http://localhost:${PORT}`);
   console.log(`  日记 API: http://localhost:${PORT}/api/entries`);
@@ -864,4 +938,5 @@ app.listen(PORT, () => {
   console.log(`  AI 周报:  POST ${PORT === 80 ? '' : ':' + PORT}/api/ai/weekly (SSE) → Ollama ${OLLAMA_URL}`);
   console.log(`  CORS 放行: ${CORS_ORIGINS.join(' , ')}`);
   console.log(`  数据库: ${DB_PATH}`);
+  warmReportCache();
 });

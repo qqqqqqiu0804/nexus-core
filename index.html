@@ -2058,7 +2058,9 @@ function renderQuickCats() {
   const el = document.getElementById('quick-cats');
   if (!el) return;
   el.innerHTML = topCategories().map(function (c) {
-    return '<button class="quick-cat' + (c === _quickCat ? ' active' : '') + '" onclick="quickPick(&quot;' + c + '&quot;)">' + c + '</button>';
+    // 分类名会跟着 wallet 走 KV 同步（导入的旧数据 / 被污染的 JSON 都可能是任意字符串），
+    // onclick 属性值和按钮正文两处都要转义，否则分类名里一个 " 就能注入事件。
+    return '<button class="quick-cat' + (c === _quickCat ? ' active' : '') + '" onclick="quickPick(&quot;' + escAttr(c) + '&quot;)">' + escHtml(c) + '</button>';
   }).join('');
 }
 
@@ -2313,11 +2315,26 @@ function inspDelete(id) {
 }
 
 function inspViewImage(url) {
+  // 用 createElement 而不是拼 innerHTML：这个 url 源自 KV 同步的数据，
+  // 可能是被污染的导入文件里带的任意字符串，拼进 innerHTML 就等于开了一个注入口。
   const d = document.createElement('div');
   d.className = 'insp-viewer';
-  d.innerHTML = '<img src="' + url + '">';
+  const img = document.createElement('img');
+  img.src = safeFileUrl(url);   // 只接受本站 /api/files/ 下的地址
+  d.appendChild(img);
   d.onclick = function () { d.remove(); };
   document.body.appendChild(d);
+}
+
+// 图片地址白名单：只放行「本站 /api/files/<32位十六进制>.<扩展名>」。
+// 为什么要这么严：fileUrl 会跟着 inspirations 走 KV 同步，
+// 任何能写 KV 的路径（被污染的导入 JSON、token 泄漏、旧服务器残留）
+// 都能把它改成 //evil.com/x.png —— 那样每次打开灵感库都会向外部发请求（带 Referer）。
+// 前缀可能是空串（同源）或 serverBase（跨源），所以只校验路径部分。
+function safeFileUrl(u) {
+  const s = String(u == null ? '' : u).trim();
+  const m = s.match(/^(.*?)(\/api\/files\/[0-9a-f]{32}\.[A-Za-z0-9]+)$/);
+  return m ? m[1] + m[2] : '';
 }
 
 function inspSetTagFilter(t) { _inspTagFilter = (_inspTagFilter === t ? '' : t); renderInspirations(); }
@@ -2334,7 +2351,10 @@ function renderInspirations() {
   all.forEach(function (it) { (it.tags || []).forEach(function (t) { freq[t] = (freq[t] || 0) + 1; }); });
   const tags = Object.entries(freq).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 12);
   barEl.innerHTML = tags.length ? tags.map(function (e) {
-    return '<button class="insp-tagbar-item' + (e[0] === _inspTagFilter ? ' active' : '') + '" onclick="inspSetTagFilter(&quot;' + e[0] + '&quot;)">#' + e[0] + ' ' + e[1] + '</button>';
+    // 标签来自 KV 同步的任意字符串，既要过属性转义（onclick 里），也要过 HTML 转义（正文里）。
+    // 原来只写了 e[0] 原文，标签里带 " 或 < 就能截断属性/注入标签。
+    const t = escAttr(e[0]);
+    return '<button class="insp-tagbar-item' + (e[0] === _inspTagFilter ? ' active' : '') + '" onclick="inspSetTagFilter(&quot;' + t + '&quot;)">#' + escHtml(e[0]) + ' ' + e[1] + '</button>';
   }).join('') : '';
 
   // 过滤
@@ -2351,10 +2371,10 @@ function renderInspirations() {
     return;
   }
 
-  const base = serverCfg().base;
   listEl.innerHTML = items.map(function (it) {
     const safeLink = safeUrl(it.link);
-    const img = it.fileUrl ? '<img class="insp-thumb" src="' + base + escAttr(it.fileUrl) + '" loading="lazy" onclick="inspViewImage(&quot;' + base + escAttr(it.fileUrl) + '&quot;)">' : '';
+    const safeImg = safeFileUrl(it.fileUrl);   // 非法地址直接丢弃，不渲染 img
+    const img = safeImg ? '<img class="insp-thumb" src="' + escAttr(safeImg) + '" loading="lazy" onclick="inspViewImage(&quot;' + escAttr(safeImg) + '&quot;)">' : '';
     const link = safeLink ? '<div style="margin-top:6px;"><a href="' + safeLink + '" target="_blank" rel="noopener noreferrer" style="font-size:0.72rem;color:var(--accent);word-break:break-all;">' + escHtml(it.link) + '</a></div>' : '';
     const tagsHtml = (it.tags || []).map(function (t) { return '<span class="insp-tag">#' + escHtml(t) + '</span>'; }).join(' ');
     const kindIco = it.kind === 'material' ? icon('image', 0.85) : icon('thought', 0.85);
