@@ -1,0 +1,9 @@
+# yt-dlp 隔离环境（体积大，服务器上重建即可）
+venv/
+
+# cookie 文件（凭据，绝不入库）
+*.cookies.txt
+.douyin-cookies.txt
+
+# 批处理产物
+*.out.json
