@@ -40,6 +40,17 @@ Edge 打开 → **Edge 加载项商店** → 搜 **Tampermonkey** → 安装
 
 > 你截图里已经装好了（8 个脚本），这一步跳过。
 
+### 先看它长什么样（30 秒，不用装）
+
+面板的样子我已经在真浏览器里跑出来并截图了：
+
+```
+docs/tools/shots/panel-1-groups.png   ← 刚进收藏夹（识别到分组）
+docs/tools/shots/panel-2-videos.png   ← 点进某个收藏夹后（在收视频）
+```
+
+觉得可以再往下做。不好看告诉我，我改。
+
 ### 第 2 步：更新脚本到 v3
 
 **这一步必须做** —— v2 面板弹不出来，v3 修好了。
@@ -108,7 +119,7 @@ Edge 打开 → **Edge 加载项商店** → 搜 **Tampermonkey** → 安装
 映射表停在 2024 年初（我实测过，见 `docs/COLLECTION-ACCESS.md`），早失效。
 让浏览器自己算才是唯一稳的路。
 
-**两道验证：**
+**三道验证：**
 
 ```bash
 cd docs/tools
@@ -121,10 +132,23 @@ node test-userscript.js douyin-favorites.user.js
 node test-userscript-v3.js douyin-favorites.user.js
 # 实测输出：全部通过（12 项）✅
 
-# ③ 只读性（应无输出）
+# ③ 真浏览器：面板在真实 Chromium 里到底建不建得出来
+#    （v2 栽的就是这一关，假 DOM 测不到）
+NODE_PATH="C:/Users/HXT/.workbuddy-ai/binaries/node/workspace/node_modules" \
+  "C:/Users/HXT/.workbuddy-ai/binaries/node/versions/22.22.2-3/node.exe" \
+  test-userscript-real.js douyin-favorites.user.js
+# 实测输出：全部通过（10 项）✅
+#   面板真出现在 DOM / 显示"4 个收藏夹分组" / XHR 钩子生效 /
+#   不溢出 430x932 屏幕 / __nexusDyStat 可用
+
+# ④ 只读性（应无输出）
 grep -nE "method:\s*['\"](POST|PUT|DELETE)|\.open\(['\"](POST|PUT|DELETE)" \
   douyin-favorites.user.js
 ```
+
+> ③ 那个测试干的事：起一个本地服务，把 `www.douyin.com` 劫持过去，
+> 用真 Chromium 打开并注入脚本，然后让假页面自己发一次收藏夹请求 ——
+> 断言面板真的出现在 DOM 里。**这就是"v2 为什么弹不出来"那个问题的回归测试。**
 
 ---
 
