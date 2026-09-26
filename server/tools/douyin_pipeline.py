@@ -33,6 +33,17 @@ import urllib.error
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+
+# 数据层：让「跑过的不用重跑」成立。
+# 用 try 是因为 pipeline 在 --list-models 这类不用 DB 的场景下也应该能跑。
+try:
+    sys.path.insert(0, str(HERE))
+    from video_db import VideoDB
+    DB_PATH = HERE.parent / 'videos.db'
+except Exception:      # noqa: BLE001
+    VideoDB = None
+    DB_PATH = None
+
 DEFAULT_YTDLP = HERE / 'venv' / 'bin' / 'python'
 
 # ⚠️ 2026-09-26 实测结论：**用公开域名，不要用工作空间专属域名。**
@@ -377,10 +388,21 @@ SUMMARY_PROMPT = """你是一个帮人提炼成长类短视频观点的助手。
 # 所以现在：端点由 ENDPOINT_HINTS 决定（认识的直接路由），
 # 不认识的**两端点都试一遍**，试出哪个能通就记住 —— 不靠我猜。
 DEFAULT_SUMMARY_MODELS = [
-    'qwen3.8-flash',      # 实测可用（multimodal 家族），速度快
-    'glm-5.3',            # 实测可用（text 家族），作为跨家族兜底
-    'qwen3.8-max-0902',   # 实测可用（multimodal 家族），质量更好
+    # 按「便宜 + 够用」排序，第一个就是默认要跑的
+    'qwen3.8-flash',            # 最快最便宜，日常首选
+    'deepseek-v4.1-flash',      # 次便宜，中文理解好，质量兜底
+    'qwen3.7-flash-2026-07-15', # flash 同档
+    'qwen3.8-27b',              # 小参数，稳
+    'kimi-k3',                  # 长文本友好（转写稿都很长）
+    'glm-5.3',                  # 跨家族兜底（text 端点）
+    'deepseek-v4-flash-0731',   # text 端点
+    'qwen3.8-max-0902',         # 贵但质量最好，留给重要的重跑
 ]
+
+# 2026-09-26 实测：以下 10 个全部可用
+#   多模态端点: qwen3.8-flash / qwen3.7-flash-2026-07-15 / deepseek-v4.1-flash
+#              / kimi-k3 / qwen3.8-27b / qwen3.8-2.4t-a95b / qwen3.8-max-0902
+#   文本端点:   deepseek-v4-flash-0731 / deepseek-v4-pro-0813 / glm-5.3
 
 EP_TEXT = '/services/aigc/text-generation/generation'
 EP_MULTI = '/services/aigc/multimodal-generation/generation'
@@ -553,36 +575,121 @@ def probe_models(api_key, candidates):
 
 
 # ---------- 主流程 ----------
+def extract_aweme_id(url):
+    """从各种链接形式里抠出 aweme_id
+
+    支持的形态：
+      https://www.douyin.com/video/7689106012851254514
+      https://www.douyin.com/note/7689106012851254514
+      https://v.douyin.com/xxxxx/          ← 短链，抠不出，返回 ''
+      https://www.douyin.com/user/xxx?modal_id=7689106012851254514
+    """
+    if not url:
+        return ''
+    m = re.search(r'/video/(\d{15,25})', url) or \
+        re.search(r'/note/(\d{15,25})', url) or \
+        re.search(r'modal_id=(\d{15,25})', url)
+    return m.group(1) if m else ''
+
+
 def process_one(url, args, api_key):
-    result = {'url': url, 'ok': False, 'steps': {}}
+    """处理单条视频
+
+    ★ 复用逻辑（2026-09-26 加）：
+      开跑前先问数据库"这条的转写有吗"。
+      有 → 跳过下载 + ASR（省时间，更省钱 —— ASR 0.6 元/小时）。
+      没有 → 正常跑，跑完写回数据库。
+    这就是「下次不用重复跑同一条视频」的落地点。
+    """
+    result = {'url': url, 'ok': False, 'steps': {}, 'cached': False}
     workdir = Path(tempfile.mkdtemp(prefix='dy-'))
+    db = getattr(args, 'db', None)
+    aweme_id = extract_aweme_id(url)
+    result['aweme_id'] = aweme_id
     try:
-        meta = fetch_meta(url, args.cookies, args.ytdlp)
-        result['title'] = meta.get('title') or ''
-        result['uploader'] = meta.get('uploader') or ''
-        result['duration'] = meta.get('duration')
-        result['steps']['meta'] = 'ok'
+        # ---------- ★ 查缓存：有转写就不下载、不 ASR ----------
+        transcript = None
+        if db and aweme_id and not args.force:
+            cached = db.get_transcript(aweme_id)   # 返回纯文本 或 None
+            if cached:
+                transcript = cached
+                result['cached'] = True
+                result['transcript_len'] = len(cached)
+                result['steps']['db'] = 'hit（已有转写，跳过下载+ASR）'
+                result['asr_seconds'] = 0
+                print('       ↳ 命中缓存，跳过 ASR', file=sys.stderr)
+                # 缓存命中时也把标题/作者带出来（DB 里存着）
+                v = db.get_video(aweme_id)
+                if v:
+                    result['title'] = v.get('desc') or ''
+                    result['uploader'] = v.get('author') or ''
+                    result['duration'] = (v.get('duration_ms') or 0) / 1000
+                if args.transcript_only:
+                    result['transcript'] = transcript
+                    result['ok'] = True
+                    return result
+        elif db and aweme_id and args.force:
+            result['steps']['db'] = 'ignore（--force 强制重跑）'
 
-        if args.meta_only:
-            result['ok'] = True
-            return result
+        # ---------- 缓存没命中：走正常流程 ----------
+        if transcript is None:
+            meta = fetch_meta(url, args.cookies, args.ytdlp)
+            result['title'] = meta.get('title') or ''
+            result['uploader'] = meta.get('uploader') or ''
+            result['duration'] = meta.get('duration')
+            result['steps']['meta'] = 'ok'
 
-        audio = fetch_audio(url, args.cookies, args.ytdlp, workdir)
-        result['steps']['download'] = f'ok ({audio.stat().st_size} bytes)'
+            if args.meta_only:
+                result['ok'] = True
+                return result
 
-        transcript, used_sec = transcribe(audio, api_key, args.asr_public,
-                                         model=args.asr_model)
-        result['transcript_len'] = len(transcript)
-        result['asr_seconds'] = used_sec
-        result['steps']['asr'] = f'ok ({used_sec}s 计费)'
-        # 视频不留存：转写完立刻删
-        for f in workdir.iterdir():
-            f.unlink(missing_ok=True)
+            audio = fetch_audio(url, args.cookies, args.ytdlp, workdir)
+            result['steps']['download'] = f'ok ({audio.stat().st_size} bytes)'
 
-        if args.transcript_only:
-            result['transcript'] = transcript
-            result['ok'] = True
-            return result
+            transcript, used_sec = transcribe(audio, api_key, args.asr_public,
+                                             model=args.asr_model)
+            result['transcript_len'] = len(transcript)
+            result['asr_seconds'] = used_sec
+            result['steps']['asr'] = f'ok ({used_sec}s 计费)'
+            # 视频不留存：转写完立刻删
+            for f in workdir.iterdir():
+                f.unlink(missing_ok=True)
+
+            # ★ 转写完立刻入库 —— 后面 LLM 失败也不影响这段已花的钱
+            if db and aweme_id:
+                db.upsert_video(aweme_id, url=url,
+                                desc=result.get('title') or '',
+                                author=result.get('uploader') or '',
+                                duration_ms=int((result.get('duration') or 0) * 1000))
+                db.save_transcript(aweme_id, transcript, used_sec,
+                                   asr_model=args.asr_model,
+                                   duration_ms=int((result.get('duration') or 0) * 1000))
+                result['steps']['save_transcript'] = 'ok'
+
+            if args.transcript_only:
+                result['transcript'] = transcript
+                result['ok'] = True
+                return result
+        else:
+            # 缓存命中但没进上面分支（transcript_only 已提前返回）——
+            # 标题/作者上面已经带出来了，这里不用再取
+            pass
+
+        # ---------- 摘要（缓存命中时也要跑，除非 DB 里已有同模型的）----------
+        want_models = args.summary_models
+        if db and aweme_id and not args.force:
+            old = db.get_summary(aweme_id)
+            if old and old.get('model') in want_models:
+                result['point'] = old.get('point') or ''
+                result['points'] = old.get('points') or []
+                v = db.get_video(aweme_id)
+                result['tags'] = json.loads((v or {}).get('tags') or '[]')
+                result['summary_model'] = old.get('model')
+                result['steps']['summary'] = f"cached ({old.get('model')})"
+                result['asr_seconds'] = result.get('asr_seconds', 0)
+                result['ok'] = True
+                print('       ↳ 摘要也命中缓存', file=sys.stderr)
+                return result
 
         summary = summarize(transcript, api_key, args.summary_models)
         result['point'] = summary.get('point', '')
@@ -590,10 +697,24 @@ def process_one(url, args, api_key):
         result['tags'] = summary.get('tags', [])
         result['summary_model'] = summary.get('_model', '')
         result['steps']['summary'] = f"ok ({summary.get('_model', '?')})"
+
+        # ★ 摘要入库
+        if db and aweme_id:
+            db.save_summary(aweme_id, result['point'], result['points'],
+                            model=result['summary_model'],
+                            tags=result['tags'])
+            result['steps']['save_summary'] = 'ok'
+
         result['ok'] = True
         return result
     except Exception as e:
         result['error'] = str(e)
+        # 失败也记一笔状态，方便下次知道哪条卡住了
+        if db and aweme_id:
+            try:
+                db.upsert_video(aweme_id, url=url, status='failed')
+            except Exception:
+                pass
         return result
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
@@ -622,6 +743,13 @@ def main():
                     help=f'ASR 模型名，默认 {ASR_MODEL}')
     ap.add_argument('--list-models', action='store_true',
                     help='逐个试探候选模型，报告你账号能用哪些（几乎不花钱）')
+    ap.add_argument('--db', default=str(DB_PATH) if DB_PATH else '',
+                    help='结果库路径（默认 server/videos.db）。'
+                         '有转写的视频会自动跳过下载+ASR，不重复花钱')
+    ap.add_argument('--no-db', action='store_true',
+                    help='完全不用数据库（不读也不写）')
+    ap.add_argument('--force', action='store_true',
+                    help='忽略缓存，强制重跑（换 ASR 模型验证效果时用）')
     args = ap.parse_args()
 
     api_key = os.environ.get('DASHSCOPE_API_KEY', '').strip()
@@ -676,6 +804,21 @@ def main():
         print('错误：需要 --url 或 --urls-file', file=sys.stderr)
         sys.exit(2)
 
+    # ---- 打开结果库 ----
+    # 为什么在 precheck 之前打开：这样启动时就能报「库里已有多少条不用重跑」，
+    # 用户能在花时间之前看到复用效果。
+    args.db = None
+    if not args.no_db and VideoDB and args.db:
+        try:
+            args.db = VideoDB(args.db)
+            s = args.db.stats()
+            print(f'【库】{args.db} 已有 {s["videos"]} 条，'
+                  f'其中 {s["transcribed"]} 条已转写（这些会跳过 ASR）',
+                  file=sys.stderr)
+        except Exception as e:      # noqa: BLE001
+            print(f'警告：打开数据库失败（{e}），本次不使用缓存', file=sys.stderr)
+            args.db = None
+
     # ---- 开跑前的成本闸门 ----
     # 这一步存在的唯一理由：ASR 免费额度只有 10 小时/月，超了要花钱。
     # 与其「跑完才发现扣钱」，不如「先算清楚、超了就停」。
@@ -704,9 +847,13 @@ def main():
         print(text)
 
     ok = sum(1 for r in out if r['ok'])
-    print(f'\n成功 {ok}/{len(out)}', file=sys.stderr)
+    cached = sum(1 for r in out if r.get('cached'))
+    print(f'\n成功 {ok}/{len(out)}' + (f'（其中 {cached} 条命中缓存，未重复花钱）' if cached else ''),
+          file=sys.stderr)
     if need_asr:
         print(f'【成本】{cost_report(load_usage())}', file=sys.stderr)
+    if args.db:
+        args.db.close()
     sys.exit(0 if ok == len(out) else 1)
 
 
