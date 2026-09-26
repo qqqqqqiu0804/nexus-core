@@ -539,6 +539,43 @@ body.compact .en-block + .en-block { margin-top: 6px; }
 body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bottom: 6px; }
 
 
+/* === 一句话记账：实时预览 ===
+   作用：用户敲完一句话，立刻显示「我理解成 支出 ¥8 · 餐饮 · 今天」。
+   手机上这一步特别重要 —— 没有它，用户要点进去看记录列表才知道记对没有。 */
+.exp-preview {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-subtle);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  display: none;                 /* 空输入时不占位，避免布局抖动 */
+}
+.exp-preview.show { display: block; }
+.exp-preview .ep-row {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+}
+.exp-preview .ep-k { color: var(--text-dim); font-size: var(--fs-2xs); flex: none; }
+.exp-preview .ep-v { color: var(--text-primary); font-weight: 600; }
+.exp-preview .ep-amt-exp { color: var(--expense); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.exp-preview .ep-amt-inc { color: var(--success); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* 命中的关键词给个弱强调 —— 让用户知道「凭什么归到这类」 */
+.exp-preview .ep-why {
+  color: var(--text-dim); font-size: var(--fs-2xs);
+  background: var(--bg-panel); border-radius: 4px; padding: 1px 6px;
+}
+.exp-preview .ep-warn { color: var(--warning, #d97706); font-size: var(--fs-2xs); }
+.exp-preview .ep-note { color: var(--text-secondary); font-size: var(--fs-2xs); }
+
+.exp-hint {
+  margin-top: 8px;
+  font-size: var(--fs-2xs);
+  color: var(--text-dim);
+  line-height: 1.6;
+  word-break: break-all;
+}
+
 /* 物品面板的位置筛选 chip。跟观点库的标签条同款手感，
    但点击热区按手机端要求给到 40px 高（手机上 32px 以下点着费劲）。 */
 .inv-locchip {
@@ -915,8 +952,14 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
 
 /* === 今日面板：可折叠区块 ===
    没数据时折成一行（标题变暗 + 箭头朝右），点标题展开；
-   有数据时默认展开。用户手动点过就记住他的选择。 */
-.daily-section.collapsible > .section-header { cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+   有数据时默认展开。用户手动点过就记住他的选择。
+
+   ★ 2026-09-26：把选择器从「只能 .daily-section」放宽到「任何挂了 .collapsible 的块」。
+   起因：用户要求账本页的「近 6 个月趋势」「交易记录」也能收起来，以及设置页的
+   「数据管理」也能收 —— 但那几块在 .panel 里，不是 .daily-section。
+   直接加 .daily-section 类是不行的（那个类带 padding/margin/背景，会把卡片撑变形），
+   所以这里改成只认 .collapsible + 直接子级 .section-header 的结构约定。 */
+.collapsible > .section-header { cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
 /* 折叠条右侧的条数角标（只在折叠时出现，由 applySectionCounts() 插入） */
 .sec-count-badge {
   font-family: var(--font-mono); font-size: var(--fs-2xs);
@@ -925,13 +968,22 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
 
 /* 折叠指示符：原来是 0.62em（约 10px，低于 12px 下限）。
    它是纯装饰，但仍然要能看清，所以用绝对值而不是相对父级的 em。 */
-.daily-section.collapsible > .section-header .section-title::after { content: ' ▾'; font-size:var(--fs-2xs); opacity: .45; }
-.daily-section.collapsible.collapsed > .section-header .section-title::after { content: ' ▸'; }
-.daily-section.collapsible.collapsed > .section-header { opacity: .55; }
-.daily-section.collapsible.collapsed > *:not(.section-header):not(.sec-always-show) { display: none !important; }
+.collapsible > .section-header .section-title::after { content: ' ▾'; font-size:var(--fs-2xs); opacity: .45; }
+.collapsible.collapsed > .section-header .section-title::after { content: ' ▸'; }
+.collapsible.collapsed > .section-header { opacity: .55; }
+.collapsible.collapsed > *:not(.section-header):not(.sec-always-show) { display: none !important; }
 /* 个别区块有「折了也要看得见」的部分（如每日观点的主句）。
    挂上 .sec-always-show 就绕开上面的隐藏规则。 */
-.daily-section.collapsible.collapsed > .sec-always-show { margin-top: 10px; }
+.collapsible.collapsed > .sec-always-show { margin-top: 10px; }
+
+/* ▲ 只压「.daily-section 上的」折叠留白 —— 卡片类区块（账本/设置页）不压，
+   否则会把 .card 的内边距压掉、看着像坏了。 */
+.daily-section.collapsible.collapsed > .section-header {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+  min-height: 26px;                 /* 保住触摸热区，别缩成点不中 */
+}
 
 
 /* === 财务洞察（2026-09-16 新增）=== */
@@ -1060,38 +1112,6 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
   color: var(--text-dim);
   margin-top: 4px;
 }
-
-.wallet-add-form {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 16px;
-}
-.wallet-type-toggle {
-  display: flex;
-  gap: 0;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  border: 1px solid var(--border-subtle);
-}
-.wallet-type-btn {
-  flex: 1;
-  padding: 8px;
-  background: transparent;
-  border: none;
-  color: var(--text-dim);
-  font-size:var(--fs-base);
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: var(--font-mono);
-}
-.wallet-type-btn.active {
-  background: var(--accent);
-  color: var(--bg-darker);
-  font-weight: 700;
-}
-#wtype-expense.active { background: var(--expense); color: #fff; }
-#wtype-income.active { background: var(--success); color: #fff; }
 
 .wallet-txn-item {
   display: flex;
@@ -1500,11 +1520,15 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
       <div id="journal-sync-hint" style="display:none;font-size:var(--fs-2xs);color:var(--warn);margin-top:6px;line-height:1.5;"></div>
     </div>
 
-    <!-- ⑦ Today Expense -->
-    <div class="daily-section collapsible" id="sec-expense" style="cursor: pointer;" onclick="switchTab('data')">
+    <!-- ⑦ Today Expense（含一句话记账入口 —— 用户要的「选项 C」）
+         ★ 这里原来整块带 onclick="switchTab('data')"，加了输入框之后必须去掉：
+         在输入框里点一下会冒泡到这层，把人瞬间弹去账本页，字都打不进去。
+         改法：「查看全部 →」自己带 onclick 跳转，整块不再可点。 -->
+    <div class="daily-section collapsible" id="sec-expense">
       <div class="section-header">
         <span class="section-title">今日支出</span>
-        <span style="font-size:var(--fs-xs); color: var(--text-dim);">查看全部 →</span>
+        <span style="font-size:var(--fs-xs); color: var(--text-dim); cursor:pointer;"
+              onclick="switchTab('data')">查看全部 →</span>
       </div>
       <div style="display: flex; gap: 16px;">
         <div style="flex: 1; text-align: center; padding: 8px; background: var(--bg-card); border-radius: 6px;">
@@ -1516,6 +1540,16 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
           <div style="font-size:var(--fs-2xs); color: var(--text-dim);">今日收入</div>
         </div>
       </div>
+      <!-- 一句话记账：买完顺手在今日页记一笔，不用跳去账本 -->
+      <div style="display:flex;gap:8px;align-items:center;margin-top:10px;">
+        <input type="text" id="daily-exp-input" placeholder="顺手记一句：肠粉 8"
+               inputmode="text" autocomplete="off" enterkeyhint="done"
+               oninput="dailyExpOnInput()" onkeydown="dailyExpOnKey(event)"
+               style="flex:1;min-width:0;font-size:16px;">
+        <button class="btn btn-primary btn-sm" onclick="dailyExpSubmit()"
+                style="flex:none;min-height:40px;padding:0 14px;">记下</button>
+      </div>
+      <div id="daily-exp-preview" class="exp-preview"></div>
     </div>
 
     <!-- ⑩ Daily Chess（每日残局，可自己走子）-->
@@ -1738,67 +1772,30 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
       </div>
     </div>
 
-    <!-- 快速记账：常用分类一键 -->
-    <div style="margin-bottom:16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <span class="section-title">快速记账</span>
-        <span class="t-dim-2xs">点分类 → 输金额</span>
-      </div>
-      <div class="quick-add" id="quick-cats"></div>
-      <div id="quick-input-row" style="display:none;margin-top:8px;gap:8px;align-items:center;">
-        <span id="quick-cat-label" style="font-size:var(--fs-sm);color:var(--accent);min-width:48px;"></span>
-        <input type="number" id="quick-amount" placeholder="金额" inputmode="decimal" step="0.01" min="0" style="flex:1;min-width:80px;">
-        <button class="btn btn-primary btn-sm" onclick="quickConfirm()">记下</button>
-        <button class="btn btn-sm" onclick="quickCancel()">取消</button>
-      </div>
-    </div>
-
-        <!-- Add Transaction -->
+    <!-- 一句话记账（2026-09-26 取代「快速记账」+「记一笔」）
+         用户原话：「我是想一句话搞定的」「填表单比较麻烦」
+         所以这里只留一个框：写「肠粉 8」「打车 18 微信」「买菜 45 昨天」都行。
+         解析在本地做（正则+词库），0 延迟、离线可用、不花钱。 -->
     <div class="section-header" style="margin-top: 16px;">
       <span class="section-title">记一笔</span>
+      <span class="t-dim-2xs">说一句就行</span>
     </div>
-    <div class="wallet-add-form">
-      <div class="wallet-type-toggle">
-        <button class="wallet-type-btn active" id="wtype-expense" onclick="setWalletType('expense')">支出</button>
-        <button class="wallet-type-btn" id="wtype-income" onclick="setWalletType('income')">收入</button>
+    <div class="card" id="exp-card" style="padding:12px;">
+      <div style="display:flex;gap:8px;align-items:flex-start;">
+        <input type="text" id="exp-input" placeholder="肠粉 8 · 打车 18 微信 · 生活费 1500"
+               inputmode="text" autocomplete="off" enterkeyhint="done"
+               oninput="expOnInput()" onkeydown="expOnKey(event)"
+               style="flex:1;min-width:0;font-size:16px;">
+        <button class="btn btn-primary" id="exp-submit" onclick="expSubmit()"
+                style="flex:none;min-height:44px;padding:0 16px;">记下</button>
       </div>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
-        <input type="number" id="wallet-amount" placeholder="金额" step="0.01" min="0" style="width: 120px;">
-        <select id="wallet-category" style="width: auto;">
-          <option value="餐饮">餐饮</option>
-          <option value="交通">交通</option>
-          <option value="购物">购物</option>
-          <option value="娱乐">娱乐</option>
-          <option value="学习">学习</option>
-          <option value="学杂">学杂</option>
-          <option value="生活">生活</option>
-          <option value="其他">其他</option>
-        </select>
-        <select id="wallet-account" style="width:auto;" aria-label="账户"></select>
-        <input type="datetime-local" id="wallet-when" style="width: 190px;" aria-label="时间">
-        <input type="text" id="wallet-note" placeholder="备注（可选）" style="flex: 1; min-width: 150px;">
-        <button class="btn btn-primary" id="wallet-add-btn" onclick="addTransaction()">记一笔</button>
-      </div>
-      <!-- 字段说明写在这里，不用 title：手机浏览器不显示 tooltip。
-           原来「账户」和「时间」两个 title 在手机上等于没说。 -->
-      <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:8px;line-height:1.5;">
-        账户决定余额从哪扣；时间可以改，用来补记以前的账。
-      </div>
+      <!-- 实时预览：写完就告诉用户「我理解成什么」，错了当场改，不用等记完才发现 -->
+      <div id="exp-preview" class="exp-preview"></div>
+      <div id="exp-hint" class="exp-hint">例：肠粉 8 · 打车 18 微信 · 买菜 45 昨天 · 工资 8000</div>
+      <!-- 编辑态：点交易记录的「改」会进到这里，用同一套解析器就地更新 -->
+      <button class="btn btn-sm" id="exp-cancel-edit" onclick="expCancelEdit()"
+              style="display:none;margin-top:8px;">取消修改</button>
     </div>
-
-    <!-- 交易复盘 (投资思考日记) -->
-    <div class="section-header" style="margin-top: 16px;">
-      <span class="section-title">交易复盘</span>
-      <span class="t-dim-xs">记录你的投资思考</span>
-    </div>
-    <div class="card">
-      <textarea id="invest-journal" placeholder="今天对市场/基金/股票有什么想法？记录下来方便以后回顾..." style="min-height:100px;" oninput="saveInvestJournal()"></textarea>
-    </div>
-    <!-- 历史复盘 -->
-    <div class="section-header" style="margin-top:12px;">
-      <span class="section-title" style="font-size:var(--fs-sm);">历史复盘</span>
-    </div>
-    <div id="invest-history-list"></div>
 
     <!-- 本月去向（分类占比）-->
     <div style="margin-bottom:16px;">
@@ -1810,8 +1807,8 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
       </div>
     </div>
 
-    <!-- 收支趋势 -->
-    <div style="margin-bottom:16px;">
+    <!-- 收支趋势（可折叠：用户要求「加一个能收起来的」）-->
+    <div class="collapsible collapsed" id="sec-data-trend" style="margin-bottom:16px;">
       <div class="section-header" style="margin-bottom:10px;">
         <span class="section-title">近 6 个月趋势</span>
         <div style="display:flex;gap:10px;font-size:var(--fs-2xs);">
@@ -1824,61 +1821,71 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
       </div>
     </div>
 
-        <!-- Transaction History -->
-    <div class="section-header" style="margin-top: 16px;">
-      <span class="section-title">交易记录</span>
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <select id="wallet-filter" style="width: auto; font-size:var(--fs-sm);" onchange="renderWalletHistory()">
-          <option value="all">全部</option>
-          <option value="today">今天</option>
-          <option value="week">本周</option>
-          <option value="month">本月</option>
-        </select>
-        <button class="btn btn-sm btn-danger" onclick="clearWalletHistory()" style="padding: 2px 8px; font-size:var(--fs-xs);">清空</button>
+        <!-- Transaction History（可折叠）-->
+    <div class="collapsible collapsed" id="sec-data-history" style="margin-top:16px;">
+      <div class="section-header">
+        <span class="section-title">交易记录</span>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <select id="wallet-filter" style="width: auto; font-size:var(--fs-sm);" onchange="renderWalletHistory()">
+            <option value="all">全部</option>
+            <option value="today">今天</option>
+            <option value="week">本周</option>
+            <option value="month">本月</option>
+          </select>
+          <button class="btn btn-sm btn-danger" onclick="clearWalletHistory()" style="padding: 2px 8px; font-size:var(--fs-xs);">清空</button>
+        </div>
       </div>
+      <div id="wallet-history-list"></div>
     </div>
-    <div id="wallet-history-list"></div>
 
-    <!-- 每日打卡档案 (原 history 面板内容) -->
-    <div class="daily-date-header" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:20px;margin:16px 0;">
-      <div>
-        <div style="font-size:var(--fs-3xl);font-weight:bold;color:var(--text-primary);margin:4px 0;">每日统计</div>
-        <div class="t-dim-sm">打卡合集 · <span id="history-year"></span></div>
+    <!-- 每日打卡档案 (原 history 面板内容)（可折叠）-->
+    <div class="collapsible collapsed" id="sec-data-calendar" style="margin-top:16px;">
+      <div class="section-header">
+        <span class="section-title">每日统计</span>
+        <span class="t-dim-xs">打卡合集 · <span id="history-year"></span></span>
       </div>
-      <div style="text-align:right;">
-        <div id="history-total-days" style="font-family:var(--font-mono);font-size:var(--fs-hero);color:var(--text-dim);opacity:0.3;">365</div>
+      <div class="daily-date-header" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:16px;margin:0 0 12px;">
+        <div>
+          <div class="t-dim-sm">累计打卡</div>
+        </div>
+        <div style="text-align:right;">
+          <div id="history-total-days" style="font-family:var(--font-mono);font-size:var(--fs-hero);color:var(--text-dim);opacity:0.3;">365</div>
+        </div>
       </div>
+
+      <!-- Filter Tags -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="btn btn-sm history-filter active" data-filter="all" onclick="filterHistory('all')">全部</button>
+        <button class="btn btn-sm history-filter" data-filter="calories" onclick="filterHistory('calories')">有饮食</button>
+        <button class="btn btn-sm history-filter" data-filter="expense" onclick="filterHistory('expense')">有支出</button>
+        <button class="btn btn-sm history-filter" data-filter="journal" onclick="filterHistory('journal')">有日记</button>
+      </div>
+
+      <!-- Entries List -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span id="history-entry-count" class="t-dim-xs"></span>
+      </div>
+      <div id="history-entries-list"></div>
     </div>
 
-    <!-- Filter Tags -->
-    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-      <button class="btn btn-sm history-filter active" data-filter="all" onclick="filterHistory('all')">全部</button>
-      <button class="btn btn-sm history-filter" data-filter="calories" onclick="filterHistory('calories')">有饮食</button>
-      <button class="btn btn-sm history-filter" data-filter="expense" onclick="filterHistory('expense')">有支出</button>
-      <button class="btn btn-sm history-filter" data-filter="journal" onclick="filterHistory('journal')">有日记</button>
+    <!-- 日记回顾（可折叠）-->
+    <div class="collapsible collapsed" id="sec-data-journal-arch" style="margin-top:16px;">
+      <div class="section-header">
+        <span class="section-title">日记回顾</span>
+        <span id="journal-arch-stats" class="t-dim-xs"></span>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-sm" onclick="journalMonthShift(-1)">‹</button>
+        <span id="journal-arch-month" style="font-family:var(--font-mono);font-size:var(--fs-sm);color:var(--accent);"></span>
+        <button class="btn btn-sm" onclick="journalMonthShift(1)">›</button>
+        <input type="text" id="journal-arch-search" placeholder="搜索全部日记..." style="flex:1;min-width:120px;" oninput="renderJournalArchive()">
+      </div>
+      <div id="journal-archive-list"></div>
     </div>
 
-    <!-- Entries List -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span id="history-entry-count" class="t-dim-xs"></span>
-    </div>
-    <div id="history-entries-list"></div>
-
-    <!-- 日记回顾 -->
-    <div class="section-header" style="margin-top:20px;">
-      <span class="section-title">日记回顾</span>
-      <span id="journal-arch-stats" class="t-dim-xs"></span>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
-      <button class="btn btn-sm" onclick="journalMonthShift(-1)">‹</button>
-      <span id="journal-arch-month" style="font-family:var(--font-mono);font-size:var(--fs-sm);color:var(--accent);"></span>
-      <button class="btn btn-sm" onclick="journalMonthShift(1)">›</button>
-      <input type="text" id="journal-arch-search" placeholder="搜索全部日记..." style="flex:1;min-width:120px;" oninput="renderJournalArchive()">
-    </div>
-    <div id="journal-archive-list"></div>
-
-    <!-- AI 周报 / 月报（本地 Ollama，经后端 SSE 代理） -->
-    <div class="section-header" style="margin-top:20px;">
+    <!-- AI 周报 / 月报（本地 Ollama，经后端 SSE 代理）（可折叠）-->
+    <div class="collapsible collapsed" id="sec-data-ai" style="margin-top:16px;">
+    <div class="section-header">
       <span class="section-title">AI 报告</span>
       <span id="ai-week-status" class="t-dim-xs"></span>
     </div>
@@ -1906,6 +1913,7 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
       </div>
     </div>
     <div id="ai-reports-list"></div>
+    </div>
   </div>
 
   <!-- Panel: Settings -->
@@ -2013,11 +2021,12 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
       </div>
     </a>
 
-    <!-- 数据管理 -->
-    <div style="margin-top:16px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+    <!-- 数据管理（可折叠：用户要求「数据管理，也可以搞一个收起来的」）-->
+    <div class="collapsible collapsed" id="sec-settings-data" style="margin-top:16px;">
+      <div class="section-header">
         <i data-ic="disk" data-size="1"></i>
-        <span class="t-pri-base">数据管理</span>
+        <span class="section-title" style="margin-left:8px;">数据管理</span>
+        <span class="t-dim-2xs">导出 / 导入 / 复制</span>
       </div>
       <div class="card" style="cursor:pointer;padding:12px;" onclick="exportData()">
         <div style="display:flex;align-items:center;gap:10px;">
@@ -2758,7 +2767,32 @@ Store.onSet((key) => {
 //
 // **唯一不折叠的是随手记**（sec-journal-input）：它是写入口，
 // 折起来等于让人没法写，那是功能残废不是简洁。
-const COLLAPSIBLE_SECTIONS = ['today-tasks', 'meals', 'expense', 'english', 'chess', 'daily-point', 'journal-today'];
+// ★ 2026-09-26：这份清单从「今日面板专用」升级为「全站通用」。
+// 用户要求：账本页的「近 6 个月趋势」「交易记录」要能收；设置页的「数据管理」要能收。
+// 所以键名加了前缀，区分是哪个面板的哪一块 —— 否则 'trend' 这种通名将来会撞。
+//
+// 今日页的那些保留原名（不加前缀），因为 sectionOpenByDay 里已经存着用户的旧选择，
+// 改名等于把他的偏好清空一次。
+const COLLAPSIBLE_SECTIONS = [
+  // 今日面板（原名，勿改）
+  'today-tasks', 'meals', 'expense', 'english', 'chess', 'daily-point', 'journal-today',
+  // 账本页（记账面板）
+  'data-trend',        // 近 6 个月趋势
+  'data-history',      // 交易记录
+  'data-calendar',     // 每日统计（打卡合集）
+  'data-journal-arch', // 日记回顾
+  'data-ai',           // AI 报告
+  // 我的（设置面板）
+  'settings-data'      // 数据管理
+];
+
+// 反查：某个 key 属于哪个面板 —— 只影响默认折叠状态和计数逻辑
+const SECTION_PANEL = {
+  'data-trend': 'data', 'data-history': 'data', 'data-calendar': 'data',
+  'data-journal-arch': 'data', 'data-ai': 'data',
+  'settings-data': 'settings'
+};
+function sectionPanel(key) { return SECTION_PANEL[key] || 'daily'; }
 
 // 折叠状态存在本地，且刻意不进 SYNC_KEYS：
 // 手机和电脑屏幕尺寸不同，「该折哪些」是每台设备各自的偏好。
@@ -2802,6 +2836,21 @@ function sectionCountText(key) {
       const el = document.getElementById('today-tasks-count');
       return el ? (el.textContent || '') : '';
     }
+    // --- 账本页 ---
+    if (key === 'data-history') {
+      const w = Store.get('wallet', {});
+      const n = w && Array.isArray(w.transactions) ? w.transactions.length : 0;
+      return n ? n + ' 笔' : '';
+    }
+    if (key === 'data-calendar') {
+      const el = document.getElementById('history-total-days');
+      const n = el ? (el.textContent || '').trim() : '';
+      return n ? n + ' 天' : '';
+    }
+    if (key === 'data-journal-arch') {
+      const el = document.getElementById('journal-arch-stats');
+      return el ? ((el.textContent || '').trim()) : '';
+    }
   } catch (e) { /* 数据还没准备好就算了，条数不是关键信息 */ }
   return '';
 }
@@ -2816,13 +2865,23 @@ function toggleSection(key) {
   applySectionCounts();
 }
 
+// 非「今日」面板的区块（账本页 / 我的）默认折叠。
+// 为什么：用户原话「加一个能收起来的，就是和「今日」一样能收起来的那个就行了」——
+// 他要的就是「打开时别全摊开」。今日页的区块保留原逻辑（有记录就展开），
+// 因为那是每天要看的主战场；账本页是回头查账的地方，默认收着更快看到头部的钱。
+function sectionDefaultOpen(key) {
+  return sectionPanel(key) === 'daily';
+}
+
 function updateSectionCollapse() {
   const st = _collapseStore();
   for (const key of COLLAPSIBLE_SECTIONS) {
     const el = document.getElementById('sec-' + key);
     if (!el) continue;
-    // 没有今天的记录 = 默认折叠（用户的「默认折叠」）
-    const open = Object.prototype.hasOwnProperty.call(st.map, key) ? st.map[key] : false;
+    // 没有今天的记录 = 用该区块的默认值
+    const open = Object.prototype.hasOwnProperty.call(st.map, key)
+      ? st.map[key]
+      : sectionDefaultOpen(key);
     el.classList.toggle('collapsed', !open);
   }
   applySectionCounts();
@@ -2862,20 +2921,25 @@ function applySectionCounts() {
   }
 }
 
-// 标题行点击 = 展开/折叠；点在标题行的控件上（如「+ 添加」）则不折叠
+// 标题行点击 = 展开/折叠；点在标题行的控件上（如「+ 添加」）则不折叠。
+// ★ 选择器从 .daily-section.collapsible 放宽到 .collapsible —— 让账本页/设置页也能用。
+// 用 dataset 打标记防重复绑定（面板切换会重复调用；重复绑定会让一次点击翻两下=看着没反应）。
 function bindSectionToggles() {
-  document.querySelectorAll('.daily-section.collapsible > .section-header').forEach(h => {
+  document.querySelectorAll('.collapsible > .section-header').forEach(h => {
+    if (h.dataset.toggleBound === '1') return;
+    h.dataset.toggleBound = '1';
     h.addEventListener('click', (e) => {
       if (e.target.closest('button, a, input, select, textarea')) return;
       e.stopPropagation();   // 「今日支出」区块整体带 onclick 跳转记账，别误触发
-      toggleSection(h.parentElement.id.replace('sec-', ''));
+      const parent = h.parentElement;
+      if (!parent || !parent.id || parent.id.indexOf('sec-') !== 0) return;
+      toggleSection(parent.id.replace('sec-', ''));
     });
   });
 }
 
 
-// === 财务洞察：预算 / 快速记账 / 分类占比 / 趋势图 ===
-let _quickCat = null;
+// === 财务洞察：预算 / 分类占比 / 趋势图 ===
 
 // ---- 预算 ----
 function monthExpenseTotal() {
@@ -2914,68 +2978,284 @@ function renderBudget() {
   else hint.textContent = '已用 ' + pct.toFixed(0) + '%，还剩 ¥' + (b.monthly - spent).toFixed(1);
 }
 
-// ---- 快速记账 ----
-function topCategories() {
-  const txns = Store.get('wallet', {}).transactions || [];
-  const freq = {};
-  txns.forEach(t => { if (t.category) freq[t.category] = (freq[t.category] || 0) + 1; });
-  const used = Object.entries(freq).sort((a, b) => b[1] - a[1]).map(x => x[0]);
-  const fallback = ['餐饮', '交通', '购物', '学习', '学杂', '娱乐'];
-  return [...new Set(used.concat(fallback))].slice(0, 6);
+// === 一句话记账：界面层 ===
+// 用户原话：「我是想一句话搞定的，包括我现有的记账」
+//           「a 加 c 要猜」（选项 A = 输入框在页面上，选项 C = 今日页也有入口）
+// 所以旧的「快速记账（点分类）」和「记一笔（表单）」都删了，只留一个框。
+//
+// 解析全在本地（parseExpenseSentence），0 延迟、离线、不花钱。
+// 为什么不上 AI：服务器没有 Ollama（见 docs），而且用户真实记录 95% 是
+// 「食物名 + 金额」这种极短句，正则完全覆盖，AI 只会让每次记账多等 1 秒。
+
+let _expEditingId = null;   // 非 null 表示在改某笔已有的记录
+
+// 高频输入时不必每敲一个字符都重渲染 —— 但记账是一句话，开销可忽略，
+// 直接实时反馈更好（用户要的就是「立刻看到我理解成什么」）。
+function expOnInput() {
+  renderExpPreview();
 }
 
-function renderQuickCats() {
-  const el = document.getElementById('quick-cats');
-  if (!el) return;
-  el.innerHTML = topCategories().map(function (c) {
-    // 分类名会跟着 wallet 走 KV 同步（导入的旧数据 / 被污染的 JSON 都可能是任意字符串），
-    // onclick 属性值和按钮正文两处都要转义，否则分类名里一个 " 就能注入事件。
-    return '<button class="quick-cat' + (c === _quickCat ? ' active' : '') + '" onclick="quickPick(&quot;' + escAttr(c) + '&quot;)">' + escHtml(c) + '</button>';
-  }).join('');
+// 回车直接提交（手机上回车键就是「完成」）
+function expOnKey(e) {
+  if (e.key === 'Enter') { e.preventDefault(); expSubmit(); }
 }
 
-function quickPick(cat) {
-  _quickCat = cat;
-  renderQuickCats();
-  document.getElementById('quick-input-row').style.display = 'flex';
-  document.getElementById('quick-cat-label').textContent = cat;
-  const amt = document.getElementById('quick-amount');
-  amt.value = '';
-  amt.focus();
+function renderExpPreview() {
+  const box = document.getElementById('exp-preview');
+  const input = document.getElementById('exp-input');
+  if (!box || !input) return;
+  const raw = (input.value || '').trim();
+  if (!raw) { box.className = 'exp-preview'; box.innerHTML = ''; return; }
+
+  const p = parseExpenseSentence(raw);
+  const isInc = p.type === 'income';
+  const cls = isInc ? 'ep-amt-inc' : 'ep-amt-exp';
+  const sign = isInc ? '+' : '-';
+
+  let html = '<div class="ep-row">';
+  html += '<span class="ep-k">记成</span>';
+  html += '<span class="ep-v">' + (p.category ? escHtml(p.category) : '其他') + '</span>';
+  if (p.catHit && p.catHit !== p.category) {
+    // 猜的依据，让用户敢信
+    html += '<span class="ep-why">凭「' + escHtml(p.catHit) + '」</span>';
+  }
+  html += '<span class="ep-k">' + (isInc ? '收入' : '支出') + '</span>';
+  html += '<span class="' + cls + '">' + sign + '¥' + (p.amount || 0).toFixed(2) + '</span>';
+  html += '</div>';
+
+  // 第二行：账户 + 日期 + 备注
+  const extras = [];
+  if (p.accountHint) extras.push('账户 ' + escHtml(p.accountHint));
+  if (p.date) extras.push(fmtExpDate(p.date));
+  if (p.note) extras.push('备注「' + escHtml(p.note) + '」');
+  if (extras.length) {
+    html += '<div class="ep-note" style="margin-top:4px;">' + extras.join(' · ') + '</div>';
+  }
+
+  // 没识别出金额 → 明确提示，别让用户按了「记下」才发现没反应
+  if (!p.amount) {
+    html += '<div class="ep-warn" style="margin-top:4px;">没找到金额，补一个数字就行（例：肠粉 8）</div>';
+  }
+
+  box.className = 'exp-preview show';
+  box.innerHTML = html;
 }
 
-function quickCancel() {
-  _quickCat = null;
-  document.getElementById('quick-input-row').style.display = 'none';
-  renderQuickCats();
+function fmtExpDate(dstr) {
+  const d = dateOf(dstr);
+  const t = TODAY();
+  if (d === t) return '今天';
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  if (d === localDate(y)) return '昨天';
+  const y2 = new Date(); y2.setDate(y2.getDate() - 2);
+  if (d === localDate(y2)) return '前天';
+  return d.slice(5).replace('-', '/');
 }
 
-function quickConfirm() {
-  const amt = parseFloat(document.getElementById('quick-amount').value);
-  if (!_quickCat) { showToast('先选一个分类', 'warning'); return; }
-  if (!amt || amt <= 0) { showToast('请输入金额', 'warning'); return; }
-  const w = loadWallet();
-  const txn = {
-    id: 'w' + Date.now(),
-    type: 'expense',
-    amount: amt,
-    category: _quickCat,
-    note: '',
-    date: localStamp().slice(0, 16) + ':00'
-  };
-  // 与 addTransaction 一致：支出落到「现金（不分账户）」池账户，余额跟着波动，
-  // 再用 _recalcCashOnly 重算总额 —— 否则只动 w.cash 不联动账户，且缺 account 的交易
-  // 会在下次加载时再次触发迁移，把现金成倍算错。
-  const acctId = CASH_POOL_ID;
+// 提交：解析 → 生成交易 → 落账户 → 重渲染
+function expSubmit() {
+  const input = document.getElementById('exp-input');
+  if (!input) return;
+  const raw = (input.value || '').trim();
+  if (!raw) { showToast('先写一句，比如「肠粉 8」', 'warning'); return; }
+
+  const p = parseExpenseSentence(raw);
+  if (!p.amount || p.amount <= 0) {
+    showToast('没识别到金额，补一个数字', 'warning');
+    return;
+  }
+
+  const wallet = loadWallet();
+  // 账户：解析器只在「用户明确说了微信/支付宝/现金」时才给 accountId；
+  // 没说就落到池账户，跟旧 addTransaction 的默认行为一致。
+  const acctId = p.accountId || CASH_POOL_ID;
+
+  if (_expEditingId) {
+    // ---- 改已有记录：先回滚旧影响，再套新值 ----
+    const t = wallet.transactions.find(x => x.id === _expEditingId);
+    if (!t) { _expEditingId = null; }
+    else {
+      const oa = _getAcct(wallet, t.account || CASH_POOL_ID);
+      const oldDelta = t.type === 'expense' ? t.amount : -t.amount;
+      oa.amount = Math.round((Number(oa.amount) + oldDelta) * 100) / 100;
+
+      t.type = p.type;
+      t.amount = p.amount;
+      t.category = p.category || '其他';
+      t.note = p.note || '';
+      t.date = p.date || localStamp();
+      t.account = acctId;
+
+      const na = _getAcct(wallet, acctId);
+      const newDelta = p.type === 'expense' ? -p.amount : p.amount;
+      na.amount = Math.round((Number(na.amount) + newDelta) * 100) / 100;
+      _recalcCashOnly(wallet);
+      Store.set('wallet', wallet);
+
+      _expEditingId = null;
+      expExitEditMode();
+      input.value = '';
+      renderExpPreview();
+      renderWallet();
+      showToast('已保存修改', 'success');
+      return;
+    }
+  }
+
+  // ---- 新增 ----
+  const txn = walletMakeTxn(p);
   txn.account = acctId;
-  w.transactions.unshift(txn);
-  const a = _getAcct(w, acctId);
-  a.amount = Math.round((Number(a.amount) - amt) * 100) / 100;
-  _recalcCashOnly(w);
-  Store.set('wallet', w);
-  showToast('已记 ' + _quickCat + ' ¥' + amt.toFixed(2), 'success');
-  quickCancel();
-  renderAll();
+  wallet.transactions.unshift(txn);
+  // ★ 必须走账户：否则「现金总额 = Σ账户」不成立，且下次加载的迁移逻辑会把池账户算错。
+  // （旧 quickConfirm 踩过这个坑，注释还在。）
+  const a = _getAcct(wallet, acctId);
+  const delta = p.type === 'expense' ? -p.amount : p.amount;
+  a.amount = Math.round((Number(a.amount) + delta) * 100) / 100;
+  _recalcCashOnly(wallet);
+  Store.set('wallet', wallet);
+
+  input.value = '';
+  renderExpPreview();
+  renderWallet();
+
+  const label = (p.type === 'income' ? '收入' : '支出') + ' ¥' + p.amount.toFixed(2) +
+                (p.category ? ' · ' + p.category : '');
+  showToast('已记 ' + label, 'success');
+  // 手机上收起键盘，让用户看到结果
+  if (document.activeElement === input) input.blur();
+}
+
+function expExitEditMode() {
+  const btn = document.getElementById('exp-cancel-edit');
+  if (btn) btn.style.display = 'none';
+  const sub = document.getElementById('exp-submit');
+  if (sub) sub.textContent = '记下';
+  const hint = document.getElementById('exp-hint');
+  if (hint) hint.textContent = '例：肠粉 8 · 打车 18 微信 · 买菜 45 昨天 · 工资 8000';
+}
+
+// --- 今日页的一句话入口（选项 C）---
+// 用户原话：「a 加 c 要猜」→ 选了 A（账本页有输入框）+ C（今日页也能记）。
+// 场景是他自己说的：「买完就记」—— 人在外面，App 停在今日页，
+// 不该为了记 8 块钱跳一次 tab（跳过去还要跳回来）。
+//
+// 复用同一个解析器，预览复用 .exp-preview 样式，只是元素 id 不同。
+function dailyExpOnInput() {
+  renderDailyExpPreview();
+}
+
+function dailyExpOnKey(e) {
+  if (e.key === 'Enter') { e.preventDefault(); dailyExpSubmit(); }
+}
+
+function renderDailyExpPreview() {
+  const box = document.getElementById('daily-exp-preview');
+  const input = document.getElementById('daily-exp-input');
+  if (!box || !input) return;
+  const raw = (input.value || '').trim();
+  if (!raw) { box.className = 'exp-preview'; box.innerHTML = ''; return; }
+
+  const p = parseExpenseSentence(raw);
+  const isInc = p.type === 'income';
+  const cls = isInc ? 'ep-amt-inc' : 'ep-amt-exp';
+  const sign = isInc ? '+' : '-';
+
+  let html = '<div class="ep-row">';
+  html += '<span class="ep-k">记成</span>';
+  html += '<span class="ep-v">' + (p.category ? escHtml(p.category) : '其他') + '</span>';
+  if (p.catHit && p.catHit !== p.category) {
+    html += '<span class="ep-why">凭「' + escHtml(p.catHit) + '」</span>';
+  }
+  html += '<span class="ep-k">' + (isInc ? '收入' : '支出') + '</span>';
+  html += '<span class="' + cls + '">' + sign + '¥' + (p.amount || 0).toFixed(2) + '</span>';
+  html += '</div>';
+  if (p.note) {
+    html += '<div class="ep-note" style="margin-top:4px;">备注「' + escHtml(p.note) + '」</div>';
+  }
+  if (!p.amount) {
+    html += '<div class="ep-warn" style="margin-top:4px;">没找到金额，补一个数字就行</div>';
+  }
+  box.className = 'exp-preview show';
+  box.innerHTML = html;
+}
+
+function dailyExpSubmit() {
+  const input = document.getElementById('daily-exp-input');
+  if (!input) return;
+  const raw = (input.value || '').trim();
+  if (!raw) { showToast('先写一句，比如「肠粉 8」', 'warning'); return; }
+  const p = parseExpenseSentence(raw);
+  if (!p.amount || p.amount <= 0) { showToast('没识别到金额，补一个数字', 'warning'); return; }
+
+  const wallet = loadWallet();
+  const acctId = p.accountId || CASH_POOL_ID;
+  const txn = walletMakeTxn(p);
+  txn.account = acctId;
+  wallet.transactions.unshift(txn);
+  const a = _getAcct(wallet, acctId);
+  const delta = p.type === 'expense' ? -p.amount : p.amount;
+  a.amount = Math.round((Number(a.amount) + delta) * 100) / 100;
+  _recalcCashOnly(wallet);
+  Store.set('wallet', wallet);
+
+  input.value = '';
+  renderDailyExpPreview();
+  renderWallet();          // 账本页的数字也要跟着动（用户可能马上切过去看）
+  renderDailyHub();        // 今日页的「今日支出」小卡要立刻更新
+
+  showToast('已记 ' + (p.type === 'income' ? '收入' : '支出') + ' ¥' + p.amount.toFixed(2) +
+            (p.category ? ' · ' + p.category : ''), 'success');
+  if (document.activeElement === input) input.blur();
+}
+
+function expCancelEdit() {
+  _expEditingId = null;
+  expExitEditMode();
+  const input = document.getElementById('exp-input');
+  if (input) input.value = '';
+  renderExpPreview();
+  showToast('已取消修改', 'info');
+}
+
+// 供「交易记录」的「改」按钮调用：把整条记录拼成一句话回填输入框，
+// 用户改哪个字段就改哪个字段，改完按「保存修改」。
+// 为什么用拼接而不是打开表单：用户明确说不要表单，所以编辑也走同一套。
+function expEditTxn(id) {
+  const wallet = loadWallet();
+  const t = wallet.transactions.find(x => x.id === id);
+  if (!t) return;
+  _expEditingId = id;
+
+  // 拼回一句话：金额 + 分类 + 备注 + 日期
+  const parts = [];
+  if (t.type === 'income') parts.push('收到');
+  parts.push(String(t.amount));
+  if (t.note) parts.push(t.note);
+  else if (t.category) parts.push(t.category);
+  const d = dateOf(t.date);
+  const today = TODAY();
+  if (d === today) { /* 今天不用写 */ }
+  else {
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const y2 = new Date(); y2.setDate(y2.getDate() - 2);
+    if (d === localDate(y)) parts.push('昨天');
+    else if (d === localDate(y2)) parts.push('前天');
+    else parts.push((new Date(d + 'T00:00:00')).getMonth() + 1 + '月' + (new Date(d + 'T00:00:00')).getDate() + '日');
+  }
+
+  const input = document.getElementById('exp-input');
+  if (input) input.value = parts.join(' ');
+  renderExpPreview();
+
+  const btn = document.getElementById('exp-cancel-edit');
+  if (btn) btn.style.display = 'inline-block';
+  const sub = document.getElementById('exp-submit');
+  if (sub) sub.textContent = '保存修改';
+  const hint = document.getElementById('exp-hint');
+  if (hint) hint.textContent = '正在修改这笔：改完点「保存修改」；也可以点下面的「取消修改」放弃。';
+
+  const card = document.getElementById('exp-card');
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // ---- 分类占比 ----
@@ -3046,12 +3326,278 @@ function chartTtl(v, max, h) { return max > 0 ? h * (v / max) : 0; }
 
 function renderFinanceInsights() {
   renderBudget();
-  renderQuickCats();
   renderCategoryBreakdown();
   renderTrendChart();
 }
 // === 财务洞察 END ===
 
+
+// === 记账一句话解析 START ===
+//
+// 用户原话：「其实，我是想一句话搞定的，包括我现有的记账」
+//         「我不想学格式，填表单比较麻烦」
+//
+// 设计依据（来自他真实的 111 笔交易，不是拍脑袋）：
+//   · 餐饮占 65/111 = 59%，所以「食物词库 → 餐饮」这一条收益最大
+//   · 备注里全是具体食物名（肠粉 / 塔斯汀汉堡 / 绿豆沙 / 烤鸭饭）
+//   · 收入分类是「生活费 / 工资 / 兼职」这样的词，本身就带语义
+// 所以分类猜测的投入产出比很高 —— 猜对了省一步，猜错了点一下改。
+
+// --- 分类词库 -------------------------------------------------------
+// 每条是 [分类, 关键词数组]。匹配时长关键词优先（「地铁票」要能命中「地铁」）。
+const CAT_WORDS = [
+  ['餐饮', ['吃饭','早饭','午饭','晚饭','早餐','午餐','晚餐','夜宵','外卖','食堂','饭店','餐厅','小吃','烧烤','火锅','麻辣烫','快餐','零食','水果','奶茶','咖啡','豆浆','牛奶','可乐','雪碧','矿泉水','饮料','水',
+            // 具体食物：直接抄用户备注里出现过的
+            '肠粉','汉堡','塔斯汀','麦当劳','肯德基','华莱士','米线','拌粉','米粉','面条','包子','馒头','粥','皮蛋瘦肉粥','饭','炒饭','盖饭','烤鸭饭','滑蛋饭','自助','烤肉','炸鸡','煎饼','烧饼','饺子','馄饨','汤','绿豆沙','龟苓膏','酸奶','蛋糕','面包','饼干','雪糕','冰淇淋','糖','鸡排','串','梨','苹果','香蕉','橙','西瓜','葡萄','草莓','菜','买菜','超市',
+            // 真实备注里出现过但第一版漏了的
+            '炒肉','肉饼','鲜肉','番茄','土豆','豆腐','蛋','鸡蛋','皮蛋','粉','面','饼','饭团','寿司','麻辣','火锅','串串','卤','炖','蒸','煮','炒']],
+  ['交通', ['地铁','公交','公交车','打车','出租车','滴滴','网约车','高铁','火车','动车','飞机','机票','车票','加油','油费','停车','过路','高速','共享单车','单车','骑行','摩的','三轮']],
+  ['学习', ['书','书本','教材','课本','资料','打印','复印','文具','笔','本子','笔记本','考试','报名','培训','网课','课程','学费','补习','辅导','自习','图书馆','四级','六级','证书','考证','代抢','综测','论文','查重','题库','网课','刷题']],
+  ['学杂', ['学杂','班费','校服','体检','保险','实验','材料','社团','活动费']],
+  ['娱乐', ['电影','游戏','游戏充值','网吧','唱歌','KTV','桌游','剧本杀','密室','门票','演唱会','音乐','会员','视频会员','充会员','陪玩','代肝','打赏','直播','订阅','点卡','皮肤','免单卡','优惠券','点券','抽卡','氪金']],
+  ['生活', ['话费','流量','宽带','网费','电费','水费','燃气','房租','租房','住宿','宿舍','日用','纸巾','卫生纸','洗发水','沐浴露','牙膏','洗衣液','日用品','理发','快递','邮费','维修','租赁','租','医药','药','看病','挂号','口罩','衣服','鞋','裤子','T恤','外套','袜子','包','化妆品','护肤','牙刷']],
+  ['购物', ['购物','买衣服','电器','数码','手机','电脑','耳机','充电','充电器','数据线','键盘','鼠标','显示器','服务器','域名','主机','相机','家具','桌椅','床','被子','枕头','收纳']]
+];
+
+// 收入类关键词（命中即把类型翻成收入）
+const INCOME_WORDS = {
+  '生活费': ['生活费','家里给','妈妈给','爸爸给','父母给','家里打','打钱'],
+  '工资':   ['工资','薪水','月薪','发工资','实习工资','兼职工资'],
+  '兼职':   ['兼职','外快','代课','家教','跑腿','接单','稿费','设计费','剪辑费','代做','代练'],
+  '奖学金': ['奖学金','助学金','补贴','补助','报销'],
+  '退款':   ['退款','退货','退钱','返还'],
+  '红包':   ['红包','压岁钱','转账收','收红包']
+};
+
+// 动词前缀：出现在句首并直接接在名词前时，它定义的「行为类型」比名词更重要。
+// 依据：「租相机」是花钱租服务（生活），不是买相机（购物）；
+//      「修手机」是维修（生活），不是买手机（购物）。
+// 不做全局替换、只在句首命中，是因为「相机租金」这种说法里名词才是主体。
+const ACTION_PREFIX = {
+  '租': '生活', '租赁': '生活', '修': '生活', '维修': '生活',
+  '洗': '生活', '寄': '生活', '快递': '生活', '充': '生活',
+  '打': '交通', '坐': '交通', '乘': '交通', '骑': '交通'
+};
+
+// 猜分类：返回 { cat, hit }。hit 是命中的关键词（用于给用户看「凭什么这么归」）
+function guessCategory(text, isIncome) {
+  const t = String(text || '');
+  if (!t) return { cat: '', hit: '' };
+  if (isIncome) {
+    for (const cat in INCOME_WORDS) {
+      for (const w of INCOME_WORDS[cat]) {
+        if (t.indexOf(w) >= 0) return { cat: cat, hit: w };
+      }
+    }
+    return { cat: '', hit: '' };
+  }
+  // ① 句首动词前缀优先（长前缀优先：「租赁」要先于「租」）
+  const prefixes = Object.keys(ACTION_PREFIX).sort((a, b) => b.length - a.length);
+  for (const p of prefixes) {
+    if (t.indexOf(p) === 0) return { cat: ACTION_PREFIX[p], hit: p };
+  }
+  // ② 长关键词优先，避免「水」把「水费」抢走（水费该归生活，不是餐饮）
+  let best = null, bestLen = 0;
+  for (const [cat, words] of CAT_WORDS) {
+    for (const w of words) {
+      if (t.indexOf(w) >= 0 && w.length > bestLen) { best = { cat: cat, hit: w }; bestLen = w.length; }
+    }
+  }
+  return best || { cat: '', hit: '' };
+}
+
+// --- 解析器 ---------------------------------------------------------
+// 支持的说法（都是人自然会说的）：
+//   「肠粉 8」              → 支出 8 餐饮
+//   「打车 18」              → 支出 18 交通
+//   「奶茶 15 微信」          → 支出 15 餐饮 账户微信
+//   「工资 8000」            → 收入 8000 工资（词本身就定类型）
+//   「买菜 45 昨天」          → 支出 45 餐饮（买菜→餐饮）日期=昨天
+//   「8.5 地铁」             → 金额在前也认
+//   「花了32 午饭」           → 「花了」是干扰词，剥掉
+//
+// 关键契约跟物品解析器一致：**永远返回可用结果，绝不报错阻塞。**
+
+const CN_DIGIT = { '零':0,'一':1,'两':2,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10 };
+
+function cnMoneyToNum(s) {
+  if (!s) return NaN;
+  if (/^\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+  // 中文数字金额：只处理 100 以内 + 整百（「三百」→300）；
+  // 更大的中文金额（「两千五」）口语里很少写，且歧义多，宁可让用户打数字
+  if (s === '十') return 10;
+  if (/^[一两二三四五六七八九]?十[一二三四五六七八九]?$/.test(s)) {
+    const [a, b] = s.split('十');
+    return (a ? CN_DIGIT[a] : 1) * 10 + (b ? CN_DIGIT[b] : 0);
+  }
+  if (/^[一两二三四五六七八九]百$/.test(s)) return CN_DIGIT[s[0]] * 100;
+  if (/^[一两二三四五六七八九]块?[半]$/.test(s)) return NaN;   // 「一块半」歧义太大，不猜
+  if (s.length === 1 && CN_DIGIT[s] !== undefined) return CN_DIGIT[s];
+  return NaN;
+}
+
+function parseExpenseSentence(input) {
+  const raw = String(input || '').trim();
+  const out = {
+    raw: raw,
+    ok: false,
+    amount: 0,
+    type: 'expense',      // expense | income
+    category: '',
+    catHit: '',           // 分类命中的关键词，给用户看依据
+    note: '',
+    date: '',             // YYYY-MM-DDTHH:mm:ss
+    accountId: '',
+    accountHint: '',
+    amountExplicit: false
+  };
+  if (!raw) return out;
+
+  let rest = raw;
+
+  // ---- 1. 账户 ----
+  // 用户真实账户：__pool__(默认池) / cash2x / cashwx1a / cash4x...
+  // 「微信」「支付宝」这类是**支付方式**不是账户名，但用户会这么说，
+  // 所以按名字包含关系去找他实际配的账户。
+  const wallets = (function () {
+    try { return (Store.get('wallet', {}).cashAccounts) || []; } catch (e) { return []; }
+  })();
+  const PAY_WORDS = [
+    { re: /(微信|wx|WX)/, key: 'wx' },
+    { re: /(支付宝|zfb|ZFB)/, key: 'zfb' },
+    { re: /(现金|现钞)/, key: 'cash' },
+    { re: /(银行卡|银行|卡里)/, key: 'bank' }
+  ];
+  for (const p of PAY_WORDS) {
+    if (p.re.test(rest)) {
+      // 先按 key 在账户名/id 里找
+      const hit = wallets.find(a => {
+        const s = ((a.name || '') + (a.id || '')).toLowerCase();
+        return s.indexOf(p.key) >= 0;
+      });
+      if (hit) { out.accountId = hit.id; out.accountHint = hit.name || ''; }
+      else { out.accountHint = rest.match(p.re)[0]; }
+      rest = rest.replace(p.re, ' ');
+      break;
+    }
+  }
+
+  // ---- 2. 日期 ----
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  let dayOffset = 0, dateMatched = false;
+  if (/(前天)/.test(rest))       { dayOffset = -2; dateMatched = true; rest = rest.replace(/前天/, ' '); }
+  else if (/(昨天|昨日)/.test(rest)) { dayOffset = -1; dateMatched = true; rest = rest.replace(/(昨天|昨日)/, ' '); }
+  else if (/(今天|今日|刚)/.test(rest)) { dayOffset = 0; dateMatched = true; rest = rest.replace(/(今天|今日|刚)/, ' '); }
+  else {
+    // 绝对日期：3月5日 / 3/5
+    const m = rest.match(/(\d{1,2})[月\/](\d{1,2})[日号]?/);
+    if (m) {
+      const mm = parseInt(m[1], 10), dd = parseInt(m[2], 10);
+      if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+        let yy = now.getFullYear();
+        const cand = new Date(yy, mm - 1, dd);
+        if (cand > now) yy -= 1;      // 记账是过去的事，未来日期理解为去年
+        out.date = yy + '-' + pad(mm) + '-' + pad(dd) + 'T' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':00';
+        dateMatched = true;
+        rest = rest.replace(m[0], ' ');
+      }
+    }
+  }
+  if (!out.date && dateMatched) {
+    const d = new Date(now.getTime()); d.setDate(d.getDate() + dayOffset);
+    out.date = fmt(d) + 'T' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':00';
+  }
+  if (!out.date) {
+    out.date = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) +
+               'T' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':00';
+  }
+
+  // ---- 3. 金额 ----
+  // 找带货币标记的优先（¥32 / 32块 / 32元 / 32.5）
+  let amt = NaN;
+  let m = rest.match(/[¥￥]\s*(\d+(?:\.\d+)?)/);
+  if (m) { amt = parseFloat(m[1]); rest = rest.replace(m[0], ' '); }
+  if (isNaN(amt)) {
+    m = rest.match(/(\d+(?:\.\d+)?)\s*(?:块钱|块|元|圆|毛|角)?/);
+    if (m) { amt = parseFloat(m[1]); rest = rest.replace(m[0], ' '); }
+  }
+  if (isNaN(amt)) {
+    // 中文数字金额：「五块」「三十」
+    m = rest.match(/([一两二三四五六七八九十]+)\s*(?:块钱|块|元|圆)?/);
+    if (m) {
+      const v = cnMoneyToNum(m[1]);
+      if (!isNaN(v)) { amt = v; rest = rest.replace(m[0], ' '); }
+    }
+  }
+  if (!isNaN(amt) && amt > 0) {
+    out.amount = Math.round(amt * 100) / 100;
+    out.amountExplicit = true;
+  }
+
+  // ---- 4. 类型（收入关键词能被识别就翻成 income）----
+  const incomeGuess = guessCategory(rest, true);
+  if (incomeGuess.cat) {
+    out.type = 'income';
+    out.category = incomeGuess.cat;
+    out.catHit = incomeGuess.hit;
+  }
+
+  // ---- 5. 分类（支出侧）----
+  if (out.type === 'expense') {
+    const g = guessCategory(rest, false);
+    if (g.cat) { out.category = g.cat; out.catHit = g.hit; }
+  }
+
+  // 用户直接写的分类名（「学习 68」）优先于词库猜测
+  // ★ 按长度降序 —— 「生活费」必须排在「生活」前面，否则先命中短的就 break 了。
+  // 踩过的坑：原来是手工排的顺序，'生活' 在 '生活费' 前，导致「生活费 1500」
+  // 被判成支出/生活。不要手工维护顺序，用长度排序是通用规则。
+  const ALL_CATS = ['餐饮','交通','购物','娱乐','学习','学杂','生活','其他','生活费','工资','兼职','奖学金','退款','红包']
+    .slice().sort((a, b) => b.length - a.length);
+  for (const c of ALL_CATS) {
+    if (rest.indexOf(c) >= 0) {
+      out.category = c;
+      out.catHit = c;
+      // 「生活费」「工资」这类本身就是收入分类
+      if (INCOME_WORDS[c]) out.type = 'income';
+      rest = rest.replace(c, ' ');
+      break;
+    }
+  }
+
+  // ---- 6. 剩下的是备注 ----
+  let note = rest
+    .replace(/[¥￥]/g, ' ')
+    .replace(/(花了?|用了?|付了?|支付了?|消费了?|买了?|收了?|赚了?|发了?)/g, ' ')
+    .replace(/[\s,，、。；;·]+/g, ' ')
+    .trim();
+  out.note = note;
+
+  // 备注为空时，用命中的关键词兜一下（「奶茶 15」→ 备注「奶茶」更有意义）
+  if (!out.note && out.catHit && out.catHit !== out.category) out.note = out.catHit;
+
+  out.ok = out.amount > 0;
+  return out;
+}
+
+// 把解析结果转成一个可保存的交易对象（字段与 addTransaction 一致）
+function walletMakeTxn(p) {
+  const wallet = loadWallet();
+  const acctId = p.accountId || CASH_POOL_ID;
+  return {
+    id: 'w' + Date.now() + Math.floor(Math.random() * 1000),
+    type: p.type,
+    amount: p.amount,
+    category: p.category || '其他',
+    note: p.note || '',
+    date: p.date || localStamp(),
+    account: acctId
+  };
+}
+
+// === 记账一句话解析 END ===
 
 // === 物品管理 / 库存 START ===
 //
@@ -6901,8 +7447,15 @@ function renderPanel(name) {
   if (name === 'daily') { renderDailyHub(); renderInvAlertCard(); }
   else if (name === 'inventory') { renderInventory(); }
   else if (name === 'courses') { renderCourses(); renderNextClassBanner(); renderScheduleModeButtons(); }
-  else if (name === 'data') { renderWallet(); renderInvestJournal(); renderHistory(); renderJournalArchive(); }
+  else if (name === 'data') { renderWallet(); renderHistory(); renderJournalArchive(); }
   else if (name === 'settings') { renderSettings(); renderAiWeek(); }
+  // ★ 每次切面板都要重算折叠态 + 补绑点击。
+  // 为什么不是只在启动时做一次：
+  //   · 折叠态是 per-panel 的，切过去时要立刻反映「用户上次在这页折了什么」
+  //   · 折叠条上的角标（几笔 / 几条）依赖刚渲染完的 DOM，顺序必须在 render 之后
+  //   · bindSectionToggles 内部用 dataset 打标记，重复调用不会重复绑定
+  updateSectionCollapse();
+  bindSectionToggles();
 }
 
 function switchTab(panel) {
@@ -7146,7 +7699,6 @@ function renderAll() {
   renderDailyHub();  renderTasks();
   renderInvAlertCard();   // 首次加载/全量刷新时也要算快过期 —— 这是最该显示的场景
   renderWallet();
-  renderInvestJournal();
   renderHistory();
   renderSettings();
   renderCourses();
@@ -7344,26 +7896,9 @@ function getPriorityColor(p) {
 
 // === Daily Task Template Manager ===
 // === Wallet / Finance Manager ===
-let _walletType = 'expense';
-
-function setWalletType(type) {
-  _walletType = type;
-  document.getElementById('wtype-expense').classList.toggle('active', type === 'expense');
-  document.getElementById('wtype-income').classList.toggle('active', type === 'income');
-  // Swap categories for income
-  const cat = document.getElementById('wallet-category');
-  if (type === 'income') {
-    cat.innerHTML = '<option value="工资">工资</option><option value="兼职">兼职</option><option value="生活费">生活费</option><option value="理财">理财</option><option value="其他">其他</option>';
-  } else {
-    cat.innerHTML = '<option value="餐饮">餐饮</option><option value="交通">交通</option><option value="购物">购物</option><option value="娱乐">娱乐</option><option value="学习">学习</option><option value="学杂">学杂</option><option value="生活">生活</option><option value="其他">其他</option>';
-  }
-}
 
 function renderWallet() {
-  const whenEl = document.getElementById('wallet-when');
-  if (whenEl && !whenEl.value) whenEl.value = localStamp().slice(0, 16);
   const wallet = loadWallet();
-  renderWalletAccountOptions();
 
   // 现金（记账会自动加减）与投资（台账汇总）分开显示
   document.getElementById('wallet-balance').textContent = '¥ ' + (Number(wallet.cash) || 0).toFixed(2);
@@ -7404,62 +7939,6 @@ function renderWallet() {
   renderFinanceInsights();
 }
 
-// 把现金账户填进「记一笔」的账户下拉框；默认选中第一个真实账户，没有则落到「不分账户」池。
-function renderWalletAccountOptions() {
-  const sel = document.getElementById('wallet-account');
-  if (!sel) return;
-  const w = loadWallet();
-  const list = _cashList(w);
-  const real = list.filter(a => a.id !== CASH_POOL_ID);
-  const cur = sel.value;
-  let html = `<option value="${CASH_POOL_ID}">现金（不分账户）</option>`;
-  html += real.map(a => `<option value="${a.id}">${escHtml(a.name)}</option>`).join('');
-  sel.innerHTML = html;
-  if (cur && (cur === CASH_POOL_ID || real.some(a => a.id === cur))) sel.value = cur;
-  else sel.value = real.length ? real[0].id : CASH_POOL_ID;
-}
-
-// === Investment Journal (交易复盘) ===
-function renderInvestJournal() {
-  const journal = Store.get('investJournal', {});
-  const today = TODAY();
-  const textarea = document.getElementById('invest-journal');
-  if (textarea && journal[today] !== undefined) textarea.value = journal[today];
-  else if (textarea) textarea.value = '';
-  renderInvestHistory();
-}
-
-function saveInvestJournal() {
-  const journal = Store.get('investJournal', {});
-  const val = document.getElementById('invest-journal').value;
-  if (val.trim()) {
-    journal[TODAY()] = val;
-    Store.set('investJournal', journal);
-  }
-  renderInvestHistory();
-}
-
-function renderInvestHistory() {
-  const journal = Store.get('investJournal', {});
-  const entries = Object.entries(journal).filter(([k,v]) => v && v.trim()).sort((a,b) => b[0].localeCompare(a[0]));
-  const container = document.getElementById('invest-history-list');
-  if (!container) return;
-  if (entries.length <= 1) { container.innerHTML = ''; return; }
-
-  container.innerHTML = entries.slice(1, 10).map(([date, text]) => {
-    const d = new Date(date);
-    const weekdays = ['日','一','二','三','四','五','六'];
-    const label = `${d.getMonth()+1}/${d.getDate()} 周${weekdays[d.getDay()]}`;
-    const preview = text.length > 60 ? text.slice(0, 60) + '...' : text;
-    return `<details class="card" style="padding:10px;margin-bottom:8px;">
-      <summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-family:var(--font-mono);font-size:var(--fs-sm);color:var(--accent);">${label}</span>
-        <span class="t-dim-xs">›</span>
-      </summary>
-      <div style="font-size:var(--fs-sm);color:var(--text-secondary);line-height:1.5;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-subtle);white-space:pre-wrap;">${escHtml(text)}</div>
-    </details>`;
-  }).join('');
-}
 
 // === History (每日统计合集) ===
 let _historyFilter = 'all';
@@ -7795,126 +8274,13 @@ function renderWalletHistory() {
             <div style="font-size:var(--fs-base); font-weight: bold; color: ${t.type === 'expense' ? 'var(--expense)' : 'var(--success)'}; font-family: var(--font-mono);">
               ${t.type === 'expense' ? '-' : '+'}¥${t.amount.toFixed(2)}
             </div>
-            <button class="btn btn-sm" onclick="editTransaction('${t.id}')" style="padding: 8px 12px; font-size:var(--fs-2xs); flex-shrink: 0;" aria-label="修改这笔">改</button>
+            <button class="btn btn-sm" onclick="expEditTxn('${t.id}')" style="padding: 8px 12px; font-size:var(--fs-2xs); flex-shrink: 0;" aria-label="修改这笔">改</button>
             <button class="btn btn-sm btn-danger" onclick="deleteTransaction('${t.id}')" style="padding: 8px 12px; font-size:var(--fs-2xs); flex-shrink: 0;" aria-label="删除这笔">${ICON_CLOSE}</button>
           </div>
         `).join('')}
       </details>
     `;
   }).join('');
-}
-
-function addTransaction() {
-  if (_editingTxnId) { saveEditTransaction(); return; }
-  const amount = parseFloat(document.getElementById('wallet-amount').value);
-  const category = document.getElementById('wallet-category').value;
-  const note = document.getElementById('wallet-note').value.trim();
-  if (!amount || amount <= 0) { showToast('请输入有效金额', 'warning'); return; }
-
-  const wallet = loadWallet();
-
-  // 记账时间：默认当前本地时间，可选过去（补记）。存本地时间串（不带 Z = 按本地解析）
-  const whenEl = document.getElementById('wallet-when');
-  const whenVal = (whenEl && whenEl.value) ? whenEl.value : localStamp().slice(0, 16);
-  const txn = {
-    id: 'w' + Date.now(),
-    type: _walletType,
-    amount: amount,
-    category: category,
-    note: note,
-    date: whenVal.length === 16 ? whenVal + ':00' : whenVal
-  };
-
-  const acctId = (document.getElementById('wallet-account') || {}).value || CASH_POOL_ID;
-  txn.account = acctId;
-  wallet.transactions.push(txn);
-  // 收支落到具体账户，让该账户余额跟着波动；投资市值不受记账影响（基金涨跌不是记账能反映的）。
-  const a = _getAcct(wallet, acctId);
-  const delta = _walletType === 'expense' ? -amount : amount;
-  a.amount = Math.round((Number(a.amount) + delta) * 100) / 100;
-  _recalcCashOnly(wallet);
-
-  Store.set('wallet', wallet);
-  document.getElementById('wallet-amount').value = '';
-  document.getElementById('wallet-note').value = '';
-  if (whenEl) whenEl.value = localStamp().slice(0, 16);
-  renderWallet();
-  showToast(`${_walletType === 'expense' ? '支出' : '收入'} ¥${amount.toFixed(2)} 已记录`, 'success');
-}
-
-function deleteTransaction(id) {
-  const wallet = loadWallet();
-  const txn = wallet.transactions.find(t => t.id === id);
-  if (!txn) return;
-  // 撤销时回滚对应账户：支出加回、收入减掉
-  const a = _getAcct(wallet, txn.account || CASH_POOL_ID);
-  const delta = txn.type === 'expense' ? txn.amount : -txn.amount;
-  a.amount = Math.round((Number(a.amount) + delta) * 100) / 100;
-  _recalcCashOnly(wallet);
-  wallet.transactions = (wallet.transactions || []).filter(t => t.id !== id);
-  Store.set('wallet', wallet);
-  renderWallet();
-  showToast('已删除该记录', 'info');
-}
-
-// 记账记录可编辑：把某笔填回「记一笔」表单，改完点「保存修改」就地更新。
-// 现金要同步回滚旧影响再算新影响，免得数字对不上。
-let _editingTxnId = null;
-function editTransaction(id) {
-  const wallet = loadWallet();
-  const t = wallet.transactions.find(x => x.id === id);
-  if (!t) return;
-  _editingTxnId = id;
-  setWalletType(t.type);
-  document.getElementById('wallet-amount').value = t.amount;
-  document.getElementById('wallet-category').value = t.category || '其他';
-  const acctSel = document.getElementById('wallet-account');
-  if (acctSel) { renderWalletAccountOptions(); acctSel.value = t.account || CASH_POOL_ID; }
-  document.getElementById('wallet-when').value = (t.date || '').slice(0, 16);
-  document.getElementById('wallet-note').value = t.note || '';
-  const btn = document.getElementById('wallet-add-btn');
-  if (btn) btn.textContent = '保存修改';
-  const form = document.getElementById('wallet-add-form') || document.querySelector('.wallet-add-form');
-  if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  showToast('修改中：改完点「保存修改」', 'info');
-}
-
-function saveEditTransaction() {
-  const amount = parseFloat(document.getElementById('wallet-amount').value);
-  const category = document.getElementById('wallet-category').value;
-  const note = document.getElementById('wallet-note').value.trim();
-  if (!amount || amount <= 0) { showToast('请输入有效金额', 'warning'); return; }
-  const wallet = loadWallet();
-  const t = wallet.transactions.find(x => x.id === _editingTxnId);
-  if (!t) { _editingTxnId = null; return; }
-  // 回滚旧影响（落回旧账户）
-  const oa = _getAcct(wallet, t.account || CASH_POOL_ID);
-  const oldDelta = t.type === 'expense' ? t.amount : -t.amount;
-  oa.amount = Math.round((Number(oa.amount) + oldDelta) * 100) / 100;
-  // 套用新值
-  const whenEl = document.getElementById('wallet-when');
-  const whenVal = (whenEl && whenEl.value) ? whenEl.value : localStamp().slice(0, 16);
-  t.type = _walletType;
-  t.amount = amount;
-  t.category = category;
-  t.note = note;
-  t.date = whenVal.length === 16 ? whenVal + ':00' : whenVal;
-  const acctId = (document.getElementById('wallet-account') || {}).value || CASH_POOL_ID;
-  t.account = acctId;
-  const na = _getAcct(wallet, acctId);
-  const newDelta = _walletType === 'expense' ? -amount : amount;
-  na.amount = Math.round((Number(na.amount) + newDelta) * 100) / 100;
-  _recalcCashOnly(wallet);
-  Store.set('wallet', wallet);
-  // 复位编辑态
-  _editingTxnId = null;
-  document.getElementById('wallet-amount').value = '';
-  document.getElementById('wallet-note').value = '';
-  if (whenEl) whenEl.value = localStamp().slice(0, 16);
-  const btn = document.getElementById('wallet-add-btn');
-  if (btn) btn.textContent = '记一笔';
-  renderWallet();
-  showToast('已保存修改', 'success');
 }
 
 function clearWalletHistory() {

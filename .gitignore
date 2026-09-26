@@ -14,6 +14,15 @@ server/node_modules/
 *.bak
 *.bak-*
 
+# 大体积单文件快照（单文件项目改坏了靠它回滚，但每个 500KB+，不入库）
+# 注：不要用 `git checkout index.html` 做局部回滚 —— 它会把整个文件退回 HEAD，
+# 本轮未提交的改动全丢（踩过三次）。用这里的备份文件。
+.backup-index-*.html
+.backup-*.html
+
+# 一次性补丁脚本（改完即弃，逻辑已经落进 index.html）
+patch_*.py
+
 # 截图事实提取、设计评审等过程产物（本地保留，不入库）
 _facts/
 _shots/

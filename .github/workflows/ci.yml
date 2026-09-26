@@ -40,6 +40,13 @@ jobs:
       - name: AI 报告（周/月）范围与转义测例
         run: node tests/ai-report.test.js
 
+      # 记账一句话解析器：语料取自用户真实的 111 笔交易备注（餐饮占 59%），
+      # 纯函数、无浏览器依赖，所以能进 CI。
+      # 另有两个 Playwright 套件（verify-wallet-mobile / verify-inventory-mobile）
+      # 要下浏览器二进制，只在本地跑 —— 别往 CI 加，会让流水线慢十几倍。
+      - name: 记账一句话解析器测例
+        run: node tests/verify-expense-parser.js
+
       # --- 后端冒烟：真起服务，验 gzip / ETag / 鉴权 ---
       - name: 安装后端依赖
         run: cd server && npm ci

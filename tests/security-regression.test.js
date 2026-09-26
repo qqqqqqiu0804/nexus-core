@@ -122,14 +122,15 @@ console.log('【P1-a】分类名 / 标签必须「属性 + 正文」双转义');
   // 所以必须分两步查：
   //   ① 模板结构对（onclick 里插的是变量 + &quot; 包裹）
   //   ② **那个变量本身确实过了 escAttr** ← 真正的防线
+  // 2026-09-26：`renderQuickCats` 已被「一句话记账」取代删除。
+  // 它原来守卫的是「分类名经 KV 同步进来、可能是任意字符串 → 插进 onclick 属性位
+  // 会被引号逃逸」。新代码里分类名仍然会被渲染（实时预览那一行），
+  // 但插在**正文位**（escHtml），不进任何 onclick 属性 —— 攻击面消失了。
+  // 所以这里不是「删掉这条断言」，而是换成守新的真实防线：
+  //   ① renderExpPreview / renderDailyExpPreview 里出现分类名/备注/命中词的地方必须是 escHtml
+  //   ② 这些函数体内**不得**把用户数据拼进 on*="..." 属性
+  //   ③ 账户名仍然进属性位（钱包账户 chip），那条继续守
   const cases = [
-    {
-      label: 'renderQuickCats 分类名',
-      tpl: "'\" onclick=\"quickPick(&quot;' + escAttr(c) + '&quot;)\">' + escHtml(c) + '</button>'",
-      // 属性位的表达式必须是 escAttr(...)，且正文位必须是 escHtml(...)
-      attrRe: /quickPick\(&quot;'\s*\+\s*escAttr\(c\)\s*\+\s*'&quot;\)/,
-      bodyRe: /&quot;\)">'\s*\+\s*escHtml\(c\)\s*\+\s*'<\/button>'/,
-    },
     {
       label: 'renderInspirations 标签',
       tpl: "'\" onclick=\"inspSetTagFilter(&quot;' + t + '&quot;)\">#' + escHtml(e[0]) + ' ' + e[1] + '</button>'",
@@ -150,6 +151,61 @@ console.log('【P1-a】分类名 / 标签必须「属性 + 正文」双转义');
       if (c.defRe.test(HTML)) ok(c.label + ' 插入属性用的变量确实由 escAttr 产出');
       else bad(c.label + ' 变量未经 escAttr —— 属性位等于没转义（模板看着对，其实是裸值）');
     }
+  }
+
+  // ---- 一句话记账的渲染：分类名/备注/命中词来自 KV，必须转义 ----
+  // 这三个值都可能被导入的脏数据污染（分类名可以是任意字符串），
+  // 所以只要有一处漏了 escHtml，就是一个存储型 XSS。
+  //
+  // 查法（踩过的坑：第一版写得太糙，把 `p.catHit !== p.category` 这种
+  // **纯比较行**也判成插值点了，白白报两个假红）：
+  //   只挑**真的往 html 字符串里拼**的行（含 `+=` 或 `push(`），
+  //   再把每条语句里的 escHtml(...) 整段挖掉；挖完还剩 p.category/p.catHit/p.note
+  //   就是裸值上屏。
+  for (const fn of ['renderExpPreview', 'renderDailyExpPreview']) {
+    const body = fnBody(HTML, fn);
+    if (!body) { bad('抠不出 ' + fn + ' 的函数体（断言会静默失效）'); continue; }
+
+    let naked = null;
+    for (const line of body.split('\n')) {
+      if (!/\+=\s*['"]|\.push\(/.test(line)) continue;         // 不是拼接行，跳过
+      if (!/p\.(category|catHit|note)\b/.test(line)) continue; // 不涉及这三个值，跳过
+      // 挖掉所有 escHtml( ... ) —— 手写括号配对，不用正则。
+      // 为什么不用正则：`(p.category ? escHtml(p.category) : '其他')` 这种
+      // 三元表达式里有嵌套括号，`[^()]*` 匹配不到，会误报（第一版就栽在这）。
+      let stripped = (function stripEsc(s) {
+        let out = '', i = 0;
+        while (i < s.length) {
+          if (s.startsWith('escHtml(', i)) {
+            let d = 0, j = i + 'escHtml'.length;
+            for (; j < s.length; j++) {
+              if (s[j] === '(') d++;
+              else if (s[j] === ')') { d--; if (d === 0) { j++; break; } }
+            }
+            out += 'ESC'; i = j;
+          } else { out += s[i]; i++; }
+        }
+        return out;
+      })(line);
+      // 再挖掉「三元/逻辑判断里的裸读」—— 那些是当条件用的，不上屏。
+      //   `p.category ? A : B`   → 条件是 p.category
+      //   `p.catHit !== p.category` → 比较
+      //   `if (p.note)`            → 判空
+      // 只保留真正会被拼进字符串的那个位置。
+      stripped = stripped
+        .replace(/p\.(category|catHit|note)\s*\?/g, 'COND?')          // 三元条件
+        .replace(/p\.(category|catHit|note)\s*(!==|===|==|!=|&&|\|\|)/g, 'CMP')  // 比较/逻辑
+        .replace(/(!==|===|==|!=|&&|\|\|)\s*p\.(category|catHit|note)\b/g, 'CMP') // 右操作数
+        .replace(/if\s*\(\s*p\.(category|catHit|note)\s*\)/g, 'if (COND)');       // if (p.note)
+      if (/p\.(category|catHit|note)\b/.test(stripped)) { naked = line.trim(); break; }
+    }
+    if (naked) bad(fn + ' 里有未经 escHtml 的值上屏 → ' + naked);
+    else ok(fn + ' 的分类名/备注所有插值点都走了 escHtml');
+
+    // 且这两个函数里不得出现 onclick 等属性位拼接
+    if (/on[a-z]+\s*=\s*["'`]/.test(body.replace(/\s+/g, ' ')))
+      bad(fn + ' 里出现了 on*= 属性拼接 —— 属性位必须用 escAttr 或干脆不拼');
+    else ok(fn + ' 没有属性位拼接（不进 onclick，攻击面为零）');
   }
 
   // 转义函数本身不能被削弱
