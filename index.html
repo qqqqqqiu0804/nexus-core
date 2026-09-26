@@ -2200,34 +2200,182 @@ function exportAllData() {
   return { app: 'nexus-core', version: '2.0', timestamp: Date.now(), data: data };
 }
 
+// ---------- 导入值校验 ----------
+// 背景：导入是唯一「把外部文件里的任意内容写进 localStorage」的入口。
+// Store.get 对 JSON.parse 失败是吞掉的（返回默认值），所以坏 JSON 不会立刻炸；
+// 真正会炸的是**类型不对但能解析**的数据：把 tasks 写成 {} 而不是 []，
+// 下游 getTasks().filter(...) 直接抛 TypeError，整块面板白屏。
+// 所以这里按「键名 → 期望类型」白名单校验，不合法就拒绝写入并回报原因。
+//
+// 三种处理策略：
+//   'object' / 'array' — 类型不符就整键拒绝（这种键类型错了没法自动救）
+//   'any'              — 只做安全检查（保留给未来的新键，向前兼容）
+//   不在表里            — 同 'any'
+const IMPORT_SCHEMA = {
+  tasks:           'array',
+  courses:         'array',
+  dailyTemplates:  'array',
+  aiReports:       'array',
+  inspirations:    'array',
+  videos:          'array',
+  investments:     'array',
+  investShots:     'array',
+  gadgets:         'array',
+  // 下面这些既可能是对象也可能显式存 null（表示「清空」），所以用 'object|null'
+  scheduleOverride: 'object|null',
+  completionLog:   'object',
+  dailyLog:        'object',
+  investJournal:   'object',
+  wallet:          'object',
+  profile:         'object',
+  budget:          'object',
+  // 标量
+  aiModel:         'any',
+};
+
+// 过长的键名 / 值都拒绝 —— localStorage 总配额只有 ~5MB，
+// 一个畸形文件就能把整个域名的存储塞满，之后所有写入（含同步）全部静默失败。
+const IMPORT_MAX_KEY_LEN = 64;
+const IMPORT_MAX_VALUE_BYTES = 1024 * 1024;   // 单键 1MB，远超任何正常数据
+const IMPORT_MAX_KEYS = 200;                  // 一次最多导入 200 个键
+
+// 原型污染：`__proto__` / `constructor` / `prototype` 作为键名会污染 Object.prototype。
+// 注意要**剥掉 nexus_ 前缀后**再比对 —— 否则 `nexus___proto__` 会从缝里钻过去
+// （它整串不等于 '__proto__'，但剥前缀后就是；这个漏洞被测试抓过）。
+// 顺带挡掉一批看起来就不像数据键的名字。
+const IMPORT_BAD_BARE_KEYS = ['__proto__', 'constructor', 'prototype'];
+
+function importKeyIsSafe(key) {
+  if (typeof key !== 'string' || !key) return false;
+  if (key.length > IMPORT_MAX_KEY_LEN) return false;
+  const bare = key.startsWith('nexus_') ? key.slice(6) : key;
+  // 剥前缀后必须有内容（`nexus_` 这种光秃秃的前缀不是有效键）
+  if (!bare) return false;
+  if (IMPORT_BAD_BARE_KEYS.includes(bare)) return false;
+  // 下划线打头的一律拒绝：`_x` 不是本项目的键命名风格，
+  // 而 `__proto__` 的各种前缀变体都是从这个口子进来的。
+  if (bare.startsWith('_')) return false;
+  // 只放行 标识符 + 连字符/点（历史键都是 nexus_snake_case）
+  if (!/^[A-Za-z0-9_.-]+$/.test(key)) return false;
+  return true;
+}
+
+// 返回 { ok: true } 或 { ok: false, reason: '...' }
+// 注意：IMPORT_SCHEMA 的键是**不带 nexus_ 前缀**的业务名（tasks 而不是 nexus_tasks），
+// 因为 SYNC_KEYS 也是这么写的 —— 查表前必须先剥前缀，否则永远查不到、全部落到 'any'，
+// 校验形同虚设（这个 bug 被 import-validation.test.js 抓过）。
+function importValueCheck(key, val) {
+  const bare = key.startsWith('nexus_') ? key.slice(6) : key;
+  const want = IMPORT_SCHEMA[bare] || 'any';
+  const isArr = Array.isArray(val);
+  const isObj = val !== null && typeof val === 'object' && !isArr;
+  if (want === 'array' && !isArr) {
+    return { ok: false, reason: '应为数组，实际是 ' + (val === null ? 'null' : typeof val) };
+  }
+  if (want === 'object' && !isObj) {
+    return { ok: false, reason: '应为对象，实际是 ' + (isArr ? '数组' : (val === null ? 'null' : typeof val)) };
+  }
+  if (want === 'object|null' && !(isObj || val === null)) {
+    return { ok: false, reason: '应为对象或 null，实际是 ' + (isArr ? '数组' : typeof val) };
+  }
+  // 值体积上限（按序列化后的字节数粗估）
+  let size = 0;
+  try { size = JSON.stringify(val) === undefined ? 0 : JSON.stringify(val).length; } catch { size = Infinity; }
+  if (size > IMPORT_MAX_VALUE_BYTES) {
+    return { ok: false, reason: '数据过大（约 ' + Math.round(size / 1024) + 'KB，上限 1024KB）' };
+  }
+  return { ok: true };
+}
+
 // 兼容两种格式：标准导出（{data:{...}}）与裸 dump（直接 {nexus_x:...}，手机导出常见）
 function importAllData(payload) {
   const d = (payload && payload.data && typeof payload.data === 'object') ? payload.data : payload;
-  if (!d || typeof d !== 'object') return { error: '文件格式不对' };
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return { error: '文件格式不对：顶层应为对象' };
+
+  const entries = Object.entries(d);
+  if (!entries.length) return { error: '文件里没有任何数据' };
+  if (entries.length > IMPORT_MAX_KEYS) {
+    return { error: '键太多（' + entries.length + ' 个，上限 ' + IMPORT_MAX_KEYS + ' 个）' };
+  }
+
+  // 先全量校验，再决定写不写 —— 不做「写一半才发现有问题」，
+  // 那样会留下一个半新半旧的拼接状态，比直接拒绝更难排查。
+  const accepted = [];
+  const rejected = [];
+  const seen = new Set();
+  for (const [k, v] of entries) {
+    const key = String(k).startsWith('nexus_') ? String(k) : 'nexus_' + k;
+    if (SYNC_SKIP_KEYS.includes(key)) continue;              // 连接配置不参与导入（各设备一份）
+    if (!importKeyIsSafe(key)) { rejected.push({ key: key, reason: '键名非法' }); continue; }
+    if (seen.has(key)) { rejected.push({ key: key, reason: '重复键' }); continue; }
+    const chk = importValueCheck(key, v);
+    if (!chk.ok) { rejected.push({ key: key, reason: chk.reason }); continue; }
+    seen.add(key);
+    accepted.push([key, v]);
+  }
+
+  if (!accepted.length) {
+    const first = rejected[0];
+    return {
+      error: '没有任何合法数据可导入' + (first ? '（如 ' + first.key + '：' + first.reason + '）' : ''),
+      rejected: rejected
+    };
+  }
+
+  // 备份当前数据（仅在被接受的键范围内 —— 与导出范围保持一致）
   const snapshot = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (k && k.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(k)) snapshot[k] = localStorage.getItem(k);
   }
   if (Object.keys(snapshot).length) {
-    localStorage.setItem('nexus_backup_before_import', JSON.stringify({ at: Date.now(), data: snapshot }));
+    try {
+      localStorage.setItem('nexus_backup_before_import', JSON.stringify({ at: Date.now(), data: snapshot }));
+    } catch (e) {
+      // 备份写不进去（配额满）还继续导入的话，就没有退路了 —— 直接中止
+      return { error: '本机存储空间不足，无法创建导入前备份，已中止（未改动任何数据）' };
+    }
   }
+
   let n = 0;
-  for (const [k, v] of Object.entries(d)) {
-    const key = k.startsWith('nexus_') ? k : 'nexus_' + k;
-    if (SYNC_SKIP_KEYS.includes(key)) continue;
-    try { localStorage.setItem(key, typeof v === 'string' ? v : JSON.stringify(v)); n++; } catch {}
+  const failed = [];
+  for (const [key, v] of accepted) {
+    try {
+      localStorage.setItem(key, typeof v === 'string' ? v : JSON.stringify(v));
+      n++;
+    } catch (e) {
+      failed.push({ key: key, reason: '写入失败（可能空间不足）' });
+    }
   }
-  return { ok: true, imported: n };
+  return { ok: true, imported: n, rejected: rejected.concat(failed) };
+}
+
+// 把 importAllData 的结果转成给用户看的一句话（导入提示用）
+function importResultMessage(r) {
+  if (r.error) return r.error;
+  const base = '已导入 ' + r.imported + ' 项';
+  const bad = (r.rejected || []).length;
+  return bad ? base + '，跳过 ' + bad + ' 项（数据格式不符）' : base;
 }
 
 function restorePreImportBackup() {
   const raw = localStorage.getItem('nexus_backup_before_import');
   if (!raw) { alert('没有可还原的备份'); return; }
   let b; try { b = JSON.parse(raw); } catch { alert('备份已损坏'); return; }
+  if (!b || typeof b.data !== 'object' || b.data === null) { alert('备份已损坏'); return; }
   if (!confirm('将把数据还原到 ' + new Date(b.at).toLocaleString('zh-CN') + ' 的状态？\n当前数据会被替换。')) return;
-  for (const [k, v] of Object.entries(b.data)) { try { localStorage.setItem(k, v); } catch {} }
-  alert('已还原，页面将刷新');
+  // 快照本身也过一遍校验 —— 它是从 localStorage 读回来的，
+  // 同样可能被外部改过（或来自旧版本留下的畸形数据），不能当可信输入直接回写。
+  let n = 0, skipped = 0;
+  for (const [k, v] of Object.entries(b.data)) {
+    if (!importKeyIsSafe(k)) { skipped++; continue; }
+    let parsed;
+    try { parsed = JSON.parse(v); } catch { parsed = v; }     // 快照存的是字符串原文
+    const chk = importValueCheck(k, parsed);
+    if (!chk.ok) { skipped++; continue; }
+    try { localStorage.setItem(k, v); n++; } catch { skipped++; }
+  }
+  alert('已还原 ' + n + ' 项' + (skipped ? '，跳过 ' + skipped + ' 项（格式不符）' : '') + '，页面将刷新');
   location.reload();
 }
 
@@ -7428,8 +7576,9 @@ function importDataPrompt() {
         if (!confirm('导入会用文件里的数据替换本机现有数据（原数据会自动备份，可还原）。继续？')) return;
         const r = importAllData(data);
         if (r.error) { showToast('导入失败：' + r.error, 'error'); return; }
-        showToast('已导入 ' + r.imported + ' 项，刷新页面生效', 'success');
-        setTimeout(() => location.reload(), 1000);
+        const skipped = (r.rejected || []).length;
+        showToast(importResultMessage(r) + '，刷新页面生效', skipped ? 'warning' : 'success');
+        setTimeout(() => location.reload(), skipped ? 1800 : 1000);
       } catch (e) {
         showToast('导入失败：文件格式错误', 'warning');
       }
