@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NEXUS CORE // 任务核心</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230d0f13%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-size=%2718%27 font-family=%27sans-serif%27 font-weight=%27bold%27 fill=%27%236c9bff%27 text-anchor=%27middle%27%3EN%3C/text%3E%3C/svg%3E">
 <style>
 /* ============================================================
    NEXUS CORE v1.0 - 赛博朋克个人任务面板
@@ -157,6 +158,11 @@ body {
   position: relative; z-index: 2;
   max-width: 1100px; margin: 0 auto;
   padding: 16px 16px 24px;
+}
+/* 底部导航是 fixed 的，任何宽度下都会盖住最后一块内容 ——
+   不只在窄屏。这里统一按导航实际高度让位。 */
+@media (min-width: 769px) {
+  .app-container { padding-bottom: calc(var(--tabbar-h) + var(--tabbar-safe) + 20px); }
 }
 
 /* === Header === */
@@ -727,14 +733,24 @@ a { color: var(--accent); text-underline-offset: 2px; }
 }
 .history-filter.active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 
-/* === Bottom Tab Bar === */
+/* === Bottom Tab Bar ===
+   ★ 高度是「唯一真来源」：.app-container 的底部内边距由 --tabbar-h 推导。
+   踩过的坑：原来两处各写各的（导航实际约 92px，容器只留 76px），
+   于是「当日记录」正好被压在导航条下面看不见 —— 而「随手记」那行还写着
+   「今天已记 N 条 ↓」，箭头指向的正是一块被盖住的内容。
+   改高度只需改这里，容器会自动跟着让位。 */
+:root {
+  --tabbar-h: 52px;                              /* tab 内容高度 */
+  --tabbar-safe: env(safe-area-inset-bottom, 6px); /* iPhone 底部横条 */
+}
 .bottom-tab-bar {
   position: fixed; bottom: 0; left: 0; right: 0;
   display: flex; background: color-mix(in srgb, var(--bg-panel) 88%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--border-subtle);
-  z-index: 50; padding: 6px 0 env(safe-area-inset-bottom, 6px);
+  z-index: 50; padding: 6px 0 var(--tabbar-safe);
+  box-sizing: content-box;
 }
 .tab-item {
   flex: 1; display: flex; flex-direction: column; align-items: center;
@@ -760,7 +776,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
   .course-view-btn { flex: 1; text-align: center; }
 
   .sync-btn { position: static; margin-top: 12px; }
-  .app-container { padding: 12px 12px 76px; }
+  .app-container { padding: 12px 12px calc(var(--tabbar-h) + var(--tabbar-safe) + 20px); }
   .panel { padding:12px; min-height: auto; }
   .task-item { min-height: 52px; }
   .tab-item { min-height: 52px; }
@@ -1210,6 +1226,10 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <svg class="tab-icon icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M3.5 9.5h17M8.5 4.5v5M15.5 4.5v5"/></svg>
       <span class="tab-label">今日</span>
     </button>
+    <button class="tab-item" data-panel="points">
+      <svg class="tab-icon icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2c1.6 0 2.6 1 3 2.2.1.4.5.6.9.6h1.4a2 2 0 0 1 2 2v1.4c0 .4.2.8.6.9 1.2.4 2.2 1.4 2.2 3s-1 2.6-2.2 3c-.4.1-.6.5-.6.9V19a2 2 0 0 1-2 2h-1.4c-.4 0-.8.2-.9.6-.4 1.2-1.4 2.2-3 2.2"/><path d="M12 3.2c-1.6 0-2.6 1-3 2.2-.1.4-.5.6-.9.6H6.7a2 2 0 0 0-2 2v1.4c0 .4-.2.8-.6.9-1.2.4-2.2 1.4-2.2 3s1 2.6 2.2 3c.4.1.6.5.6.9V19a2 2 0 0 0 2 2h1.4c.4 0 .8.2.9.6.4 1.2 1.4 2.2 3 2.2"/><circle cx="12" cy="12" r="2.6"/></svg>
+      <span class="tab-label">观点</span>
+    </button>
     <button class="tab-item" data-panel="courses">
       <svg class="tab-icon icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c-2.5-1.5-5.5-1.5-8 0v11c2.5-1.5 5.5-1.5 8 0 2.5-1.5 5.5-1.5 8 0V5c-2.5-1.5-5.5-1.5-8 0Z"/><path d="M12 5v11"/></svg>
       <span class="tab-label">课表</span>
@@ -1332,6 +1352,15 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div id="daily-chess-body"></div>
     </div>
 
+    <!-- ⑫ 每日观点（来自服务器观点库，每天一条，同一天刷新不变） -->
+    <div class="daily-section" id="sec-daily-point" style="display:none;">
+      <div class="section-header">
+        <span class="section-title">每日观点</span>
+        <span id="daily-point-from" class="t-dim-xs"></span>
+      </div>
+      <div id="daily-point-body"></div>
+    </div>
+
     <!-- ⑪ 当日记录（随手记的内容展示区）
          写入口在上方「饮食记录」下面；这里只展示今天已记的内容。
          放在最底部是有意的：列表会随记录条数变长，压在最下面就不会挤占上面各模块。 -->
@@ -1396,6 +1425,31 @@ a { color: var(--accent); text-underline-offset: 2px; }
 
   </div>
 
+
+  <!-- Panel: Points（观点库）—— 内容来自服务器 /api/points，
+       不是 localStorage。所以换手机、换浏览器看到的都一样。 -->
+  <div class="panel" id="panel-points">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:4px;">
+      <div style="font-size:var(--fs-xl);font-weight:bold;color:var(--text-primary);">观点库</div>
+      <div id="points-count" class="t-dim-xs"></div>
+    </div>
+    <div class="t-dim-xs" style="margin-bottom:12px;line-height:1.6;">
+      从收藏的短视频里提炼出来的观点。点卡片看要点，点「看原视频」跳回抖音。
+    </div>
+
+    <!-- 搜索 + 刷新 -->
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <input id="points-search" placeholder="搜观点 / 作者…" oninput="pointsOnSearch()"
+             style="flex:1;min-width:0;">
+      <button class="btn btn-sm" onclick="pointsLoad(true)" style="flex:none;padding:0 14px;">刷新</button>
+    </div>
+
+    <!-- 标签筛选条 -->
+    <div id="points-tagbar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
+
+    <div id="points-list"></div>
+    <div id="points-more" style="text-align:center;margin-top:4px;"></div>
+  </div>
 
   <!-- 原「任务」面板已改为浮层（#task-overlay，见文件末尾），底部导航不再单列一格。
        入口在今日面板「今日任务」标题右侧的「全部 →」 -->
@@ -2927,6 +2981,220 @@ function updateInspEntryCount() {
   const n = inspData().length;
   el.textContent = n ? (n + ' 条记录') : '记下想法和素材';
 }
+
+// === 观点库 START ===
+// 数据来自服务器 /api/points，不用 localStorage。
+// 为什么不做本地缓存：观点是「我正在读的东西」，一定要跨设备一致
+// （手机上刷到的和电脑上看到的是同一份）。而且它本来就依赖网络才能更新，
+// 缓存反而会让我看到过期的内容还以为是最新的。
+//
+// 手机优先的几个具体决定：
+//   · 卡片默认折叠，只露观点那一句 —— 一屏能扫到 5~6 条，不用一直滑
+//   · 点开才显示 3 条要点，避免一屏只有一条卡
+//   · 「看原视频」用 target="_blank" 直接跳抖音，不在站内做播放器
+
+let _pointsData = [];      // 当前筛选后的列表
+let _pointsAllTags = [];
+let _pointsTag = '';
+let _pointsKeyword = '';
+let _pointsLoading = false;
+let _pointsLoaded = false; // 首次进页面才拉，之后靠「刷新」按钮
+
+function pointsApiBase() {
+  // 复用「服务器地址 + token」这一套配置，跟日记/KV 同步同一个来源
+  const c = serverCfg();
+  return c.base;
+}
+
+// 统一的取数。token 走 Authorization 头 —— 跟 /api/entries 一样。
+async function pointsFetchJson(pathq) {
+  const c = serverCfg();
+  if (!c.base || !c.token) throw new Error('还没配置服务器地址或 token（去「我的」页填）');
+  const r = await fetch(c.base + pathq, {
+    headers: { 'Authorization': 'Bearer ' + c.token }
+  });
+  if (r.status === 401) throw new Error('token 不对或过期了');
+  if (!r.ok) throw new Error('服务器返回 ' + r.status);
+  return r.json();
+}
+
+async function pointsLoad(force) {
+  if (_pointsLoading) return;
+  if (_pointsLoaded && !force) return;
+  _pointsLoading = true;
+  const listEl = document.getElementById('points-list');
+  if (listEl) listEl.innerHTML = '<div class="t-dim-xs" style="padding:20px 0;text-align:center;">加载中…</div>';
+  try {
+    const d = await pointsFetchJson('/api/points?limit=200');
+    _pointsData = d.items || [];
+    _pointsAllTags = d.tags || [];
+    _pointsLoaded = true;
+    renderPoints();
+  } catch (e) {
+    if (listEl) {
+      listEl.innerHTML = '<div style="padding:24px 12px;text-align:center;line-height:1.9;">'
+        + '<div style="color:var(--warn);font-size:var(--fs-sm);margin-bottom:8px;">'
+        + pointsEsc(e.message) + '</div>'
+        + '<div class="t-dim-xs">观点库要连服务器才能读。检查「我的」页里的地址和 token。</div></div>';
+    }
+  } finally {
+    _pointsLoading = false;
+  }
+}
+
+function pointsEsc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// 从抖音链接里抠出规范的视频地址。跟「视频收藏」同一个思路：
+// 只放行白名单站点，不做通用代理。
+function pointsVideoUrl(it) {
+  const u = String(it.url || '');
+  if (/^https?:\/\/(www\.)?douyin\.com\//i.test(u)) return u;
+  return 'https://www.douyin.com/video/' + encodeURIComponent(it.aweme_id || '');
+}
+
+function pointsSetTag(t) {
+  _pointsTag = (_pointsTag === t) ? '' : t;
+  renderPoints();
+}
+
+let _pointsSearchTimer = null;
+function pointsOnSearch() {
+  clearTimeout(_pointsSearchTimer);
+  // 手机打字慢，等 300ms 再过滤，否则每敲一个字都重排整个列表会卡
+  _pointsSearchTimer = setTimeout(() => {
+    const el = document.getElementById('points-search');
+    _pointsKeyword = el ? el.value.trim().toLowerCase() : '';
+    renderPoints();
+  }, 300);
+}
+
+function pointsFiltered() {
+  let list = _pointsData;
+  if (_pointsTag) list = list.filter(it => (it.tags || []).includes(_pointsTag));
+  if (_pointsKeyword) {
+    const k = _pointsKeyword;
+    list = list.filter(it =>
+      (it.point + ' ' + (it.points || []).join(' ') + ' ' + (it.desc || '') + ' ' + (it.author || ''))
+        .toLowerCase().indexOf(k) >= 0);
+  }
+  return list;
+}
+
+function renderPoints() {
+  const tagbar = document.getElementById('points-tagbar');
+  if (tagbar) {
+    const tags = ['', ..._pointsAllTags];
+    tagbar.innerHTML = tags.map(t => {
+      const on = _pointsTag === t;
+      return '<button class="btn btn-sm" onclick="pointsSetTag(' + JSON.stringify(t).replace(/"/g, '&quot;') + ')" '
+        + 'style="font-size:var(--fs-2xs);padding:3px 10px;' + (on ? 'border-color:var(--accent);color:var(--accent);' : '') + '">'
+        + (t ? '#' + pointsEsc(t) : '全部') + '</button>';
+    }).join('');
+  }
+
+  const list = pointsFiltered();
+  const cnt = document.getElementById('points-count');
+  if (cnt) cnt.textContent = list.length ? (list.length + ' 条') : '';
+
+  const listEl = document.getElementById('points-list');
+  if (!listEl) return;
+
+  if (!list.length) {
+    listEl.innerHTML = '<div style="padding:28px 14px;text-align:center;color:var(--text-dim);font-size:var(--fs-sm);line-height:1.9;">'
+      + (_pointsData.length ? '没有匹配的观点' : '还没有观点。<br>视频跑完转写和提炼后会自动出现在这里。') + '</div>';
+    return;
+  }
+
+  // 折叠用 details 元素：手机上不点开就只有一句观点，一屏能扫好几条。
+  // 不用 JS 控制显隐，是因为它是原生的，免费拿到无障碍支持和键盘操作。
+  // （注释里别写出裸标签名 —— 以后 grep 统计标签配平会把它算进去。）
+  listEl.innerHTML = list.map(it => {
+    const pts = (it.points || []);
+    const tags = (it.tags || []);
+    return '<details class="card" style="padding:12px 14px;margin-bottom:10px;">'
+      + '<summary style="cursor:pointer;list-style:none;display:block;">'
+      +   '<div style="font-size:var(--fs-base);line-height:1.5;color:var(--text-primary);font-weight:600;">'
+      +     pointsEsc(it.point) + '</div>'
+      +   '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px;font-size:var(--fs-2xs);color:var(--text-dim);">'
+      +     (it.author ? '<span>' + pointsEsc(it.author) + '</span>' : '')
+      +     tags.map(t => '<span style="color:var(--accent);">#' + pointsEsc(t) + '</span>').join('')
+      +     (pts.length ? '<span style="margin-left:auto;">' + pts.length + ' 个要点 ›</span>' : '')
+      +   '</div>'
+      + '</summary>'
+      + (pts.length
+          ? '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle);">'
+            + '<ol style="margin:0;padding-left:20px;font-size:var(--fs-sm);color:var(--text-secondary);line-height:1.75;">'
+            + pts.map(p => '<li style="margin-bottom:4px;">' + pointsEsc(p) + '</li>').join('')
+            + '</ol>'
+            + '<div style="display:flex;gap:8px;margin-top:10px;">'
+            +   '<a href="' + pointsEsc(pointsVideoUrl(it)) + '" target="_blank" rel="noopener noreferrer" class="btn btn-sm">看原视频</a>'
+            + '</div>'
+            + (it.desc ? '<div class="t-dim-xs" style="margin-top:8px;line-height:1.5;opacity:.75;">原标题：' + pointsEsc(it.desc) + '</div>' : '')
+            + '</div>'
+          : '')
+      + '</details>';
+  }).join('');
+}
+
+// === 每日观点（今日页面）===
+// 每天一条，当天刷新不变（服务器用日期做种子选的）。
+// 这里再存一份本机缓存：万一哪天出门没网，至少还能看到今天那条。
+async function renderDailyPoint() {
+  const sec = document.getElementById('sec-daily-point');
+  const body = document.getElementById('daily-point-body');
+  if (!sec || !body) return;
+
+  const today = TODAY();
+
+  // 先画本机缓存（有就直接显示，不闪空）
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem('nexus_daily_point') || 'null'); } catch (e) {}
+  if (cached && cached.date === today && cached.item) {
+    paintDailyPoint(cached.item);
+  }
+
+  // 再去服务器拿当天的。拿回来发现是同一天就直接复用缓存不重绘。
+  if (!pointsApiBase() || !serverConfigured()) return;
+  try {
+    const d = await pointsFetchJson('/api/points/daily?date=' + today);
+    if (d && d.item) {
+      if (!cached || cached.date !== today || cached.item.aweme_id !== d.item.aweme_id) {
+        try { localStorage.setItem('nexus_daily_point', JSON.stringify({ date: today, item: d.item })); } catch (e) {}
+        paintDailyPoint(d.item);
+      }
+    }
+  } catch (e) {
+    // 拿不到就用手上有的。没缓存就整个区块不显示 —— 不弹错误打断「今日」页。
+  }
+}
+
+function paintDailyPoint(it) {
+  const sec = document.getElementById('sec-daily-point');
+  const body = document.getElementById('daily-point-body');
+  const from = document.getElementById('daily-point-from');
+  if (!sec || !body || !it) return;
+  sec.style.display = '';
+  if (from) from.textContent = it.author ? ('来自 ' + it.author) : '';
+  const pts = it.points || [];
+  body.innerHTML =
+      '<div style="font-size:var(--fs-lg);line-height:1.6;color:var(--text-primary);font-weight:600;margin-bottom:10px;">'
+    +   pointsEsc(it.point)
+    + '</div>'
+    + (pts.length
+        ? '<ol style="margin:0 0 10px;padding-left:20px;font-size:var(--fs-sm);color:var(--text-secondary);line-height:1.8;">'
+          + pts.map(p => '<li style="margin-bottom:3px;">' + pointsEsc(p) + '</li>').join('')
+          + '</ol>'
+        : '')
+    + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+    +   '<a href="' + pointsEsc(pointsVideoUrl(it)) + '" target="_blank" rel="noopener noreferrer" class="btn btn-sm">看原视频</a>'
+    +   '<button class="btn btn-sm" onclick="switchTab(\'points\')" style="font-size:var(--fs-2xs);">看全部观点</button>'
+    + '</div>';
+}
+// === 观点库 END ===
 
 // === 视频收藏 START ===
 // 这里只存链接，不存视频文件、不做播放器。原因：服务器出网实测只有 424 KB/s(≈3.4Mbps)，
@@ -4703,6 +4971,9 @@ function renderDailyHub() {
 
   updateSectionCollapse();
 
+  // ⑫ 每日观点（异步拉服务器，不阻塞下面同步渲染）
+  renderDailyPoint();
+
   // ⑧ Journal（随手记）
   renderJournalToday();
   // 日记与服务端对账交给 syncJournalToday()（带节流）：
@@ -5588,6 +5859,7 @@ function deleteAiReport(id) {
 // 触发 renderAll / 具体 render，所以切 tab 不必每次全量重渲——避免移动端卡顿与冗余服务端请求）。
 function renderPanel(name) {
   if (name === 'daily') { renderDailyHub(); }
+  else if (name === 'points') { pointsLoad(false); }
   else if (name === 'courses') { renderCourses(); renderNextClassBanner(); renderScheduleModeButtons(); }
   else if (name === 'data') { renderWallet(); renderInvestJournal(); renderHistory(); renderJournalArchive(); }
   else if (name === 'settings') { renderSettings(); renderAiWeek(); }
@@ -7673,19 +7945,30 @@ function importDataPrompt() {
 }
 
 // === Navigation ===
+// 切标签只渲染「刚切到的那个面板」，不调 renderAll()。
+//
+// 踩过的坑：这里原来调的是 renderAll()，它把 8 个面板全部无条件重渲染，
+// 于是 renderPanel() 里「按面板名分派」那套逻辑在这条路径上完全没被执行。
+// 表现就是：加了新面板（观点库）后，点标签卡片永远是空的 —— 因为
+// 没有任何一行代码在切过去时去取它的数据。
+//
+// 改成 renderPanel(name) 有两个好处：
+//   1. 新面板能真正被初始化（这就是那个 bug）
+//   2. 不用每次点标签都重算 8 个看不见的面板 —— 手机 CPU 弱，这是实打实的省
+// renderAll() 保留给「全量刷新」的场景（导入数据后、同步完成后）。
 document.getElementById('nav').addEventListener('click', (e) => {
   const btn = e.target.closest('.tab-item');
   if (!btn) return;
 
+  const panel = btn.dataset.panel;
   document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 
-  const panelId = 'panel-' + btn.dataset.panel;
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  const target = document.getElementById(panelId);
+  const target = document.getElementById('panel-' + panel);
   if (target) target.classList.add('active');
 
-  renderAll();
+  renderPanel(panel);
 });
 
 // === Filter/Sort listeners ===
