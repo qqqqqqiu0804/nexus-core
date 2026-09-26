@@ -76,6 +76,43 @@ DASHSCOPE_API_KEY=... python3 douyin_pipeline.py \
 | 1 | 有失败条目（看 JSON 里的 `error` 字段） |
 | 2 | 参数/环境不对（缺 key、缺 url、目录不存在等） |
 
+## 成本（2026-09 查证阿里云官方）
+
+| 模型 | 免费额度 | 有效期 | 超出后 |
+|---|---|---|---|
+| Paraformer-V2 | **10 小时/月** | **每月 1 日 0 点重置** | 0.6 元/小时 |
+| qwen-plus | 100 万 Token | 90 天，不续发 | 入 0.8 / 出 2.0 元/百万 Token |
+
+**100 条视频（平均 2 分钟）**：ASR 3.3 小时（33%，且月月重置）+ LLM 13.5 万 Token（13.5%）
+→ **0 元**。即使平均 5 分钟（8.3 小时）仍在免费内。
+
+### 成本闸门（防止「跑完才发现扣钱」）
+
+| 机制 | 说明 |
+|---|---|
+| 按官方计费时长记账 | 用 `usage.duration`，不用文件大小估 |
+| 账本按自然月 | 跨月读取自动归零（对应官方重置） |
+| 批量前预估并拦截 | 超预算**第一条都不跑** |
+| 每次运行报账 | 打印本月已用 / 免费 10 小时 |
+
+默认预算 = 免费额度。想超额需**显式**放宽：
+
+```bash
+# 默认：超了就停，不产生任何费用
+python3 douyin_pipeline.py --urls-file /tmp/urls.txt
+
+# 明确允许花最多 2 元（约 3.3 小时）：
+python3 douyin_pipeline.py --urls-file /tmp/urls.txt --budget-seconds 48000
+
+# 不限制（不推荐）
+python3 douyin_pipeline.py --urls-file /tmp/urls.txt --budget-seconds 0
+```
+
+另建议在阿里云控制台把 Paraformer 的 **「免费额度用完即停」** 打开，
+作为云端双保险 —— 即使本地记账有偏差也不会被扣钱。
+
+计量逻辑的测试：`python3 test_usage.py`（14 项，已接入 `npm test`）。
+
 ## 设计原则（改这个脚本时请遵守）
 
 1. **失败必须显式暴露。** 任何一步失败都写清楚「哪一步、为什么」。
