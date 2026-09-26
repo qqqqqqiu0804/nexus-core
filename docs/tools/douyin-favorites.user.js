@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音收藏夹导出（供 nexus-core 分析）
 // @namespace    nexus-core
-// @version      3.0.0
+// @version      3.1.0
 // @description  把抖音收藏夹列表导出成 JSON。只读，不收藏/不取消/不点赞。
 // @author       nexus-core
 // @match        https://www.douyin.com/*
@@ -11,31 +11,25 @@
 // ==/UserScript==
 
 /* ============================================================================
- * v3 改动（2026-09-26）：从「弹不出来」改成「一定弹得出来」
+ * v3.1 改动（2026-09-26）：按接口分流 —— 修「193 条变 337 条」的根源
  *
- * 用户反馈：脚本装上了（篡改猴显示已启用），但页面上没面板。
+ * 用户发现的问题：想抓「对自己好」（193 条）却抓到 337 条，
+ * 且里面混着美食、追星、小说、游戏 —— 明显不是一个夹的内容。
  *
- * 我复盘出三个问题，v3 逐条修：
+ * 我复盘出的原因：
+ *   抖音「我的收藏」页面同时会打三类接口
+ *     /aweme/v1/web/aweme/favorite/        ← 全部收藏混合流（所有夹混在一起）
+ *     /aweme/v1/web/collects/list/         ← 收藏夹分组列表
+ *     /aweme/v1/web/collects/video/list/   ← 某个分组内的视频
+ *   v3.0 把三者返回的数据**全塞进同一个 items**，没记来源，
+ *   于是「在混合流里滚动」收到的 337 条，被当成了「对自己好」的 193 条。
  *
- *   问题 1：面板只在「判定为收藏夹页面」时才建。
- *           判定失败 = 面板完全不出现 = 用户以为脚本没生效，
- *           而我拿不到任何线索。**这是设计错误：把失败伪装成"没反应"。**
- *     → v3：面板**任何 douyin.com 页面都建**，只是内容分状态显示。
- *           判定不准时用户至少能看到"我在，但还没看到收藏夹数据"。
+ * v3.1 修法：
+ *   1. 每次 absorb 都带上**当时的接口路径**，每条记录标注 `from`（来源接口）
+ *   2. 导出时分两组：`items`（明确来自某个分组的）和 `mixed`（混合流来的）
+ *   3. 面板上分开显示两个数字，用户一眼就知道自己的操作生效了没有
  *
- *   问题 2：不给用户看到"捕获到了什么接口"。
- *           用户只能看到数字不涨，没法告诉我卡在哪。
- *     → v3：面板上实时显示**最近捕获到的接口路径**（脱敏，只留路径）。
- *           这样用户截个图给我，我立刻知道该匹配哪个名字。
- *
- *   问题 3：只认 `listcollection` 一个路径。
- *           但用户的收藏夹是**分组式**的（一堆收藏夹封面卡片，
- *           比如"猛学 404 / 大学计算机 249"），
- *           这种页面调的接口和「某个收藏夹内的视频列表」不是同一个。
- *     → v3：改成**宽松匹配**（只要路径里含 collect/favorite 就记下来），
- *           并区分"分组列表"和"视频列表"两种数据形态，都能吃。
- *
- * 仍然不变的原则：**不自己算签名、不碰 cookie、只读。**
+ * 这样「点进分组再滚」和「在混合流里滚」的结果不会再混淆。
  * ========================================================================== */
 
 (function () {
@@ -44,11 +38,21 @@
   // 宽松匹配：宁可多记，不要漏记。真正的判断交给数据形态（见 absorb）
   const LOOSE = /\/aweme\/v1\/web\/[a-z0-9_/]*(collect|favorite|mix)[a-z0-9_/]*/i;
 
-  const items = new Map();      // aweme_id -> 视频条目
+  const items = new Map();      // aweme_id -> 视频条目（**明确来自某个分组**）
+  const mixed = new Map();      // aweme_id -> 视频条目（来自"全部收藏"混合流）
   const groups = new Map();     // 收藏夹分组（名字 -> {name, count}）
   let pageCount = 0;
   const seenApis = [];          // 最近见过的接口路径
   const hookState = { xhr: false, fetch: false, lastHit: '' };
+
+  // v3.1：判断这个接口是不是「全部收藏混合流」
+  // 混合流的特征是路径里是 favorite 但没有 collects（分组）
+  function isMixedStream(path) {
+    const p = String(path || '');
+    if (!/favorite/i.test(p)) return false;
+    if (/collects/i.test(p)) return false;   // 分组相关，不是混合流
+    return true;
+  }
 
   // ======================= 面板 =======================
   let box = null, bodyEl = null, btnEl = null, apiEl = null;
@@ -113,9 +117,25 @@
                   ' · ' + (hookState.fetch ? 'fetch ✅' : 'fetch ⏳');
 
     let main;
-    if (items.size) {
-      main = '视频 <b style="color:#7dd3fc;font-size:15px">' + items.size +
-             '</b> 条' + (pageCount ? '（' + pageCount + ' 次响应）' : '');
+    if (items.size || mixed.size) {
+      // v3.1：两个数字分开显示，用户一眼看出自己是在分组里还是在混合流里
+      main = '';
+      if (items.size) {
+        main += '分组内视频 <b style="color:#7dd3fc;font-size:15px">' +
+                items.size + '</b> 条';
+      }
+      if (mixed.size) {
+        if (main) main += '<br>';
+        main += '<span style="color:#fbbf24">混合流 <b style="font-size:15px">' +
+                mixed.size + '</b> 条</span>' +
+                '<br><span style="opacity:.75;font-size:12px">' +
+                '（混合流=全部收藏，不是某个分组；' +
+                '要抓某个夹请<b>点进那个夹</b>）</span>';
+      }
+      if (pageCount) {
+        main += '<br><span style="opacity:.55;font-size:12px">' +
+                pageCount + ' 次响应</span>';
+      }
     } else if (groups.size) {
       main = '发现 <b style="color:#fbbf24;font-size:15px">' + groups.size +
              '</b> 个收藏夹分组<br>' +
@@ -142,6 +162,15 @@
   }
 
   // ======================= 收集 =======================
+  // v3.1：把 URL 归一成「路径」，用于判断来源接口
+  function pathOf(url) {
+    try {
+      const s = String(url);
+      const m = s.match(/^https?:\/\/[^/]+(\/[^?#]*)/);
+      return m ? m[1] : (s.split('?')[0] || '');
+    } catch (e) { return ''; }
+  }
+
   function noteApi(url) {
     // 不用 new URL(相对路径, base) —— 那个依赖 location.origin 有值。
     // 真实浏览器里它一定有，但没必要为一个纯展示字段担这个风险：
@@ -169,6 +198,10 @@
     try { data = JSON.parse(text); } catch (e) { return; }
     if (!data || typeof data !== 'object') return;
 
+    // v3.1：先判断这条数据是从哪个接口来的，决定进哪个桶
+    const path = pathOf(url);
+    const target = isMixedStream(path) ? mixed : items;
+
     // ---- 形态 A：视频列表 ----
     // 已知字段名：aweme_list（收藏夹内视频）/ data（部分接口）
     let list = data.aweme_list;
@@ -181,8 +214,10 @@
     if (Array.isArray(list) && list.length) {
       let added = 0;
       list.forEach((a) => {
-        if (a && a.aweme_id && !items.has(a.aweme_id)) {
-          items.set(a.aweme_id, a);
+        if (a && a.aweme_id && !target.has(a.aweme_id)) {
+          // v3.1：每条都记下来源接口，导出的 JSON 里能看出是哪抓的
+          a.__nexus_from = path || '(未知)';
+          target.set(a.aweme_id, a);
           added++;
         }
       });
@@ -191,9 +226,9 @@
         render(added ? '' : '<span style="opacity:.6">（本页都是重复的）</span>');
         const hm = data.has_more;
         const atEnd = (hm === 0 || hm === false);
-        if (atEnd && items.size) {
+        if (atEnd && (items.size || mixed.size)) {
           btnEl.style.display = 'block';
-          btnEl.textContent = '导出 ' + items.size + ' 条';
+          btnEl.textContent = '导出 ' + (items.size + mixed.size) + ' 条';
           render('<span style="color:#6ee7a8">已到底部，可以导出了</span>');
         }
         return;
@@ -263,8 +298,8 @@
   }
 
   // ======================= 导出 =======================
-  function exportNow() {
-    const rows = [...items.values()].map((a) => ({
+  function toRow(a) {
+    return {
       aweme_id: a.aweme_id,
       desc: String(a.desc || '').replace(/\s+/g, ' ').trim(),
       url: 'https://www.douyin.com/video/' + a.aweme_id,
@@ -273,16 +308,27 @@
       create_time: a.create_time || 0,
       aweme_type: a.aweme_type || a.media_type || '',
       digg_count: (a.statistics && a.statistics.digg_count) || 0,
-    }));
+      from: a.__nexus_from || '',          // v3.1：来源接口，便于分辨是哪个夹
+    };
+  }
+
+  function exportNow() {
+    // v3.1：分组内 / 混合流 分开导出，不再混在一起
+    const grouped = [...items.values()].map(toRow);
+    const mixedRows = [...mixed.values()].map(toRow);
 
     const payload = {
       exported_at: new Date().toISOString(),
-      count: rows.length,
+      count: grouped.length + mixedRows.length,
       source: 'nexus-core-userscript',
-      version: '3.0.0',
-      groups: [...groups.values()],   // 顺带把分组信息也带上
-      seen_apis: seenApis,            // 便于排查
-      items: rows,
+      version: '3.1.0',
+      groups: [...groups.values()],
+      seen_apis: seenApis,
+      // ⚠️ 两桶分开：别混着用
+      grouped: grouped,     // 来自「某个收藏夹内部」，可用
+      mixed: mixedRows,     // 来自「全部收藏」混合流，含各夹内容，需自行过滤
+      // 兼容旧格式（下游按 items 读的不用改）
+      items: grouped.length ? grouped : mixedRows,
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)],
@@ -295,14 +341,15 @@
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 
-    render('<span style="color:#6ee7a8">已导出 ' + rows.length +
-           ' 条 → douyin-favorites.json</span>');
+    render('<span style="color:#6ee7a8">已导出：分组 ' + grouped.length +
+           ' + 混合流 ' + mixedRows.length + ' → douyin-favorites.json</span>');
   }
 
   // 兜底入口（面板被关了也能导）
   window.__nexusDyExport = exportNow;
   window.__nexusDyStat = () => ({
-    items: items.size, groups: [...groups.values()],
+    groupedItems: items.size, mixedItems: mixed.size,
+    groups: [...groups.values()],
     apis: seenApis, hooks: hookState,
   });
 
