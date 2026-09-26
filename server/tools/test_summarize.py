@@ -103,8 +103,75 @@ try:
 except RuntimeError as e:
     chk("非 JSON 抛错且含原文", '不是 JSON' in str(e), True)
 
+# ============================================================
+# 以下为 2026-09-26 端点错配事故后新增的回归测试
+#
+# 事故经过：我原来一律打到 text-generation 端点，
+# 10 个模型里 7 个返回 400 InvalidParameter「url error」。
+# 那条报错跟 url 毫无关系，是端点家族选错。
+# 而两个端点的**响应体形状也不同**（字符串 vs 列表），
+# 解析代码只处理了字符串那种。
+# 这两件事都必须被测试钉住，否则下次「顺手重构」就会再炸一次。
+# ============================================================
+
+# --- [9] multimodal 家族：content 是列表，也要能取到 ---
+def fake_multi(url, payload, api_key, **kw):
+    return {'output': {'choices': [{'message': {
+        'content': [{'text': json.dumps(GOOD)}],   # ← 列表形态
+        'role': 'assistant'}}]}}
+d.post_json = fake_multi
+d._ENDPOINT_CACHE.clear()
+r = d.summarize('文稿', 'k', ['qwen3.8-flash'])
+chk("multimodal 列表形态能解析", r['point'], GOOD['point'])
+
+# --- [10] text 家族：content 是字符串，也要能取到 ---
+def fake_text(url, payload, api_key, **kw):
+    return {'output': {'choices': [{'message': {'content': json.dumps(GOOD)}}]}}
+d.post_json = fake_text
+d._ENDPOINT_CACHE.clear()
+r = d.summarize('文稿', 'k', ['glm-5.3'])
+chk("text 字符串形态能解析", r['point'], GOOD['point'])
+
+# --- [11] 端点自动探测：不认识的模型，第一个端点报 url error 时应换端点重试 ---
+seen_urls = []
+def fake_probe(url, payload, api_key, **kw):
+    seen_urls.append(url)
+    if 'multimodal' in url:
+        raise RuntimeError('HTTP 400: InvalidParameter url error, please check url！')
+    return {'output': {'choices': [{'message': {'content': json.dumps(GOOD)}}]}}
+d.post_json = fake_probe
+d._ENDPOINT_CACHE.clear()
+r = d.summarize('文稿', 'k', ['brand-new-model'])
+chk("未知模型能自动换端点成功", r['point'], GOOD['point'])
+chk("试了两个端点", len(seen_urls), 2)
+chk("探测结果被缓存（下次直接用）", d._ENDPOINT_CACHE.get('brand-new-model'),
+    d.EP_TEXT)
+
+# --- [12] 缓存生效：第二次调用只打一次请求 ---
+seen_urls.clear()
+r = d.summarize('文稿', 'k', ['brand-new-model'])
+chk("第二次复用缓存，只请求一次", len(seen_urls), 1)
+
+# --- [13] 「url error」必须被判为端点错配（否则不会触发换端点）---
+chk("识别 url error 为端点错配",
+    d._is_endpoint_mismatch('HTTP 400: InvalidParameter url error, please check url！'),
+    True)
+chk("网络 500 不算端点错配",
+    d._is_endpoint_mismatch('HTTP 500: internal server error'), False)
+
+# --- [14] 已知模型的端点路由必须与实测一致 ---
+chk("qwen3.8-flash 走 multimodal", d._endpoints_for('qwen3.8-flash'), [d.EP_MULTI])
+chk("glm-5.3 走 text", d._endpoints_for('glm-5.3'), [d.EP_TEXT])
+
+# --- [15] _pick_content 的边界情况 ---
+chk("content 是 None 时返回空串", d._pick_content({'content': None}), '')
+chk("content 是列表但元素无 text", d._pick_content({'content': [{'x': 1}]}), '')
+chk("content 是混合列表时只取有 text 的",
+    d._pick_content({'content': [{'text': 'a'}, {'x': 1}, {'text': 'b'}]}), 'ab')
+
 d.post_json = _orig
+d._ENDPOINT_CACHE.clear()
 print()
-print("全部通过（%d 项）" % (0 if fails else 16) if not fails
+print("全部通过（%d 项）" % (0 if fails else 27) if not fails
       else "失败 %d 项: %s" % (len(fails), fails))
 sys.exit(0 if not fails else 1)

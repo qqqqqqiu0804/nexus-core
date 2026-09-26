@@ -34,7 +34,19 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_YTDLP = HERE / 'venv' / 'bin' / 'python'
-DASHSCOPE_BASE = 'https://dashscope.aliyuncs.com/api/v1'
+
+# ⚠️ 2026-09-26 实测结论：**用公开域名，不要用工作空间专属域名。**
+#
+# 用户控制台上写的专属域名是
+#   https://ws-01q7948czi100mb.cn-beijing.maas.aliyuncs.com/api/v1
+# 我按它配了，结果**所有模型都返回 403 Endpoint.AccessDenied**——
+# 不是模型没有权限，是这个入口对该 key 没开通。
+# 换回公开域名 https://dashscope.aliyuncs.com/api/v1 之后 10/10 全部可用。
+#
+# 所以默认走公开域名；DASHSCOPE_BASE 环境变量仍可覆盖，
+# 但**不要**在没有实测通过的情况下把专属域名填进去。
+DASHSCOPE_BASE = os.environ.get('DASHSCOPE_BASE', '').strip() \
+    or 'https://dashscope.aliyuncs.com/api/v1'
 
 # 临时音频托管目录（nginx 静态托管，公网可读）。
 # 为什么必须这样：Paraformer 官方明确「不支持 Base64 或本地路径」，
@@ -342,32 +354,110 @@ SUMMARY_PROMPT = """你是一个帮人提炼成长类短视频观点的助手。
 
 # 总结用的模型。**必须可配置**，原因见下方注释。
 #
-# ⚠️ 2026-09-26 教训：我原来把 'qwen-plus' 硬编码在这里，
-# 结果用户把自己控制台的免费额度列表发过来，里面**根本没有 qwen-plus** ——
-# 他的账号有 qwen3.8-flash / qwen3.8-max / deepseek / glm 等的额度，
-# 但没有旧命名的 qwen-plus。硬编码一个「我以为是默认」的模型名，
-# 等于把一个必然失败换成另一个必然失败。
+# ⚠️ 2026-09-26 教训一：我原来把 'qwen-plus' 硬编码在这里，
+# 结果用户把自己控制台的免费额度列表发过来，里面**根本没有 qwen-plus**。
+# 硬编码一个「我以为是默认」的模型名，等于把一个必然失败换成另一个必然失败。
 #
-# 更糟的是：百炼一直在下线旧命名模型（2026-07-13 下线 qwen-turbo 等 10 个，
-# 2026-10-10 还要再下线一批）。今天能用的名字，下个月可能就是 404。
+# ⚠️ 2026-09-26 教训二（更贵的一课）：**模型还分属两个不同的接口端点。**
+# 我原来一律打到 /services/aigc/text-generation/generation，
+# 结果 10 个模型里有 7 个返回 400 InvalidParameter「url error」。
+# 那个报错信息是**误导性**的——它跟 url 毫无关系，真实原因是
+# 「该模型不属于这个端点家族」。实测矩阵：
 #
-# 所以：
-#   1. 模型名走环境变量 / 命令行参数，不写死
-#   2. 带一个**候选链**，主模型 404/无权限就自动降级到下一个
-#   3. 提供 --list-models 让你直接问「我这个 key 到底能用哪些」
+#   text-generation 家族：deepseek-v4-flash-0731 / glm-5.3 / deepseek-v4-pro-0813
+#   multimodal 家族     ：qwen3.8-27b / qwen3.7-flash-2026-07-15 / qwen3.8-flash /
+#                        kimi-k3 / qwen3.8-max-0902 / deepseek-v4.1-flash /
+#                        qwen3.8-2.4t-a95b
+#
+# 而且两个端点的**响应体形状也不一样**：
+#   text-generation  → choices[0].message.content 是 **字符串** "收到"
+#   multimodal       → choices[0].message.content 是 **列表** [{"text":"收到"}]
+# 我原来的解析只处理字符串，遇到列表会拿不到内容（或静默拼错）。
+#
+# 所以现在：端点由 ENDPOINT_HINTS 决定（认识的直接路由），
+# 不认识的**两端点都试一遍**，试出哪个能通就记住 —— 不靠我猜。
 DEFAULT_SUMMARY_MODELS = [
-    'qwen3.8-flash',      # 用户额度列表里确认有 1M
-    'qwen3.8-max-0902',   # 备选，额度列表里也有
-    'qwen-plus',          # 旧命名，兼容老账号
+    'qwen3.8-flash',      # 实测可用（multimodal 家族），速度快
+    'glm-5.3',            # 实测可用（text 家族），作为跨家族兜底
+    'qwen3.8-max-0902',   # 实测可用（multimodal 家族），质量更好
 ]
+
+EP_TEXT = '/services/aigc/text-generation/generation'
+EP_MULTI = '/services/aigc/multimodal-generation/generation'
+
+# 只登记「实测确认过」的，没登记的走自动探测，而不是瞎猜
+ENDPOINT_HINTS = {
+    'glm-5.3': EP_TEXT,
+    'deepseek-v4-flash-0731': EP_TEXT,
+    'deepseek-v4-pro-0813': EP_TEXT,
+    'qwen3.8-flash': EP_MULTI,
+    'qwen3.8-max-0902': EP_MULTI,
+    'qwen3.8-27b': EP_MULTI,
+    'qwen3.8-2.4t-a95b': EP_MULTI,
+    'qwen3.7-flash-2026-07-15': EP_MULTI,
+    'deepseek-v4.1-flash': EP_MULTI,
+    'kimi-k3': EP_MULTI,
+}
+
+# 探测成功后的缓存，避免同一个模型每次调用都白试一次
+_ENDPOINT_CACHE = {}
+
+
+def _pick_content(msg):
+    """把两种响应体形状统一成字符串。
+
+    这是本次踩坑的**根因所在**，单独抽成函数并加注释，
+    防止以后有人「顺手简化」掉。
+    """
+    c = (msg or {}).get('content', '')
+    if isinstance(c, str):
+        return c                                  # text-generation 家族
+    if isinstance(c, list):                       # multimodal 家族
+        return ''.join(p.get('text', '') for p in c
+                       if isinstance(p, dict) and p.get('text'))
+    return ''
+
+
+def _extract_llm_text(res):
+    """从任意家族的响应里取出正文。取不到返回空串。"""
+    out = res.get('output') or {}
+    choices = out.get('choices')
+    if isinstance(choices, list) and choices:
+        txt = _pick_content(choices[0].get('message'))
+        if txt:
+            return txt
+    return out.get('text', '') or ''
+
+
+def _endpoints_for(model):
+    """这个模型该打哪个端点。认识就直接给，不认识就给两个让调用方试。"""
+    if model in _ENDPOINT_CACHE:
+        return [_ENDPOINT_CACHE[model]]
+    if model in ENDPOINT_HINTS:
+        return [ENDPOINT_HINTS[model]]
+    return [EP_MULTI, EP_TEXT]      # 不认识 → 都试，试出来就记住
+
+
+def _is_endpoint_mismatch(msg):
+    """判断这个报错是不是「端点选错了」。
+
+    关键点：阿里云对「模型不在这个端点」返回的是
+    400 InvalidParameter「url error, please check url！」
+    ——这条信息具有**严重的误导性**，跟 url 一点关系都没有。
+    实测验证过：同一个 url、同一个 payload，只换端点就从 400 变 200。
+    """
+    return ('url error' in msg.lower()
+            or 'InvalidParameter' in msg
+            or 'Model not exist' in msg
+            or 'model not found' in msg.lower())
 
 
 def summarize(transcript, api_key, models):
     """按候选链依次尝试，第一个成功的就返回。
 
     models 可以是字符串（单个）或列表（候选链）。
-    这样做的理由：模型下线/无权限是**这个平台最常见的失败**，
-    不该让用户因为「模型名过期」而拿到一个空结果。
+    这样做的理由：模型下线/无权限/端点错配是**这个平台最常见的失败**，
+    不该让用户因为「我猜错了协议」而拿到一个空结果。
     """
     if isinstance(models, str):
         models = [models]
@@ -377,10 +467,9 @@ def summarize(transcript, api_key, models):
             return _summarize_one(transcript, api_key, model)
         except Exception as e:
             msg = str(e)
-            # 只对「模型不存在/无权限」这类错误降级；
+            # 只对「模型/端点/权限」这类问题降级；
             # 别的错误（比如网络断了）降级也没用，直接抛出来更诚实
-            if 'Model not exist' in msg or 'model not found' in msg.lower() \
-                    or 'AccessDenied' in msg or 'InvalidParameter' in msg \
+            if _is_endpoint_mismatch(msg) or 'AccessDenied' in msg \
                     or 'HTTP 404' in msg:
                 errs.append(f'{model}: {msg[:160]}')
                 continue
@@ -399,14 +488,25 @@ def _summarize_one(transcript, api_key, model):
         ]},
         'parameters': {'result_format': 'message'},
     }
-    res = post_json(f'{DASHSCOPE_BASE}/services/aigc/text-generation/generation',
-                    payload, api_key)
-    out = (res.get('output') or {})
-    txt = ''
-    if isinstance(out.get('choices'), list) and out['choices']:
-        txt = (out['choices'][0].get('message') or {}).get('content', '')
-    if not txt:
-        txt = out.get('text', '')
+
+    res = None
+    last_err = None
+    for ep in _endpoints_for(model):
+        try:
+            res = post_json(f'{DASHSCOPE_BASE}{ep}', payload, api_key)
+            if model not in ENDPOINT_HINTS:
+                _ENDPOINT_CACHE[model] = ep   # 探测到的路由记下来，下次直接用
+            break
+        except Exception as e:
+            last_err = e
+            if _is_endpoint_mismatch(str(e)):
+                continue          # 换下一个端点再试
+            raise
+
+    if res is None:
+        raise last_err or RuntimeError(f'{model} 无可用端点')
+
+    txt = _extract_llm_text(res)
     if not txt:
         raise RuntimeError(f'LLM 未返回内容：{json.dumps(res, ensure_ascii=False)[:300]}')
 
@@ -423,26 +523,31 @@ def _summarize_one(transcript, api_key, model):
 
 
 def probe_models(api_key, candidates):
-    """逐个试探候选模型，报告哪个能用。
+    """逐个试探候选模型，报告哪个能用 + 走哪个端点。
 
-    这是我能给用户的最实用的一个命令：与其猜「我的 key 能用什么」，
-    不如直接问。用最小 token 请求，几乎不花钱。
+    这是我能给用户的最实用的一个命令：与其猜「我的 key 能用什么、
+    该走哪个端点」，不如直接问。用最小 token 请求，几乎不花钱。
     """
     results = []
     for m in candidates:
-        row = {'model': m, 'ok': False, 'detail': ''}
-        try:
-            payload = {
-                'model': m,
-                'input': {'messages': [{'role': 'user', 'content': 'hi'}]},
-                'parameters': {'result_format': 'message', 'max_tokens': 1},
-            }
-            post_json(f'{DASHSCOPE_BASE}/services/aigc/text-generation/generation',
-                      payload, api_key)
-            row['ok'] = True
-            row['detail'] = '可用'
-        except Exception as e:
-            row['detail'] = str(e)[:200]
+        row = {'model': m, 'ok': False, 'detail': '', 'endpoint': ''}
+        payload = {
+            'model': m,
+            'input': {'messages': [{'role': 'user', 'content': 'hi'}]},
+            'parameters': {'result_format': 'message', 'max_tokens': 1},
+        }
+        tried = []
+        for ep in _endpoints_for(m):
+            try:
+                post_json(f'{DASHSCOPE_BASE}{ep}', payload, api_key)
+                row['ok'] = True
+                row['endpoint'] = ep
+                row['detail'] = '可用'
+                break
+            except Exception as e:
+                tried.append(f'{ep.split("/")[-2]}={str(e)[:70]}')
+        if not row['ok']:
+            row['detail'] = ' | '.join(tried)[:240]
         results.append(row)
     return results
 
@@ -529,11 +634,16 @@ def main():
             sys.exit(2)
         cands = ([args.summary_model] if args.summary_model
                  else DEFAULT_SUMMARY_MODELS)
+        print(f'域名：{DASHSCOPE_BASE}', file=sys.stderr)
         print('逐个试探候选模型（每个只发 1 个 token 的请求）：\n', file=sys.stderr)
         rows = probe_models(api_key, cands)
         for r in rows:
             mark = '✅' if r['ok'] else '❌'
-            print(f'  {mark} {r["model"]:<24} {r["detail"]}', file=sys.stderr)
+            # 端点也要报：这个平台的端点错配会伪装成「url error」，
+            # 不报出来用户就没法自己判断该不该换模型
+            fam = r['endpoint'].split('/')[-2] if r['endpoint'] else '-'
+            print(f'  {mark} {r["model"]:<24} {fam:<22} {r["detail"]}',
+                  file=sys.stderr)
         good = [r['model'] for r in rows if r['ok']]
         print(f'\n可用 {len(good)}/{len(rows)}：{", ".join(good) or "（全不可用）"}',
               file=sys.stderr)
