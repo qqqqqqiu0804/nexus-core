@@ -24,6 +24,12 @@ jobs:
         run: node --check server/server.js
 
       # --- 两套测例都从 index.html 抽真实代码跑 ---
+      - name: 导入校验测例（88 项）
+        run: node tests/import-validation.test.js
+
+      - name: 象棋界面测例（22 项）
+        run: node tests/chess-ui.test.js
+
       - name: 象棋走法校验器测例
         run: node tests/xiangqi-moves.test.js
 

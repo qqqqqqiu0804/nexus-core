@@ -1,6 +1,6 @@
 # nexus-core 技术栈与架构说明
 
-> 版本：`4cc9bf0`（2026-09-26 安全复审后）
+> 版本：`ac37c09`（2026-09-26 补 `importAllData` 值校验后）
 > 线上：https://nexus.kotete.xyz
 > 本文件描述「现在是什么样」，不是「应该是什么样」。设计红线和已知欠债都如实写。
 
@@ -22,7 +22,7 @@ nexus-core 是个**手机优先**的个人工作台。用户用手机浏览器�
 | 提示 | 关键信息不能塞在 `title` 属性里 —— 手机不显示 tooltip |
 | 折行 | 375~430px 宽下不溢出；长文本 / 长 ID 要 `word-break` |
 | 表格 | 宽表要想好手机怎么办（横滚 or 改卡片式） |
-| 首屏 | 体积守住：`index.html` 403 KB raw → 8.6 KB gzip 传输 |
+| 首屏 | 体积守住：`index.html` 429 KB raw → 136.8 KB gzip 传输（省 68%） |
 | 观感 | 第一眼顺眼 —— 留白/字号/对比度/暗色主题是功能，不是装饰 |
 | 反馈 | 加载、提交、失败都要有即时可见的反馈 |
 | 返回 | 浮层要能关掉，不能把人困在里面 |
@@ -35,7 +35,7 @@ nexus-core 是个**手机优先**的个人工作台。用户用手机浏览器�
 ## 一、一句话概括
 
 一个**单人自用**的个人数据台（记账 / 投资 / 任务 / 日记 / 灵感 / 阅读 / 象棋），
-前端是**一个 7,704 行的 `index.html`**，后端是**一个 942 行的 `server.js`**，
+前端是**一个 8,175 行的 `index.html`**，后端是**一个 946 行的 `server.js`**，
 除了 Express 和 cors **没有任何第三方运行时依赖**。
 
 核心取舍是：**用「零构建」换「改完就能上」**。
@@ -137,7 +137,7 @@ Node / Express（127.0.0.1:3458）
 │ 组件样式（.card / .insp-* / .btn）     │
 └──────────────────────────────────────┘
 ┌─ HTML ───────────────────────────────┐
-│ 顶部导航（tab 切换）                    │
+│ 底部导航（4 个 tab 切换）               │
 │ 各 panel（渲染函数按需填充）            │
 │ 浮层（灵感库 / 阅读器 / 抽屉）          │
 └──────────────────────────────────────┘
@@ -150,6 +150,18 @@ Node / Express（127.0.0.1:3458）
 │ ⑥ 入口      boot() + 定时器
 └──────────────────────────────────────┘
 ```
+
+**4 个 tab 的真实分布**（`data-panel` → `renderPanel` 分支）：
+
+| tab | 面板 id | 承载内容 |
+|---|---|---|
+| 今日 | `panel-daily` | 饮食 / 支出 / 英语 / **象棋**（4 个可折叠区块）+ 任务 + 随手记 |
+| 课表 | `panel-courses` | 周视图 / 日视图 / 明日预告 / 下周预告 |
+| 账本 | `panel-data` | 钱包 / 投资台账 / 历史日历 / 日记归档 |
+| 我的 | `panel-settings` | 服务器连接 / 数据健康 / AI 报告 / 主题 / 令牌 |
+
+> 底部**只有 4 个 tab**，手机宽度已接近上限（见第六节）。新模块**优先嵌进现有面板**
+> （尤其「今日」的可折叠区块），而不是加第 5 个 tab。
 
 **关键设计**：面板渲染是**按需的**。`renderPanel(name)` 只在切到那个 tab 时调用对应
 `renderXxx()`，不是一次性把全部面板渲染一遍。这避免了「数据一多首屏就卡」。
@@ -247,7 +259,6 @@ videos, investments, investShots, gadgets
 
 > ⚠️ 相等时间戳的行为在 `4cc9bf0` 有过修正。原实现 `>` / `<` 两个分支都不覆盖
 > `ts === cur.updated_at`，导致同毫秒双写**不报错也不写库**，是真实的数据丢失路径。
-
 ### 3.7 路由全清单
 
 ```
@@ -287,9 +298,9 @@ videos, investments, investShots, gadgets
 
 ---
 
-## 四、`4cc9bf0` 这轮修了什么（安全复审结果）
+## 四、历轮安全修复（安全复审结果）
 
-完整复审 + 修复，全部有回归测试。**106 项测试 + 6 项新增加固回归**。
+完整复审 + 修复，全部有回归测试。**268 项断言**（7 个套件）+ 3 套冒烟脚本。
 
 ### 已修
 
@@ -302,6 +313,11 @@ videos, investments, investShots, gadgets
 | 5 | KV 相等时间戳**静默丢写却报 `ok:true`** → 真实数据丢失 | `server.js:425` | P1 | `>` 改 `>=` |
 | 6 | `fetchCapped` 用 `redirect:'follow'`，**首跳白名单校验被 302 绕过** → 条件性 SSRF | `server.js:525` | P2 | 改 `manual` + 逐跳 `hopGuard(true)` 复查 |
 | 7 | `/report/:name` **请求内同步 `gzipSync`** → 阻塞事件循环 | `server.js:180` | P2 | 启动时 `warmReportCache()` 预压缩 |
+| 8 | `importAllData()` 写入 `nexus_*` 前**不做任何值校验** → 能解析但类型错的数据一路传到 `getTasks().filter(...)`，`TypeError` **白屏** | `index.html` | P1 | 新增 `IMPORT_SCHEMA` 类型白名单 + `importKeyIsSafe()` 键名校验，**先全校验再统一写**；写前快照、快照失败即中止 |
+
+> 【8】是本轮补的最后一道外部写入口。`Store.get()` 会吞掉 `JSON.parse` 错误返回默认值，
+> 所以畸形 *JSON* 其实无害；真正的风险是**类型错**。防回归在
+> `tests/import-validation.test.js`（88 项）。
 
 ### 复审查过、确认**没问题**的（不用再担心）
 
@@ -312,6 +328,7 @@ videos, investments, investShots, gadgets
 | 路径穿越 `/api/files/:id` | **挡得住**。`replace(/[^a-zA-Z0-9._-]/g,'')` 把 `/` 全删，`../../` 塌缩成普通文件名 |
 | `LINK_HOSTS` 白名单 | **不可绕**。userinfo（`evil.com@bilibili.com`）、后缀（`bilibili.com.evil.com`）、IDN 实测全拒 |
 | `fetchCapped` 字节上限 | **真实字节上限**，流式累加，不信任可伪造的 `Content-Length` |
+| `importAllData` 原型污染 | **挡得住**。`__proto__` / `constructor` / `prototype` 在**剥掉 `nexus_` 前缀后**比对，`nexus___proto__` 这类变体也拒；下划线打头的裸名一律拒 |
 | `AUTH_TOKEN` 默认回退 | **无**。缺失直接 `process.exit(1)`，不存在 `\|\| 'dev'` 静默放行 |
 | `X-Powered-By` | **已关**。线上实测响应头无此项 |
 
@@ -319,11 +336,11 @@ videos, investments, investShots, gadgets
 
 | 项 | 状态 |
 |---|---|
-| **`AUTH_TOKEN` 仍是泄漏过的那个值** | 用户选择「暂不轮换」。`server/.env` 与 `/root/.pm2/dump.pm2` 里都还是 `3137...5650`。**建议尽快轮换**；轮换只需改 `server/.env` 一行 + `pm2 restart nexus-api` |
-| `https://qqqqqqiu0804.github.io` 仍在**线上 pm2 环境**里 | 新配置的默认值和 `server.js` 的代码默认值都已移除；但线上进程仍是旧 env 起的，要等按 `ecosystem.config.js` 重新注册后才真正生效（**功能上无害**，删掉只是更干净） |
-| `deploy.sh:155` 读 `.env` 拿端口 | 该文件不存在，恒回退硬编码 `3458`。恰好等于真实值所以「蒙对」，改端口会误报 |
+| **`AUTH_TOKEN` 仍是泄漏过的那个值** | 用户已明确决定**不轮换**，此事不再跟踪。轮换操作本身很简单：改 `server/.env` 一行 + `pm2 restart nexus-api` |
+| `deploy.sh` 读 `.env` 拿端口 | 该文件在本地不存在，恒回退硬编码 `3458`。恰好等于真实值所以「蒙对」，改端口会误报 |
 | `entries.updated_at` 用 `datetime('now','localtime')` | 依赖服务器时区。阿里云默认 UTC 的话展示时间会偏 8 小时（冲突判定用 `client_ts`，**不影响收敛**） |
 | `parseStamp` 解析空格分隔日期 | Safari 对 `"2026-09-26 10:00"` 解析可能失败（Chrome/Firefox 宽松）。未在 Safari 实测 |
+| 前端仍是单文件 8,175 行 | 有意保留，见第七节「如果重来」 |
 
 ---
 
@@ -331,25 +348,32 @@ videos, investments, investShots, gadgets
 
 ```
 nexus-core/
-├── index.html              前端全部（7,704 行 / 403 KB）
+├── index.html              前端全部（8,175 行 / 429 KB）
 ├── README.md               使用与部署说明
+├── ecosystem.config.js     pm2 配置（密钥走 server/.env）
 ├── report/
 │   └── 2026-09.html        月报（静态，启动时预压缩）
 ├── server/
-│   ├── server.js           后端全部（942 行）
+│   ├── server.js           后端全部（946 行）
 │   ├── package.json        2 个依赖
 │   ├── deploy.sh           回滚安全的部署脚本（支持 --dry-run）
-│   ├── DEPLOY.md           部署细节
+│   ├── DEPLOY.md           从买机器到上线的作战手册
+│   ├── .env.example        环境变量模板（可入库）
 │   ├── journal.db          SQLite（WAL，线上唯一真数据）
 │   └── data/files/         上传的图片
 ├── tests/
-│   ├── ai-report.test.js        31 项（从 index.html 抽真实代码跑）
-│   ├── xiangqi-moves.test.js    62 项（象棋走子规则）
-│   ├── smoke-server.sh          后端冒烟（gzip/ETag/鉴权）
-│   ├── smoke-report.sh          13 项（月报路由/路径穿越）
-│   └── smoke-hardening.sh        6 项（本轮安全修复回归）
-├── tools/                  辅助脚本
-├── docs/                   文档
+│   ├── import-validation.test.js  88 项（导入校验 / 原型污染 / 限流）
+│   ├── chess-ui.test.js           22 项（象棋界面结构 + 窄屏兜底）
+│   ├── xiangqi-moves.test.js      62 项（象棋走子规则）
+│   ├── ai-report.test.js          31 项（报告范围 / 汇总 / 转义）
+│   ├── mobile-audit.js             5 项（字号 / 根字号 / title / viewport）
+│   ├── ecosystem-config.test.js   18 项（pm2 配置不变量）
+│   ├── security-regression.test.js 42 项（安全修复防回归）
+│   ├── smoke-server.sh            后端冒烟（gzip/ETag/鉴权）
+│   ├── smoke-report.sh            13 项（月报路由/路径穿越）
+│   └── smoke-hardening.sh          6 项（错误不泄堆栈/KV 同毫秒不丢写）
+├── tools/                  象棋题库生成 + pm2 环境导出
+├── docs/                   架构 / 象棋重构 / 安全复审计划
 └── .github/workflows/ci.yml
 ```
 
@@ -391,8 +415,8 @@ entries 表 ← 只有 5 天日记（2026-09-13 ~ 09-25）
 
 ### 测试
 ```bash
-cd server && npm test          # 93 项单元测试
-npm run test:smoke             # 后端 + 月报 + 加固冒烟
+cd server && npm test          # 268 项断言（7 个套件）
+npm run test:smoke             # 后端 + 月报 + 加固冒烟（真起服务）
 ```
 
 ### 部署
@@ -416,7 +440,7 @@ bash server/deploy.sh             # 真部署（自动备份 + 测试 + 回滚�
 - **可读**：没有抽象层，`grep` 就能找到任何逻辑
 
 ### 代价（不是 bug，是取舍）
-- **单文件 7,700 行**：编辑器里跳转靠搜索，没有模块边界
+- **单文件 8,175 行**：编辑器里跳转靠搜索，没有模块边界
 - **手写渲染**：每次都要自己记得转义，容易漏（本轮 3 个 XSS 就是这么来的）
 - **无用户体系**：单 token，泄漏即全开
 - **同步是 LWW**（最后写入者胜）：没有 CRDT，时间戳错了就是数据错
