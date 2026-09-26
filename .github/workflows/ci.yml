@@ -30,6 +30,10 @@ jobs:
       - name: 象棋界面测例（22 项）
         run: node tests/chess-ui.test.js
 
+      # 课表周次切换 / 全学期总览：重点防「同屏两个数字口径不一致」
+      - name: 课表周次与总览测例（56 项）
+        run: node tests/course-week.test.js
+
       - name: 象棋走法校验器测例
         run: node tests/xiangqi-moves.test.js
 

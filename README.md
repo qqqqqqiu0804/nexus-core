@@ -28,7 +28,7 @@ AUTH_TOKEN=$(node -e "console.log(require('crypto').randomBytes(32).toString('he
 | 前端 | 一个 `index.html`（HTML / CSS / JS 全内联，**没有构建步骤、没有框架、没有依赖、没有 CDN**） |
 | 后端 | `server/server.js`（Node 22 + Express 4 + 内置 `node:sqlite`，**零原生模块**） |
 | 依赖总数 | **2 个**（`express` + `cors`） |
-| 体量 | `index.html` 8,175 行 / 429 KB（gzip 后 136.8 KB，省 68%）；`server.js` 946 行 |
+| 体量 | `index.html` 8,484 行 / 455 KB（gzip 后 144.3 KB，省 68%）；`server.js` 946 行 |
 | 部署 | 阿里云 ESA 边缘 → Nginx → Node，pm2 守护 |
 
 单文件前端不是行为艺术，是刻意的：**改完直接上线就生效**，不需要装 node_modules、不需要 build、不需要 CDN。
@@ -48,7 +48,15 @@ AUTH_TOKEN=$(node -e "console.log(require('crypto').randomBytes(32).toString('he
 
 外加：**任务**（周期任务 + 限时任务，聚合出"今天要做的"；完成记录进 `completionLog`，连续签到算 `streak`；周期任务按 `seriesId` 串联，未到期的副本不显示）、**随手记**（memos / flomo 那种，一天可以记多条，每条自动带时间戳，`Ctrl/⌘ + Enter` 或点「记下」即存）。
 
-**课表**（`panel-courses`）—— 内置 2026-2027-1 学期全量课程。两套作息按月份自动切换（5–9 月夏季、10 月起春秋冬季）；能识别**假期**（放假当天不显示课，改标假期）和**调休补课**（表头标"补课"并说明补的是哪一周的课）；周视图 / 日视图 / 明日预告 / 下周预告四个视角。
+**课表**（`panel-courses`）—— 内置 2026-2027-1 学期全量课程。两套作息按月份自动切换（5–9 月夏季、10 月起春秋冬季）；能识别**假期**（放假当天不显示课，改标假期）和**调休补课**（表头标"补课"并说明补的是哪一周的课）。
+
+四个视角：**日** / **周** / **总览** / **预告**。
+
+**周次切换** —— 顶部胶囊条可任意翻到第 1–16 周（左右翻页 + 逐周点选 + 「回本周」）。每格下方的角标是**当周实际节数**（已扣掉假期，0 节的显示「—」，一眼看出哪几周空）。默认处于「跟随态」——跟着今天走；手动翻走才固定，翻回本周会自动回到跟随态，所以应用开着跨过周日午夜时视图会自己跟进。切周后**日视图也跟着切**（基准日变成那一周的周一），否则会出现「标题写第 13 周、内容却是今天」的自相矛盾；此时倒计时不再显示（预览别的周算出来没意义），换成一行「正在预览第 N 周」。
+
+**全学期总览** —— 按周列出 1–16 周的完整课表，顶部四格汇总（学期周数 / 总节数 / 最忙周节数 / 最忙的一周）。用**纵向卡片**而不是「N 周 × 7 天」大网格：16 周并排要 ~1900px，手机上是灾难。卡片左边框按当周节数分档（越忙越亮），假期周单独标注哪几天停课；点卡片头可直接跳到那一周的周视图深看。
+
+**学期总周数由课表实际最大周次推出**，不写死 —— 换学期导入新课表后自动跟着变。
 
 **账本**（`panel-data`）—— 钱包记账（收支流水、分类占比、6 个月趋势、月度预算）、投资台账、历史日历、日记归档（按月 / 搜索）。
 
@@ -78,7 +86,7 @@ AUTH_TOKEN=$(node -e "console.log(require('crypto').randomBytes(32).toString('he
 
 ```
 nexus-core/
-├── index.html                整个前端（单文件，8,175 行）
+├── index.html                整个前端（单文件，8,484 行）
 ├── README.md                 你正在看的
 ├── ecosystem.config.js       pm2 配置（端口/内存上限/重启策略；密钥走 server/.env）
 ├── report/                   月报页 / 周报页（静态 HTML，丢进来即可）
@@ -86,6 +94,7 @@ nexus-core/
 ├── tests/                    全部测例（不需要构建）
 │   ├── import-validation.test.js    88 项  导入校验 / 原型污染 / 限流
 │   ├── chess-ui.test.js             22 项  象棋界面结构 + 窄屏兜底
+│   ├── course-week.test.js          56 项  课表周次切换 / 总览口径一致
 │   ├── xiangqi-moves.test.js        62 项  象棋走子规则
 │   ├── ai-report.test.js            31 项  报告范围 / 汇总 / 转义
 │   ├── mobile-audit.js               5 项  字号 / 根字号 / title / viewport
@@ -121,8 +130,9 @@ nexus-core/
 |---|---|
 | 装依赖 | `cd server && npm install` |
 | 本地起服务 | `cd server && AUTH_TOKEN=xxx npm start` |
-| 跑全部单元测例 | `cd server && npm test` （268 项） |
+| 跑全部单元测例 | `cd server && npm test` （324 项） |
 | 跑冒烟测试 | `cd server && npm run test:smoke` （真起服务） |
+| 课表周次 / 总览 | `node tests/course-week.test.js` （56 项） |
 | 安全防回归 | `node tests/security-regression.test.js` （42 项） |
 | 手机端体验审计 | `node tests/mobile-audit.js` |
 | 部署（先演练） | `bash server/deploy.sh --dry-run` |
@@ -305,7 +315,7 @@ bash server/deploy.sh             # 真部署
 - **「墨与信号」**：中性墨底 + 单一克制的蓝 accent，语义色只用来标状态；等宽字体只给数据。霓虹光晕、粒子雨、扫描线这些装饰已经全部退役，不复活。
 - **不做"看起来完整"的功能**。日程的时间分配、睡眠记录、习惯打卡都曾写出来过，四天零数据 → 直接整块删掉，连同 CSS 和历史记录里的引用一起清干净。**判断一个功能该不该留，看数据，不看当初的设计文档。**
 - **记录类功能的第一原则是降低门槛**：饮食不强迫你算卡路里，随手记不要求你写一段话。写不出来的功能等于不存在。
-- **单文件前端就该配 gzip + ETag**。429 KB 冷启动下载在移动网络上很浪费，gzip 后 136.8 KB（省 68%），二次访问走 `If-None-Match` 直接 304 零传输。用 Node 内置 `zlib`，**不引入 `compression` 包**——守住「零多余依赖」。压缩在启动时算一次并缓存，不要每请求压。
+- **单文件前端就该配 gzip + ETag**。455 KB 冷启动下载在移动网络上很浪费，gzip 后 144.3 KB（省 68%），二次访问走 `If-None-Match` 直接 304 零传输。用 Node 内置 `zlib`，**不引入 `compression` 包**——守住「零多余依赖」。压缩在启动时算一次并缓存，不要每请求压。
 - **所有插值到 innerHTML 的用户数据必须过 `escHtml` / `escAttr`**。任务标题、课程名这些能粘贴进来的字段都算用户数据；漏一个就是存储型 XSS，而且会经 `/api/kv` 同步到所有设备。**别拼 `onclick="fn('+x+')"`** —— 这是历史 bug 的重灾区。
 - **不对外暴露技术栈**。`app.disable('x-powered-by')` —— 默认的 `X-Powered-By: Express` 等于给攻击者一张匹配已知 CVE 的清单，关掉零成本。
 - **静态文件路由一律用文件名白名单**，不拼路径。

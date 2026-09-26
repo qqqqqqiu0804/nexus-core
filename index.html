@@ -991,9 +991,13 @@ a { color: var(--accent); text-underline-offset: 2px; }
 
 
 /* === Course Schedule === */
-.course-view-toggle { display:flex; gap:6px; }
-.course-view-btn { background:var(--bg-card); border:1px solid var(--border-subtle); color:var(--text-secondary); padding:6px 14px; border-radius:6px; font-size:var(--fs-sm); cursor:pointer; transition:.2s; }
+/* 四个视图按钮（日/周/总览/预告）在 390px 上刚好卡在换行边缘：
+   「总览」两个字会被挤成两行，把按钮撑高一截。
+   white-space:nowrap + 收窄内边距，保证一行放得下。 */
+.course-view-toggle { display:flex; gap:6px; flex-wrap:nowrap; }
+.course-view-btn { background:var(--bg-card); border:1px solid var(--border-subtle); color:var(--text-secondary); padding:6px 10px; border-radius:6px; font-size:var(--fs-sm); cursor:pointer; transition:.2s; white-space:nowrap; -webkit-tap-highlight-color:transparent; }
 .course-view-btn.active { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+@media (max-width:360px) { .course-view-btn { padding:6px 8px; font-size:var(--fs-xs); } }
 /* AI 报告的周/月粒度切换：沿用课表视图按钮的观感，保持一致 */
 /* AI 报告的周/月粒度切换：沿用课表视图按钮的观感，保持一致。
    padding 用 8px 12px 而不是 5px 16px —— 后者高度只有 ~31px，手机上偏难点中。 */
@@ -1023,6 +1027,8 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .week-grid { display:grid; grid-template-columns: 52px repeat(7,1fr); gap:4px; font-size:var(--fs-xs); }
 .week-corner { }
 .week-head { text-align:center; color:var(--accent); padding:6px 0; font-weight:600; }
+/* 表头日期：翻到第 13 周时光看「周一…周日」不知道是哪几天，补上 M/D */
+.week-head-date { display:block; font-size:var(--fs-2xs); font-weight:400; color:var(--text-dim); font-family:var(--font-mono); margin-top:1px; }
 .week-sec { background:var(--bg-card); border-radius:6px; padding:6px 2px; text-align:center; color:var(--text-secondary); line-height:1.2; }
 .week-sec-time { font-size:var(--fs-2xs); color:var(--text-dim); font-family:var(--font-mono); }
 .week-cell { background:var(--bg-card); border-radius:6px; min-height:46px; padding:4px; }
@@ -1044,6 +1050,102 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .forecast-holiday { font-size:var(--fs-xs); color:var(--orange); padding:6px 0; }
 .forecast-day-head .fd-hol { font-size:var(--fs-xs); color:var(--orange); }
 .forecast-day-head .fd-makeup { font-size:var(--fs-xs); color:var(--accent); }
+
+/* === 周次选择器 ===
+   手机上 16 个周次胶囊一行放不下，所以走横轴滚动（overflow-x:auto）而不是换行：
+   换行会把这块撑成三行高，把下面的课表一路顶下去。
+   左右两个翻页按钮固定不动，中间可滚 —— 手势和点击都能用。 */
+#course-week-picker { margin-bottom:12px; min-width:0; }
+.wk-bar { display:flex; align-items:center; gap:6px; min-width:0; }
+.wk-step {
+  flex:none; width:36px; height:44px;                    /* 铁律：可点元素 ≥44px 高 */
+  display:flex; align-items:center; justify-content:center;
+  background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm);
+  color:var(--text-secondary); font-size:var(--fs-lg); line-height:1; cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.wk-step:disabled { opacity:0.35; cursor:default; }
+.wk-track {
+  flex:1; min-width:0; display:flex; gap:5px;
+  overflow-x:auto; overflow-y:hidden; padding:2px 0;
+  scrollbar-width:none; -webkit-overflow-scrolling:touch;
+}
+.wk-track::-webkit-scrollbar { display:none; }
+.wk-cell {
+  flex:none; min-width:44px; height:44px;                 /* ≥44px 触控目标 */
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm);
+  color:var(--text-secondary); font-size:var(--fs-sm); cursor:pointer;
+  padding:0 8px; -webkit-tap-highlight-color:transparent; transition:border-color .15s, color .15s;
+}
+.wk-cell .wk-n { font-family:var(--font-mono); font-size:var(--fs-2xs); color:var(--text-dim); line-height:1; }
+.wk-cell .wk-n-empty { opacity:0.5; }
+/* 「本周」用虚线边框区分：它是锚点，但不应抢走当前选中态的视觉焦点 */
+.wk-cell.now { border-style:dashed; border-color:color-mix(in srgb, var(--accent) 45%, transparent); }
+.wk-cell.cur {
+  border-color:var(--accent); color:var(--accent); background:var(--accent-soft); font-weight:700;
+}
+.wk-cell.cur .wk-n { color:var(--accent); }
+.wk-foot { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:6px; min-height:20px; }
+.wk-hint { font-size:var(--fs-2xs); color:var(--text-dim); }
+.wk-now {
+  flex:none; background:var(--accent-soft); border:1px solid var(--accent-line); color:var(--accent);
+  border-radius:999px; padding:3px 12px; font-size:var(--fs-2xs); cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+
+/* === 全学期总览 ===
+   纵向卡片列表，不是「N 周 × 7 天」大网格：16 周并排要 ~1900px，手机上没法看。
+   冷热分档只靠左边框 + 底色深浅，不堆文字。 */
+.ov-summary {
+  display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:6px; margin-bottom:10px;
+}
+.ov-sum-item {
+  background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm);
+  padding:8px 4px; text-align:center; min-width:0;
+}
+.ov-sum-n { display:block; font-size:var(--fs-lg); font-weight:700; color:var(--accent); font-family:var(--font-mono); line-height:1.2; }
+.ov-sum-k { display:block; font-size:var(--fs-2xs); color:var(--text-dim); margin-top:2px; }
+.ov-legend { font-size:var(--fs-2xs); color:var(--text-dim); margin-bottom:12px; line-height:1.5; }
+.ov-card {
+  background:var(--bg-card); border:1px solid var(--border-subtle); border-left-width:3px;
+  border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:10px;
+}
+.ov-w0 { border-left-color:var(--text-dim); opacity:0.75; }
+.ov-w1 { border-left-color:color-mix(in srgb, var(--accent) 35%, transparent); }
+.ov-w2 { border-left-color:color-mix(in srgb, var(--accent) 65%, transparent); }
+.ov-w3 { border-left-color:var(--accent); background:color-mix(in srgb, var(--accent) 5%, var(--bg-card)); }
+/* 当前查看的那一周加一圈高亮，翻页后能马上找到自己在哪 */
+.ov-shown { border-color:var(--accent-line); box-shadow:0 0 0 1px var(--accent-line) inset; }
+.ov-card-head {
+  display:flex; align-items:baseline; gap:8px; cursor:pointer;
+  -webkit-tap-highlight-color:transparent; min-width:0;
+}
+.ov-week { font-size:var(--fs-base); font-weight:700; color:var(--text-primary); flex:none; }
+.ov-range { font-size:var(--fs-2xs); color:var(--text-dim); font-family:var(--font-mono); flex:1; min-width:0; }
+.ov-now {
+  flex:none; font-size:var(--fs-2xs); color:var(--accent); border:1px solid var(--accent-line);
+  background:var(--accent-soft); border-radius:999px; padding:1px 8px;
+}
+.ov-count { flex:none; font-size:var(--fs-2xs); color:var(--text-secondary); font-family:var(--font-mono); }
+.ov-hol { font-size:var(--fs-xs); color:var(--orange); margin-top:6px; line-height:1.5; }
+.ov-none { font-size:var(--fs-xs); color:var(--text-dim); margin-top:6px; }
+.ov-day { margin-top:8px; }
+.ov-day-head { font-size:var(--fs-2xs); color:var(--accent); margin-bottom:3px; font-weight:600; }
+.ov-mk { color:var(--text-dim); font-weight:400; }
+.ov-row {
+  display:flex; align-items:center; gap:8px; padding:5px 0;
+  border-top:1px solid color-mix(in srgb, var(--border-subtle) 60%, transparent);
+  font-size:var(--fs-sm); min-width:0; cursor:pointer;
+}
+.ov-sec {
+  flex:none; width:20px; height:20px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--accent-soft); color:var(--accent); font-size:var(--fs-2xs); font-weight:600;
+}
+.ov-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-primary); }
+.ov-loc { flex:none; max-width:96px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-2xs); color:var(--text-dim); }
+.ov-time { flex:none; font-size:var(--fs-2xs); color:var(--text-dim); font-family:var(--font-mono); }
 
 /* === 一个 authored 动效：面板切换时克制入场（指数缓出，从已可见默认态开始）=== */
 @keyframes panelIn {
@@ -1231,12 +1333,19 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div class="course-view-toggle">
         <button class="course-view-btn active" data-view="day" onclick="switchCourseView('day')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><rect x="3.5" y="5" width="17" height="15.5" rx="2.2"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/></svg> 日</button>
         <button class="course-view-btn" data-view="week" onclick="switchCourseView('week')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><rect x="3.5" y="5" width="17" height="15.5" rx="2.2"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3M12 12.5v3M9.5 14h5"/></svg> 周</button>
+        <button class="course-view-btn" data-view="overview" onclick="switchCourseView('overview')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="19.5" cy="18" r="1.2"/></svg> 总览</button>
         <button class="course-view-btn" data-view="forecast" onclick="switchCourseView('forecast')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><path d="M5 19V8l7-4 7 4v11"/><path d="M9 19v-5h6v5"/></svg> 预告</button>
       </div>
     </div>
+    <!-- 周次选择器：由 renderWeekPicker() 填充。
+         预告视图是固定的「明天+下周」，跟所选周次无关，那边会自动隐藏这一块。 -->
+    <div id="course-week-picker"></div>
     <div id="course-day-view"></div>
     <div id="course-week-view" style="display:none;"></div>
+    <div id="course-overview-view" style="display:none;"></div>
     <div id="course-forecast-view" style="display:none;"></div>
+    <!-- 「本周实际是第 M 周」提示：翻走之后才出现 -->
+    <div id="course-week-sub" class="t-dim-xs" style="margin-top:-4px;"></div>
 <!-- 课表数据 / 调课更新 -->
     <details style="margin-top:16px;">
       <summary style="cursor:pointer;font-size:var(--fs-xs);color:var(--text-dim);padding:8px 0;list-style:none;user-select:none;"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.2 5.2l1.8 1.8M17 17l1.8 1.8M18.8 5.2 17 7M7 17l-1.8 1.8"/></svg> 课表数据 · 调课更新</summary>
@@ -7722,6 +7831,21 @@ function weekForDate(date) {
 }
 function getCurrentWeek() { return weekForDate(new Date()); }
 
+// 学期总周数：从课表里实际出现的最大周次推出来，不写死。
+// 为什么不用教务的 22 周：那 6 周本来就没课，总览里会凭空多出 6 段空白，
+// 反而看不出「学期到底上到第几周」。换学期导入新课表后这里自动跟着变。
+// 都不合法时兜底 16，保证周次选择器至少不是空的。
+function termTotalWeeks() {
+  let max = 0;
+  for (const c of getCourses()) {
+    if (!Array.isArray(c.weeks)) continue;
+    for (const w of c.weeks) {
+      if (Number.isInteger(w) && w > max) max = w;
+    }
+  }
+  return max || 16;
+}
+
 function getWeekRange(week) {
   const d = new Date(new Date(TERM_START + 'T00:00:00').getTime() + (week - 1) * 7 * 86400000);
   const md = dt => (dt.getMonth() + 1) + '/' + dt.getDate();
@@ -7729,6 +7853,22 @@ function getWeekRange(week) {
 }
 
 function courseMatches(c, week) { return c.weeks && c.weeks.indexOf(week) >= 0; }
+
+// 某一周实际排了几节课 —— 周次选择器的角标和总览都用它，
+// 所以必须**两边口径完全一致**：都要按「星期 + 周次」逐天算，并把放假的天剔掉。
+// 早先这里只按 weeks 数组长度算，忽略了假期，结果总览报「第 3 周 12 节」、
+// 选择器角标却报 14 节（中秋那三天本就没课），同一屏两个数字打架。
+function lessonsInWeek(week) {
+  const daysOfWeek = DAY_NAMES.slice(1).concat(['星期日']);
+  const dates = getWeekDates(week);
+  let n = 0;
+  dates.forEach((d, i) => {
+    if (holidayForDate(d)) return;
+    const dayName = daysOfWeek[i];
+    n += getCourses().filter(c => c.day === dayName && courseMatches(c, week)).length;
+  });
+  return n;
+}
 
 // 某周 7 天的实际日期（周一 → 周日），供课表按「日期」而不是「星期名」判断假期
 function getWeekDates(week) {
@@ -7745,14 +7885,52 @@ function coursesForDate(d) {
 }
 
 let _courseView = 'day';
+// 当前正在查看的周次。null = 跟随「今天」所在的周（默认），
+// 手动翻到别的周后才是一个具体数字。
+// 为什么要区分 null 和具体值、而不是直接初始化成 getCurrentWeek()：
+//   「回到本周」得知道用户翻走过没有；而且应用开着跨过周日午夜时，
+//   跟随态会自动滚到新的一周，写死数字就卡在旧周不动了。
+let _courseWeek = null;
+
+// 实际生效的周次（默认取今天所在周）
+function activeWeek() { return _courseWeek === null ? getCurrentWeek() : _courseWeek; }
+
 function switchCourseView(v) { _courseView = v; renderCourses(); }
+
+// 切换到第 w 周：越界直接夹住，不报错也不静默不动。
+// 注意翻回「今天所在周」时要顺手清掉固定态（回到跟随），
+// 否则应用开着跨过周日午夜后，视图会卡在旧的周次上不跟进。
+function setCourseWeek(w) {
+  const total = termTotalWeeks();
+  const n = Math.min(total, Math.max(1, Math.round(Number(w) || 1)));
+  _courseWeek = (n === getCurrentWeek()) ? null : n;
+  renderCourses();
+}
+// 翻页：delta 为 ±1。
+// 跟随态下基准是「今天所在周」（此时 _courseWeek 是 null，不能直接加）
+function stepCourseWeek(delta) {
+  setCourseWeek(activeWeek() + delta);
+}
+// 回到本周 = 回到跟随态
+function gotoCurrentWeek() { _courseWeek = null; renderCourses(); }
 
 function renderCourses() {
   const panel = document.getElementById('panel-courses');
   if (!panel) return;
-  const week = getCurrentWeek();
+  const week = activeWeek();
+  const cur = getCurrentWeek();
+  const total = termTotalWeeks();
   const wl = document.getElementById('course-week-label');
-  if (wl) wl.textContent = `第 ${week} 周 · ${getWeekRange(week)}`;
+  if (wl) {
+    // 跟随态只写「第 N 周」；手动翻走后补一句「本周是第 M 周」——
+    // 否则翻了半天会忘了现在是哪一周，这是最容易迷失的地方。
+    wl.textContent = `第 ${week} 周 · ${getWeekRange(week)}`;
+    const sub = document.getElementById('course-week-sub');
+    if (sub) {
+      if (week === cur) sub.textContent = '';
+      else sub.textContent = `本周实际是第 ${cur} 周 · 点「回本周」返回`;
+    }
+  }
   const sl = document.getElementById('course-season-label');
   if (sl) {
     // 作息按「所查看这一周的周一」推算，而不是按今天：
@@ -7765,12 +7943,60 @@ function renderCourses() {
   const dayEl = document.getElementById('course-day-view');
   const weekEl = document.getElementById('course-week-view');
   const fcEl = document.getElementById('course-forecast-view');
+  const ovEl = document.getElementById('course-overview-view');
   dayEl.style.display = _courseView === 'day' ? '' : 'none';
   weekEl.style.display = _courseView === 'week' ? '' : 'none';
   if (fcEl) fcEl.style.display = _courseView === 'forecast' ? '' : 'none';
+  if (ovEl) ovEl.style.display = _courseView === 'overview' ? '' : 'none';
+
+  // 周次选择器：只在「按周/按日/总览」下出现。
+  // 预告视图是固定的「明天+下周」，跟所选周次无关，露着选择器会自相矛盾。
+  const picker = document.getElementById('course-week-picker');
+  if (picker) {
+    const show = _courseView !== 'forecast';
+    picker.style.display = show ? '' : 'none';
+    if (show) renderWeekPicker(week, cur, total);
+  }
+
   if (_courseView === 'day') renderCourseDay(week);
   else if (_courseView === 'week') renderCourseWeek(week);
+  else if (_courseView === 'overview') renderCourseOverview();
   else renderCourseForecast();
+}
+
+// === 周次选择器 ===
+// 结构：上一周 / [1][2]…[N] / 下一周 + 回到本周。
+// 手机上 16 个周次胶囊一行放不下，所以横轴滚动（overflow-x:auto）而不是换行——
+// 换行会把整块撑成三行高，把下面的课表一路顶下去。
+function renderWeekPicker(week, cur, total) {
+  const el = document.getElementById('course-week-picker');
+  if (!el) return;
+  let cells = '';
+  for (let w = 1; w <= total; w++) {
+    const n = lessonsInWeek(w);
+    const cls = 'wk-cell' + (w === week ? ' cur' : '') + (w === cur ? ' now' : '');
+    // 节数角标：0 节标成「—」，一眼看出哪几周是空的（放假/停课）
+    const badge = n ? `<span class="wk-n">${n}</span>` : '<span class="wk-n wk-n-empty">—</span>';
+    cells += `<button class="${cls}" onclick="setCourseWeek(${w})" aria-label="第 ${w} 周，${n} 节课">${w}${badge}</button>`;
+  }
+  el.innerHTML = `<div class="wk-bar">
+      <button class="wk-step" onclick="stepCourseWeek(-1)" ${week <= 1 ? 'disabled' : ''} aria-label="上一周">‹</button>
+      <div class="wk-track">${cells}</div>
+      <button class="wk-step" onclick="stepCourseWeek(1)" ${week >= total ? 'disabled' : ''} aria-label="下一周">›</button>
+    </div>
+    <div class="wk-foot">
+      <span class="wk-hint">共 ${total} 周 · 角标为当周节数</span>
+      ${week === cur ? '' : '<button class="wk-now" onclick="gotoCurrentWeek()">回本周</button>'}
+    </div>`;
+
+  // 把当前周滚进可视区。不这么做的话，选到第 13 周时视图停在最左边 1-5 周，
+  // 用户看不到自己选中的那一格，会以为没生效。
+  const track = el.querySelector('.wk-track');
+  const sel = el.querySelector('.wk-cell.cur');
+  if (track && sel && sel.offsetLeft > track.clientWidth - sel.offsetWidth) {
+    // 略偏左一点，让相邻周次也能看见
+    track.scrollLeft = sel.offsetLeft - track.clientWidth / 3;
+  }
 }
 
 // 预告视图：明天 + 下周（跨周用 weekForDate 按日期算周次）
@@ -7829,39 +8055,83 @@ function renderCourseForecast() {
 
 function renderCourseDay(week) {
   const el = document.getElementById('course-day-view');
-  const today = new Date();
-  const hol = holidayForDate(today);
+  const cur = getCurrentWeek();
+  // 日视图的统一基准「日期」：
+  //   跟随态（没翻过周）→ 真·今天，保留倒计时/「上课中」这些实时状态；
+  //   手动翻到别的周 → 换成那一周的周一，否则会出现
+  //   「标题写第13周、内容却是今天」这种自相矛盾的画面。
+  const isToday = week === cur;
+  const base = isToday ? new Date() : getWeekDates(week)[0];
+  const baseName = DAY_NAMES[base.getDay()];
+
+  const hol = holidayForDate(base);
   if (hol) {
     el.innerHTML = `<div class="holiday-card"><span class="hc-icon">${hol.icon}</span>
-      <div><div>${hol.name}假期 · 今天不上课</div>
-      <div class="hc-sub">${hol.note} 放假（第 ${week} 周）</div></div></div>`;
+      <div><div>${hol.name}假期 · 不上课</div>
+      <div class="hc-sub">${hol.note} 放假（第 ${week} 周 ${baseName.replace('星期', '周')}）</div></div></div>`;
     return;
   }
-  const todayName = DAY_NAMES[today.getDay()];
-  const list = coursesForDate(today);
-  if (!list.length) { el.innerHTML = `<div class="course-empty">今天（${todayName}）第 ${week} 周无课 🎉</div>`; return; }
+
+  const list = isToday ? coursesForDate(base) : coursesOnDay(week, baseName);
+  const dayLabel = isToday ? `今天（${baseName}）` : `第 ${week} 周 · ${baseName.replace('星期', '周')}`;
+  if (!list.length) {
+    el.innerHTML = `<div class="course-empty">${dayLabel} 无课 🎉</div>`;
+    return;
+  }
+
   const now = new Date();
-  const makeup = MAKEUP_DAYS[localDate(today)];
-  el.innerHTML = (makeup ? `<div class="makeup-bar">📌 今天为调休上课日（${makeup}）</div>` : '') + list.map(c => {
-    const t = getCurrentSchedule()[c.section];
-    const [h, m] = t.start.split(':').map(Number);
-    const startDt = new Date(); startDt.setHours(h, m, 0, 0);
-    const [eh, em] = t.end.split(':').map(Number);
-    const endDt = new Date(); endDt.setHours(eh, em, 0, 0);
-    let status;
-    if (now < startDt) status = `<span class="course-countdown">${Math.round((startDt - now) / 60000)} 分钟后上课</span>`;
-    else if (now <= endDt) status = `<span class="course-countdown" style="color:var(--orange)">上课中</span>`;
-    else status = `<span class="course-countdown" style="color:var(--text-dim)">已结束</span>`;
-    const wtxt = c.weeks.length >= 14 ? '全学期' : (c.weeks.length > 1 ? `${c.weeks[0]}-${c.weeks[c.weeks.length - 1]}周` : `${c.weeks[0]}周`);
-    return `<div class="course-card">
-      <div class="course-time">${t.start}<br>${t.end}</div>
-      <div class="course-body">
-        <div class="course-name">${shortCourseName(c.name)}</div>
-        <div class="course-meta">${icon('pin', 0.8)} ${c.location || '地点待定'} · ${wtxt}</div>
-      </div>
-      ${status}
-    </div>`;
-  }).join('');
+  const makeup = MAKEUP_DAYS[localDate(base)];
+  el.innerHTML = (makeup ? `<div class="makeup-bar">📌 这天为调休上课日（${makeup}）</div>` : '') +
+    (!isToday ? `<div class="makeup-bar" style="background:var(--bg-card);border-color:var(--border-subtle);color:var(--text-dim);">👀 正在预览第 ${week} 周，不是今天</div>` : '') +
+    list.map(c => {
+      const t = getCurrentSchedule()[c.section];
+      let status = '';
+      // 倒计时只在「今天」有意义：预览别的周时算出来的是负数/无意义的值
+      if (isToday) {
+        const [h, m] = t.start.split(':').map(Number);
+        const startDt = new Date(); startDt.setHours(h, m, 0, 0);
+        const [eh, em] = t.end.split(':').map(Number);
+        const endDt = new Date(); endDt.setHours(eh, em, 0, 0);
+        if (now < startDt) status = `<span class="course-countdown">${Math.round((startDt - now) / 60000)} 分钟后上课</span>`;
+        else if (now <= endDt) status = `<span class="course-countdown" style="color:var(--orange)">上课中</span>`;
+        else status = `<span class="course-countdown" style="color:var(--text-dim)">已结束</span>`;
+      }
+      const wtxt = weekSpanText(c.weeks);
+      return `<div class="course-card">
+        <div class="course-time">${t.start}<br>${t.end}</div>
+        <div class="course-body">
+          <div class="course-name">${shortCourseName(c.name)}</div>
+          <div class="course-meta">${icon('pin', 0.8)} ${c.location || '地点待定'} · ${wtxt}</div>
+        </div>
+        ${status}
+      </div>`;
+    }).join('');
+}
+
+// 第 w 周某一天（星期名）的课。和 coursesForDate 的区别：
+// coursesForDate 走「真实日期 → 周次」，这里是「给定周次 + 星期名」直接查，
+// 给日视图预览别的周用。
+function coursesOnDay(week, dayName) {
+  return getCourses()
+    .filter(c => c.day === dayName && courseMatches(c, week))
+    .sort((a, b) => a.section - b.section);
+}
+
+// weeks 数组 → 人类可读的范围。数据里 weeks 是「哪几周上课」的枚举数组，
+// 直接 join 出来是 "1,2,3,4,5,6,7,8,9,10" 这种一长串，手机上完全没法看。
+// 这里合并成 "1-10周"，遇到断层再起一段："1-10, 13-14周"。
+function weekSpanText(weeks) {
+  if (!Array.isArray(weeks) || !weeks.length) return '未标周次';
+  const ws = [...new Set(weeks)].filter(w => Number.isInteger(w)).sort((a, b) => a - b);
+  if (!ws.length) return '未标周次';
+  const parts = [];
+  let s = ws[0], p = ws[0];
+  for (let i = 1; i <= ws.length; i++) {
+    if (i < ws.length && ws[i] === p + 1) { p = ws[i]; continue; }
+    parts.push(s === p ? String(s) : s + '-' + p);
+    if (i < ws.length) { s = ws[i]; p = ws[i]; }
+  }
+  return parts.join(', ') + '周';
 }
 
 function renderCourseWeek(week) {
@@ -7874,7 +8144,8 @@ function renderCourseWeek(week) {
     const makeup = MAKEUP_DAYS[localDate(dates[i])];
     const mark = hol ? `<span class="week-head-hol-label">${hol.short}</span>`
       : (makeup ? '<span class="week-head-makeup-label">补课</span>' : '');
-    html += `<div class="week-head${hol ? ' week-head-holiday' : ''}">${d.replace('星期', '周')}${mark}</div>`;
+    // 表头带上日期：翻到第 13 周时光看「周一…周日」根本不知道是哪几天
+    html += `<div class="week-head${hol ? ' week-head-holiday' : ''}">${d.replace('星期', '周')}${mark}<span class="week-head-date">${fmtMD(dates[i])}</span></div>`;
   });
   for (let s = 1; s <= 6; s++) {
     const st = getCurrentSchedule();
@@ -7890,6 +8161,94 @@ function renderCourseWeek(week) {
   }
   html += '</div>';
   el.innerHTML = html;
+}
+
+// === 全学期总览 ===
+// 按周罗列 1..N 周的完整课表，用纵向卡片而不是「N 周 × 7 天」大网格：
+// 16 周并排要 ~1900px，手机上是灾难。纵向列表能一路滑到底，
+// 每张卡片给出「这一周上什么、几节、有没有假期」，方便逐周对比。
+// 每张卡片头部可点，直接跳到那一周的周视图深看。
+function renderCourseOverview() {
+  const el = document.getElementById('course-overview-view');
+  if (!el) return;
+  const total = termTotalWeeks();
+  const cur = getCurrentWeek();
+  const nowShown = activeWeek();
+  const daysOfWeek = DAY_NAMES.slice(1).concat(['星期日']);
+
+  let totalLessons = 0, busiest = { w: 0, n: -1 };
+  const rows = [];
+  for (let w = 1; w <= total; w++) {
+    const dates = getWeekDates(w);
+    // 整周都落在假期里才算「假期周」；单天假期在卡片里单独标，不算整周
+    const holDays = [], items = [];
+    dates.forEach((d, i) => {
+      const hol = holidayForDate(d);
+      const dayName = daysOfWeek[i];
+      if (hol) { holDays.push(hol.short); return; }
+      const makeup = MAKEUP_DAYS[localDate(d)];
+      const cs = getCourses().filter(c => c.day === dayName && courseMatches(c, w));
+      if (cs.length) items.push({ dayName, cs, makeup });
+    });
+    const n = items.reduce((a, it) => a + it.cs.length, 0);
+    // 防御性自检：n 是上面逐天累出来的，lessonsInWeek 是抽出来的同一套口径。
+    // 两者不一致说明有人改了其中一边忘了另一边，宁可让节数走 lessonsInWeek，
+    // 也不要让选择器角标和总览卡片对不上。
+    if (n !== lessonsInWeek(w)) console.warn('[课表] 第 ' + w + ' 周节数口径不一致: ' + n + ' vs ' + lessonsInWeek(w));
+    totalLessons += n;
+    if (n > busiest.n) busiest = { w, n };
+    rows.push({ w, n, items, holDays: [...new Set(holDays)] });
+  }
+
+  const head = `<div class="ov-summary">
+    <div class="ov-sum-item"><span class="ov-sum-n">${total}</span><span class="ov-sum-k">学期周数</span></div>
+    <div class="ov-sum-item"><span class="ov-sum-n">${totalLessons}</span><span class="ov-sum-k">总节数</span></div>
+    <div class="ov-sum-item"><span class="ov-sum-n">${busiest.n > 0 ? busiest.n : 0}</span><span class="ov-sum-k">最忙周节数</span></div>
+    <div class="ov-sum-item"><span class="ov-sum-n">${busiest.n > 0 ? '第' + busiest.w + '周' : '—'}</span><span class="ov-sum-k">最忙的一周</span></div>
+  </div>
+  <div class="ov-legend">点任意一周可跳到那一周的课表 · 角标是当周节数</div>`;
+
+  el.innerHTML = head + rows.map(r => {
+    const isCur = r.w === cur, isShown = r.w === nowShown;
+    // 冷热分档：一眼看出哪几周忙。用边框/底色深浅区分，不堆更多文字。
+    const size = r.n === 0 ? 'ov-w0' : (r.n >= 20 ? 'ov-w3' : (r.n >= 14 ? 'ov-w2' : 'ov-w1'));
+    // 假期提示：整周放假就没课可列，单独给一句，别让卡片看起来像没加载出来
+    const holNote = r.holDays.length ? `<div class="ov-hol">🌕 假期：${r.holDays.join('、')}（${r.holDays.length} 天停课）</div>` : '';
+    const body = r.items.length
+      ? r.items.map(it => `<div class="ov-day">
+          <div class="ov-day-head">${it.dayName.replace('星期', '周')}${it.makeup ? ' <span class="ov-mk">补课</span>' : ''}</div>
+          ${it.cs.map(c => {
+            const t = getCurrentSchedule()[c.section];
+            return `<div class="ov-row" onclick="showCourseFull(&quot;${escAttr(c.name)}&quot;,&quot;${escAttr(c.location || '')}&quot;)">
+              <span class="ov-sec">${SEC_CN[c.section - 1]}</span>
+              <span class="ov-name">${shortCourseName(c.name)}</span>
+              <span class="ov-loc">${c.location || ''}</span>
+              <span class="ov-time">${t.start}</span>
+            </div>`;
+          }).join('')}
+        </div>`).join('')
+      : `<div class="ov-none">${r.holDays.length ? '整周假期' : '这一周没有课'}</div>`;
+
+    return `<div class="ov-card ${size}${isShown ? ' ov-shown' : ''}">
+      <div class="ov-card-head" onclick="overviewJump(${r.w})" role="button" tabindex="0">
+        <span class="ov-week">第 ${r.w} 周</span>
+        <span class="ov-range">${getWeekRange(r.w)}</span>
+        ${isCur ? '<span class="ov-now">本周</span>' : ''}
+        <span class="ov-count">${r.n} 节</span>
+      </div>
+      ${holNote}${body}
+    </div>`;
+  }).join('');
+}
+
+// 总览里点某周 → 切到那一周的周视图
+function overviewJump(w) {
+  // 走 setCourseWeek 而不是直接赋值，好让「点回本周」也回到跟随态
+  _courseWeek = (w === getCurrentWeek()) ? null : w;
+  _courseView = 'week';
+  renderCourses();
+  const el = document.getElementById('panel-courses');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderNextClassBanner() {
