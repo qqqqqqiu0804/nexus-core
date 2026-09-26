@@ -143,6 +143,74 @@ def fetch_audio(url, cookies, ytdlp_py, workdir):
 
 ASR_MODEL = 'paraformer-v2'
 
+# ---------- 成本计量（防止「意外账单」这件最讨厌的事）----------
+#
+# 为什么必须做：ASR 免费额度是 **10 小时/月**，超出后 **0.6 元/小时**。
+# 如果不计量，批量跑一个大收藏夹就可能悄悄跨过免费线开始扣钱。
+# 这里在**本地**记流水，跑到预算上限就停，不依赖云端额度查询。
+#
+# 云端额度是「每月 1 日 0 点自动重置」的，所以用量也按自然月记账。
+
+ASR_FREE_SECONDS_PER_MONTH = 10 * 3600      # 10 小时/月，每月 1 日重置
+ASR_PRICE_PER_HOUR = 0.6                    # 元/小时（超出后）
+USAGE_FILE = HERE / 'usage.json'
+
+
+def _this_month():
+    return time.strftime('%Y-%m')
+
+
+def load_usage():
+    """读本月已消耗的音频秒数。文件损坏时按 0 处理（宁可少报也不崩）。"""
+    if not USAGE_FILE.exists():
+        return {'month': _this_month(), 'asr_seconds': 0}
+    try:
+        u = json.loads(USAGE_FILE.read_text('utf-8'))
+    except Exception:
+        return {'month': _this_month(), 'asr_seconds': 0}
+    # 跨月了：额度已重置，计数器也归零
+    if u.get('month') != _this_month():
+        return {'month': _this_month(), 'asr_seconds': 0}
+    return {'month': u.get('month'), 'asr_seconds': int(u.get('asr_seconds') or 0)}
+
+
+def add_usage(seconds):
+    u = load_usage()
+    u['asr_seconds'] += int(seconds)
+    USAGE_FILE.write_text(json.dumps(u, ensure_ascii=False, indent=1), encoding='utf-8')
+    return u
+
+
+def cost_report(u):
+    """把秒数翻译成人话：用了多少 / 免费还剩多少 / 超了要花多少。"""
+    used = u['asr_seconds']
+    free = ASR_FREE_SECONDS_PER_MONTH
+    over = max(0, used - free)
+    yuan = over / 3600 * ASR_PRICE_PER_HOUR
+    return (f'本月 ASR 已用 {used/3600:.2f} 小时 / 免费 {free/3600:.0f} 小时'
+            f'（{u["month"]}）'
+            + (f'，⚠️ 已超出 {over/3600:.2f} 小时 → 约 {yuan:.2f} 元'
+               if over else f'，剩余 {free-used:.0f} 秒额度'))
+
+
+def precheck_budget(n_items, avg_seconds, budget_seconds):
+    """开跑前先估：这批要多少额度、会不会超预算。超了就拒绝启动。
+
+    avg_seconds 只能是猜（还没下载不知道时长），所以用保守值，
+    并在真正处理时按**实际**时长累加。
+    """
+    u = load_usage()
+    est = n_items * avg_seconds
+    after = u['asr_seconds'] + est
+    if budget_seconds and after > budget_seconds:
+        return (False,
+                f'按平均 {avg_seconds} 秒 × {n_items} 条估算，本月将达 '
+                f'{after/3600:.2f} 小时，超过你设的预算上限 '
+                f'{budget_seconds/3600:.2f} 小时。\n'
+                f'当前：{cost_report(u)}\n'
+                f'要么调大 --budget-seconds，要么减少条数，要么下月再跑（额度会重置）。')
+    return True, ''
+
 
 def transcribe(audio_path, api_key, public_base, model=ASR_MODEL):
     """把音频通过公网 URL 提交给 Paraformer，轮询拿文稿。
@@ -157,6 +225,7 @@ def transcribe(audio_path, api_key, public_base, model=ASR_MODEL):
     tmp_dir = Path(ASR_TMP_DIR)
     tmp_dir.mkdir(parents=True, exist_ok=True)
     dest = tmp_dir / filename
+    last_usage = {'seconds': 0}
 
     try:
         shutil.copyfile(audio_path, dest)
@@ -182,7 +251,15 @@ def transcribe(audio_path, api_key, public_base, model=ASR_MODEL):
             out = chk.get('output') or {}
             st = out.get('task_status')
             if st == 'SUCCEEDED':
-                return _extract_text(out)
+                # usage.duration 是官方给的**计费时长**（秒），拿它记账最准，
+                # 不要用文件大小或元数据里的 duration 估 —— 差一点都会算错钱。
+                last_usage['seconds'] = _usage_seconds(chk)
+                text = _extract_text(out)
+                # 记账放在这里（成功且有官方时长），不在 finally 里 ——
+                # 失败的调用不计费，记进去会虚报用量、吓到自己。
+                if last_usage['seconds']:
+                    add_usage(last_usage['seconds'])
+                return text, last_usage['seconds']
             if st == 'FAILED':
                 raise RuntimeError(
                     f'ASR 任务失败：{json.dumps(chk, ensure_ascii=False)[:400]}')
@@ -191,6 +268,14 @@ def transcribe(audio_path, api_key, public_base, model=ASR_MODEL):
     finally:
         # 不管成败，临时音频立刻删 —— 它是公网可见的，多留一秒都是风险
         dest.unlink(missing_ok=True)
+
+
+def _usage_seconds(res):
+    """从查询结果里取官方计费时长（秒）。取不到时返回 0（不瞎猜）。"""
+    try:
+        return int(((res.get('usage') or {}).get('duration')) or 0)
+    except Exception:
+        return 0
 
 
 def _extract_text(out):
@@ -303,9 +388,10 @@ def process_one(url, args, api_key):
         audio = fetch_audio(url, args.cookies, args.ytdlp, workdir)
         result['steps']['download'] = f'ok ({audio.stat().st_size} bytes)'
 
-        transcript = transcribe(audio, api_key, args.asr_public)
+        transcript, used_sec = transcribe(audio, api_key, args.asr_public)
         result['transcript_len'] = len(transcript)
-        result['steps']['asr'] = 'ok'
+        result['asr_seconds'] = used_sec
+        result['steps']['asr'] = f'ok ({used_sec}s 计费)'
         # 视频不留存：转写完立刻删
         for f in workdir.iterdir():
             f.unlink(missing_ok=True)
@@ -341,6 +427,11 @@ def main():
     ap.add_argument('--ytdlp', default=str(DEFAULT_YTDLP), help='yt-dlp 的 python 路径')
     ap.add_argument('--asr-public', default=ASR_PUBLIC_BASE,
                     help='临时音频对外的公网前缀（Paraformer 要求音频走公网 URL）')
+    ap.add_argument('--budget-seconds', type=int, default=ASR_FREE_SECONDS_PER_MONTH,
+                    help='本月 ASR 用量上限（秒），默认 = 免费额度 10 小时。'
+                         '超过就拒绝启动，防止意外扣费。传 0 表示不限制')
+    ap.add_argument('--avg-seconds', type=int, default=120,
+                    help='批量预估用的单条平均时长（秒），默认 120')
     args = ap.parse_args()
 
     api_key = os.environ.get('DASHSCOPE_API_KEY', '').strip()
@@ -367,6 +458,19 @@ def main():
         print('错误：需要 --url 或 --urls-file', file=sys.stderr)
         sys.exit(2)
 
+    # ---- 开跑前的成本闸门 ----
+    # 这一步存在的唯一理由：ASR 免费额度只有 10 小时/月，超了要花钱。
+    # 与其「跑完才发现扣钱」，不如「先算清楚、超了就停」。
+    if need_asr and args.budget_seconds:
+        ok, why = precheck_budget(len(urls), args.avg_seconds, args.budget_seconds)
+        if not ok:
+            print(f'已阻止执行（成本保护）：\n{why}', file=sys.stderr)
+            sys.exit(2)
+    if need_asr:
+        print(f'【成本】{cost_report(load_usage())}', file=sys.stderr)
+        print(f'       这批 {len(urls)} 条，预估约 '
+              f'{len(urls)*args.avg_seconds/3600:.2f} 小时\n', file=sys.stderr)
+
     out = []
     for i, u in enumerate(urls):
         print(f'[{i+1}/{len(urls)}] {u}', file=sys.stderr)
@@ -383,6 +487,8 @@ def main():
 
     ok = sum(1 for r in out if r['ok'])
     print(f'\n成功 {ok}/{len(out)}', file=sys.stderr)
+    if need_asr:
+        print(f'【成本】{cost_report(load_usage())}', file=sys.stderr)
     sys.exit(0 if ok == len(out) else 1)
 
 

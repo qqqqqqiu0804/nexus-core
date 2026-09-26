@@ -7,3 +7,6 @@ venv/
 
 # 批处理产物
 *.out.json
+
+# 成本计量流水（本地账本，不入库）
+usage.json
