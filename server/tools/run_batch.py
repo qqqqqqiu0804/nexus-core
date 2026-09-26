@@ -44,6 +44,7 @@ sys.path.insert(0, str(HERE))
 
 from video_db import VideoDB          # noqa: E402
 import douyin_pipeline as P           # noqa: E402
+from filter_noise import classify     # noqa: E402
 
 DB_PATH = HERE.parent / 'videos.db'
 ASR_TMP = Path('/var/www/asrtmp')
@@ -117,6 +118,46 @@ def probe_duration(path):
         return 0
 
 
+# ★★ 单位陷阱：采集脚本导出的 duration_ms 实际是**微秒** ★★
+#
+# 实测（用 ffprobe 对真实 CDN 流核对，三条全中）：
+#   字段 30434000 → 真实 30.43 秒   （比值 1000000）
+#   字段 52167000 → 真实 52.17 秒   （比值 1000000）
+#   字段 109400000 → 真实 109.40 秒 （比值 1000000）
+#
+# 名字叫 _ms 但单位是 _us。按毫秒读会放大 1000 倍：
+# 一条 30 秒的短视频被当成 8.5 小时，成本闸门直接失控。
+#
+# ★ 踩过的二次坑：我第一版写了「量级判断」——
+#   `if v > 3*3600*1000: v //= 1000`，想法是"超过 3 小时就肯定是微秒"。
+#   错的。15134000µs = 15.1 秒，但它 < 10,800,000 这个阈值，
+#   于是被当成 15134 毫秒留下，估算直接虚高到 6.94 小时。
+#   **单位是字段的属性，不是数值的属性** —— 不能靠量级猜，
+#   要么信字段、要么实测量。这里选择：一律按微秒，再用量级做合理性校验。
+US_PER_MS = 1000
+MAX_PLAUSIBLE_SEC = 3 * 3600     # 短视频不可能超过 3 小时
+
+
+def norm_duration_ms(raw):
+    """把采集来的 duration 归一化成毫秒。
+
+    采集脚本的 duration_ms 实测单位是微秒，统一 //1000 得到毫秒。
+    之后做一次合理性校验：若换算后仍 > 3 小时，说明单位假设错了，
+    宁可返回 0（下游会按默认 2 分钟估），也不要让一个虚高的数字
+    把成本闸门骗过去 —— 钱的事，宁小不大。
+    """
+    try:
+        v = int(raw or 0)
+    except Exception:
+        return 0
+    if v <= 0:
+        return 0
+    ms = v // US_PER_MS
+    if ms > MAX_PLAUSIBLE_SEC * 1000:
+        return 0
+    return ms
+
+
 def main():
     ap = argparse.ArgumentParser(description='批量跑采集到的收藏')
     ap.add_argument('json_file', help='篡改猴采集导出的 JSON')
@@ -134,6 +175,8 @@ def main():
     ap.add_argument('--budget-seconds', type=int, default=P.ASR_FREE_SECONDS_PER_MONTH)
     ap.add_argument('--clip', default='',
                     help='只处理前 N 秒，如 --clip 300（省钱试效果用）')
+    ap.add_argument('--keep-noise', action='store_true',
+                    help='不过滤噪音，处理全部（默认会先过滤）')
     args = ap.parse_args()
 
     key = os.environ.get('DASHSCOPE_API_KEY', '').strip()
@@ -147,6 +190,19 @@ def main():
     print('  导出时间: %s' % data.get('exported_at', '?'))
     print('  条目 %d 条，其中含播放地址 %d 条' %
           (len(items), data.get('with_url', sum(1 for i in items if i.get('play_url')))))
+
+    # ★ 单位归一化：采集脚本的 duration_ms 实际是微秒（实测比值 1000000）。
+    # 在这里统一改掉，下游（成本估算、打印、写库）就都不用再操心。
+    fixed = 0
+    for i in items:
+        raw = i.get('duration_ms') or 0
+        n = norm_duration_ms(raw)
+        if n != raw:
+            fixed += 1
+        i['duration_ms'] = n
+    if fixed:
+        print('  ⚠ 修正 %d 条时长单位（采集脚本给的是微秒，已按毫秒归一）'
+              % fixed)
     print()
 
     # 只要带地址的
@@ -154,6 +210,30 @@ def main():
     no_url = len(items) - len(usable)
     if no_url:
         print('  跳过 %d 条没有播放地址的（图文类，无音频可转写）' % no_url)
+
+    # ★ 噪音过滤 —— 必须在花钱之前跑
+    #
+    # 教训：第一版没接过滤器，直接跑前 5 条，结果 2 条 ASR 失败。
+    # 一看那 2 条正是演唱会内容 —— filter_noise 早就把它们标成
+    # 「强特征词: 演唱会」了。**过滤器就是为省这笔钱存在的，
+    # 不接上就等于白写。**
+    dropped_noise = []
+    if not args.keep_noise:
+        kept = []
+        for i in usable:
+            v = classify(i)
+            if v['keep']:
+                kept.append(i)
+            else:
+                dropped_noise.append((i, v['reason']))
+        usable = kept
+    if dropped_noise:
+        print('  过滤噪音 %d 条（不花钱、不转写）：' % len(dropped_noise))
+        for i, why in dropped_noise[:12]:
+            print('    - %s | %s' % (why, (i.get('desc') or '')[:36]))
+        if len(dropped_noise) > 12:
+            print('    ... 另有 %d 条' % (len(dropped_noise) - 12))
+    print()
 
     db = VideoDB(args.db)
 
@@ -182,15 +262,23 @@ def main():
         return 0
 
     # 成本闸门
+    #
+    # 估算依据：优先用库里的 duration_ms（已归一化），没有就按 2 分钟猜。
+    # 注意 ASR **按真实音频时长计费**，和视频声明时长可能差几秒，
+    # 所以这里只当"预估值"，最终以 DashScope 返回的 usage.duration 为准
+    # （那是真正记账用的数字）。
     est = sum((i.get('duration_ms') or 120000) / 1000 for i in todo)
     month_used = db.stats()['asr_seconds_total']
     print('\n【成本】本月已用 %.2f 小时，本批预估 %.2f 小时' %
           (month_used / 3600, est / 3600))
     if month_used + est > args.budget_seconds:
-        print('⚠️  本批会超出预算 %.1f 小时（免费额度 %d 小时/月）' %
-              (args.budget_seconds / 3600, args.budget_seconds / 3600))
-        print('    超出部分按 %.1f 元/小时计费' % P.ASR_PRICE_PER_HOUR)
+        over = (month_used + est - args.budget_seconds) / 3600
+        print('⚠️  超出预算 %.2f 小时，超出部分按 %.1f 元/小时计费（约 %.1f 元）'
+              % (over, P.ASR_PRICE_PER_HOUR, over * P.ASR_PRICE_PER_HOUR))
         print('    加 --budget-seconds 调整上限，或 --limit 减少条数')
+    else:
+        left = (args.budget_seconds - month_used - est) / 3600
+        print('    免费额度够用，跑完还剩约 %.2f 小时' % left)
     print()
 
     if args.dry_run:
