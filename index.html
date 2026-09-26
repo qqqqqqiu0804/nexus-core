@@ -232,9 +232,12 @@ body {
 
 /* === Header === */
 .header {
-  padding: 20px 0 16px;
+  /* 手机端收紧：原来 20/16 padding + 20 margin = 56px 纯留白，
+     加上两行标题共占 114px，是首屏最大的单块浪费。
+     标题在手机上价值低（从主屏点进来当然知道是哪个 App），留白更没必要。 */
+  padding: 10px 0 8px;
   border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   position: relative;
 }
 .header-title {
@@ -243,8 +246,8 @@ body {
   color: var(--text-primary);
 }
 .header-subtitle {
-  font-size:var(--fs-sm); color: var(--text-dim);
-  letter-spacing: 0.02em; margin-top: 2px;
+  font-size:var(--fs-2xs); color: var(--text-dim);
+  letter-spacing: 0.02em; margin-top: 1px;
 }
 
 /* === Panel (Content Area) === */
@@ -499,6 +502,42 @@ a { color: var(--accent); text-underline-offset: 2px; }
   border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
   box-shadow: var(--shadow-card);
 }
+/* === 紧凑（折叠时不留空）===
+   ─────────────────────────────────────────────────────────────
+   实测：8 个折叠区块合计 750px（视口才 740px），就为了显示 8 行标题。
+   单个折叠块 75~97px，其中 padding 32px + header 的下边距/下内边距/底边框 21px
+   —— 这些留白本来是给展开后的内容用的，折叠时纯属浪费。
+
+   所以只压「折叠状态」，展开后原样保留呼吸感。
+   （不要全局压扁：那样展开的正文会贴在一起，读起来更累。） */
+.daily-section.collapsible.collapsed {
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+/* 折叠时标题下面没东西了，那条分隔线和留白都没意义 */
+.daily-section.collapsible.collapsed > .section-header {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+  min-height: 26px;                 /* 保住触摸热区，别缩成点不中 */
+}
+/* 每日观点例外：折叠时要显示那句话，所以给它一点下边距 */
+.daily-section.collapsible.collapsed:has(> .sec-always-show) {
+  padding-bottom: 12px;
+}
+.daily-section.collapsible.collapsed > .sec-always-show {
+  margin-top: 8px;
+}
+
+/* === 全局紧凑开关（用户可选，展开状态也收紧）===
+   折叠压缩是「无脑受益」所以默认开；
+   展开状态压缩会牺牲阅读舒适度，所以做成可选，由 body.compact 控制。 */
+body.compact .daily-section { padding: 12px; margin-bottom: 8px; }
+body.compact .section-header { margin-bottom: 8px; padding-bottom: 6px; }
+body.compact .en-block { padding: 8px 10px; }
+body.compact .en-block + .en-block { margin-top: 6px; }
+body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bottom: 6px; }
+
 /* === 每日英语 === */
 .en-block {
   padding: 10px 12px; background: var(--bg-panel);
@@ -1291,8 +1330,8 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <button class="sync-btn" id="theme-toggle" onclick="toggleTheme()" aria-label="切换主题">
         <span id="theme-icon" class="icn" style="display:inline-flex;"></span>
       </button>
-      <!-- 字号档位：点一下切一档（标准 → 大 → 特大 → 标准）。
-           做成循环而不是弹面板，是因为手机上少点两下就少两次误触机会。 -->
+      <!-- 字号滑条入口：点开弹出 #font-panel（13–22px 连续可调）。
+           注：这里曾经是「点一下切一档」的三档循环，2026-09-26 按用户要求改成了滑条。 -->
       <button class="sync-btn" id="font-toggle" onclick="toggleFontPanel(event)" aria-label="调整字号">
         <span style="font-size:15px;font-weight:700;line-height:1;">A</span>
       </button>
