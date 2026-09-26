@@ -494,6 +494,131 @@ app.get('/api/health', wrap(() => {
   return { ok: true, lastBackup, backups, dbBytes, serverTime: Date.now() };
 }));
 
+const QUERY_POINTS = `
+  SELECT v.aweme_id, v.desc, v.author, v.url, v.tags, v.create_time,
+         s.point, s.points, s.model
+  FROM summaries s
+  JOIN videos v ON v.aweme_id = s.aweme_id
+  ORDER BY s.created_at DESC
+`;
+
+const QUERY_DAILY = `
+  SELECT v.aweme_id, v.desc, v.author, v.url, v.tags, v.create_time,
+         s.point, s.points, '' AS model
+  FROM summaries s
+  JOIN videos v ON v.aweme_id = s.aweme_id
+`;
+
+// ===== 观点库（videos.db）=====
+// 这是「收藏夹 → 转写 → 摘要」流水线的出口。数据库由 tools/run_batch.py 写，
+// 本服务只读，不碰写路径 —— 两边职责分开，跑批崩了也不会把接口带下去。
+//
+// 为什么单开一个库文件：videos.db 和 journal.db 生命周期完全不同。
+// journal 是每天都要备份的个人数据；videos.db 是可重建的衍生数据
+// （原始视频还在抖音上，重跑一遍就有）。混在一起会让每日备份白白变大。
+//
+// 只读打开：万一有 bug 想往里写，会直接报错，而不是悄悄改坏已跑好的批次。
+const VIDEOS_DB = path.resolve(process.env.VIDEOS_DB || path.join(__dirname, 'videos.db'));
+let vdb = null;
+function videosDb() {
+  if (vdb) return vdb;
+  if (!fs.existsSync(VIDEOS_DB)) return null;   // 还没跑过批：当作空库，不是故障
+  vdb = new DatabaseSync(VIDEOS_DB, { readOnly: true });
+  return vdb;
+}
+
+// 摘要里的 points 是 JSON 字符串存的（SQLite 没有数组类型），读出来要还原。
+// 解析失败返回空数组而不是抛错：单条脏数据不该把整个列表接口带崩。
+const parseList = (raw) => {
+  if (!raw) return [];
+  try { const a = JSON.parse(raw); return Array.isArray(a) ? a : []; }
+  catch { return []; }
+};
+
+// 把「摘要 + 视频元信息」的行统一转成前端要的形状。
+// 前端不认识 raw_scores / asr_seconds 这些内部字段，多传就是浪费手机流量。
+const toPoint = (r) => ({
+  aweme_id: r.aweme_id,
+  point:    r.point || '',
+  points:   parseList(r.points),
+  tags:     parseList(r.tags),
+  author:   r.author || '',
+  desc:     r.desc || '',
+  url:      r.url || ('https://www.douyin.com/video/' + r.aweme_id),
+  ts:       r.create_time ? r.create_time * 1000 : null,
+  model:    r.model || ''
+});
+
+// 「内容过短，无法提炼」是跑批对碎碎念的正常输出，不是错误 ——
+// 但它也不能算一条「观点」，不然观点库里全是空话。
+const isRealPoint = (it) => it.point && it.point.indexOf('内容过短') < 0;
+
+// GET /api/points —— 观点库列表
+//   ?limit=50   默认 50，上限 200（手机上一屏一屏加载）
+//   ?offset=0   分页
+//   ?tag=xxx    按标签过滤
+//   ?q=关键词    观点/要点/标题/作者 全文搜
+app.get('/api/points', wrap(req => {
+  const dbv = videosDb();
+  if (!dbv) return { ok: true, total: 0, items: [], tags: [], note: 'videos.db 还没生成' };
+
+  const limit  = Math.min(Number(req.query.limit) || 50, 200);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  const tag    = String(req.query.tag || '').trim();
+  const q      = String(req.query.q || '').trim();
+
+  // JOIN 两张表：只有摘要存在才算一条「观点」。
+  // 光转写还没摘要的（批量跑到一半）不该出现在这里，不然点开是空的。
+  const rows = dbv.prepare(QUERY_POINTS).all();
+
+  let items = rows.map(toPoint).filter(isRealPoint);
+
+  if (tag) items = items.filter(it => it.tags.includes(tag));
+  if (q) {
+    const k = q.toLowerCase();
+    items = items.filter(it =>
+      (it.point + ' ' + it.points.join(' ') + ' ' + it.desc + ' ' + it.author)
+        .toLowerCase().indexOf(k) >= 0);
+  }
+
+  const total = items.length;
+  return {
+    ok: true,
+    total,
+    items: items.slice(offset, offset + limit),
+    // 所有出现过的标签一次给全，前端做筛选条不用再发请求
+    tags: Array.from(new Set(items.flatMap(it => it.tags))).sort()
+  };
+}));
+
+// GET /api/points/daily —— 今日观点（「今日」页面的每日观点分享用）
+//
+// 关键：**同一天必须永远是同一条**。
+// 如果用随机数，用户下拉刷新一次就换一条，那就不叫「每日」了，叫彩票。
+// 所以用日期当种子算一个稳定下标。
+app.get('/api/points/daily', wrap(req => {
+  const dbv = videosDb();
+  if (!dbv) return { ok: true, item: null };
+
+  // 用上海时区算「今天」：服务器时区未必是东八区，
+  // 直接用本地日期的话，晚上 8 点后会跳到第二天，用户会觉得「今天」不对。
+  const date = String(req.query.date || '').trim() ||
+    new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' });
+
+  const rows = dbv.prepare(QUERY_DAILY).all();
+
+  // 挑出来的必须像「观点」：一句话太短没信息量；points 为空说明没提炼出来。
+  // 宁可今天不推，也不要推一条「（内容过短，无法提炼）」给人看。
+  const cand = rows.map(toPoint)
+    .filter(it => isRealPoint(it) && it.point.length >= 12 && it.points.length > 0);
+
+  if (!cand.length) return { ok: true, date, item: null, pool: 0 };
+
+  let h = 0;
+  for (let i = 0; i < date.length; i++) h = (h * 31 + date.charCodeAt(i)) >>> 0;
+  return { ok: true, date, item: cand[h % cand.length], pool: cand.length };
+}));
+
 // ===== 链接标题（「视频收藏」用）=====
 // GET /api/link-title?url=...
 
