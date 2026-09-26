@@ -460,6 +460,78 @@ console.log('\n【11】总览口径自检必须真的挂上（不是死代码）
     : bad('口径不一致时静默通过，问题会埋在界面里');
 }
 
+console.log('\n【12】周视图布局契约（手机上不可读的坑，用断言钉住）');
+{
+  // 这一段是线上实际出过问题的：周视图在手机上曾出现
+  //   ① 左栏「第一 大 节」被挤成一个字一行，整列拉成竖线；
+  //   ② 320px 下网格撑出页面，整页多出 9px 横向滚动；
+  //   ③ 为了塞下而把列宽压到 38px，中文课名又变成一字一行。
+  // 三类都是「CSS 看着没写错、渲染出来才发现」的问题，只能靠契约断言挡。
+  const cssStart = html.indexOf('<style>');
+  const cssEnd = html.indexOf('</style>');
+  const css = html.slice(cssStart, cssEnd);
+
+  // 抽某条规则的声明块。同一选择器可能出现多条，所以返回全部再合并判断
+  const allRules = (sel) => {
+    const re = new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}', 'g');
+    return [...css.matchAll(re)].map(m => m[1]);
+  };
+  const hasProp = (sel, prop, valRe) =>
+    allRules(sel).some(block => {
+      const m = block.match(new RegExp('(?:^|;)\\s*' + prop + '\\s*:\\s*([^;}]+)'));
+      return m && valRe.test(m[1].trim());
+    });
+
+  // ① 左栏不得再渲染「第X大节」整串 —— 30px 宽放不下，硬塞会一字一行
+  /<span class="week-sec-idx">/.test(html)
+    ? ok('左栏用序号 span（week-sec-idx），不再塞「第X大节」整串')
+    : bad('左栏又变回「第X大节」整串了，窄屏会被挤成一字一行');
+  /第\$\{SEC_CN\[s - 1\]\}大节<br>/.test(html)
+    ? bad('周视图左栏又写成「第X大节<br>」，会重现竖排乱码')
+    : ok('周视图左栏没有退回「第X大节<br>」写法');
+  /aria-label="第\$\{SEC_CN\[s - 1\]\}大节/.test(html)
+    ? ok('完整读法保留在 aria-label（读屏仍读得到）')
+    : bad('序号缩了但 aria-label 没补，信息只剩一个「一」');
+
+  // ② 必须有可横向滚动的外壳，且网格 min-width:0（否则 1fr 缩不下去会撑破页面）
+  /class="week-scroll"/.test(html)
+    ? ok('周视图包在 .week-scroll 外壳里')
+    : bad('没有 .week-scroll，窄屏上网格会撑破整页');
+  hasProp('.week-scroll', 'overflow-x', /(auto|scroll)/)
+    ? ok('.week-scroll overflow-x 可滚')
+    : bad('.week-scroll 不能横向滚动，最后一列够不着');
+
+  // ③ 列宽下限必须 ≥41px：低于这个值中文课名会退化成一字一行
+  const gridBlocks = allRules('.week-grid');
+  const colsDecl = gridBlocks.map(b => (b.match(/grid-template-columns\s*:\s*([^;}]+)/) || [])[1]).find(Boolean);
+  if (!colsDecl) {
+    bad('找不到 .week-grid 的 grid-template-columns');
+  } else {
+    const minm = colsDecl.match(/minmax\(\s*(\d+)px/);
+    const min = minm ? Number(minm[1]) : 0;
+    if (min >= 41) ok(`列宽下限 ${min}px ≥ 41px（课名不会退化成一字一行）`);
+    else bad(`列宽下限只有 ${min}px，中文课名会变成一字一行`);
+    /repeat\(\s*7\s*,/.test(colsDecl) ? ok('仍是 7 天 ×1 组') : bad('列定义不再是 7 天');
+  }
+
+  // ④ 课名不得用 break-all —— 那是「一字一行」的直接元凶
+  const cellBlocks = allRules('.week-cell-course');
+  const wb = cellBlocks.map(b => (b.match(/word-break\s*:\s*([^;}]+)/) || [])[1]).find(Boolean);
+  (wb && wb.trim() === 'break-all')
+    ? bad('.week-cell-course 又用了 word-break:break-all，中文会一字一行')
+    : ok('.week-cell-course 未使用 break-all');
+  cellBlocks.some(b => /overflow-wrap\s*:\s*anywhere/.test(b))
+    ? ok('长英文课名用 overflow-wrap:anywhere 兜底')
+    : bad('缺 overflow-wrap:anywhere，长英文课名会溢出格子');
+
+  // ⑤ 左栏时间串必须走令牌，且不得低于 12px（mobile-audit 会拦，这里先自检）
+  const timeBlocks = allRules('.week-sec-time');
+  const fsDecl = timeBlocks.map(b => (b.match(/font-size\s*:\s*([^;}]+)/) || [])[1]).find(Boolean) || '';
+  /var\(--fs-/.test(fsDecl)
+    ? ok('左栏时间字号用 --fs-* 令牌')
+    : bad(`左栏时间字号没走令牌：「${fsDecl.trim()}」（会被 mobile-audit 判失败）`);
+}
+
 console.log('\n────────────────────────');
 console.log(`通过 ${pass} 项，失败 ${fail} 项`);
 process.exit(fail === 0 ? 0 : 1);

@@ -1024,15 +1024,40 @@ a { color: var(--accent); text-underline-offset: 2px; }
 .course-meta { font-size:var(--fs-xs); color:var(--text-dim); margin-top:3px; }
 .course-countdown { font-size:var(--fs-xs); color:var(--success); white-space:nowrap; }
 .course-empty { text-align:center; color:var(--text-dim); padding:24px 0; font-size:var(--fs-base); }
-.week-grid { display:grid; grid-template-columns: 52px repeat(7,1fr); gap:4px; font-size:var(--fs-xs); }
+/* 周视图的外层滚动壳。
+   为什么需要它：7 天 + 左栏的最小内容宽度加起来约 420px，320px 的机器上
+   可用只有 272px（320 − 两侧各 12 的 app-container padding − 两侧各 12 的面板 padding）。
+   1fr 缩不到比 min-content 更窄，网格就会自己撑出去，把整页顶出横向滚动条
+   （body 虽有 overflow-x:hidden，documentElement.scrollWidth 仍会超出 innerWidth，属于真溢出）。
+   这里给它一个能滚的壳：装得下就铺满、看不见滚动；装不下时横向滑动看全 7 天，
+   而不是让整页左右晃。
+
+   列宽为什么是 41px 这个下限：390px 是最常见的手机宽度，减去 app-container 和面板
+   两侧各 12 的内边距，可用 342px；扣掉 30px 左栏和 6 道 3px 间隙（共 18px），
+   剩 294px / 7 天 = 42px，取 41px 留 1px 余量，保证 390px 既不滚动也不溢出。
+   宽一点的机器（430+）自然涨到 46px 上下。
+   再往下压（试过 38px）中文课名就变成一个字一行，格子被拉高、反而更难读；
+   小于 ~380px 时才启用横向滚动，宁可滑一下也要保住课名可读。
+   间隙用 3px 而不是 4px：4px 时 7 列共多出 6px，390px 上正好把网格顶到 341 > 340 又开始滚。 */
+.week-scroll { overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; }
+.week-grid { display:grid; grid-template-columns: 30px repeat(7,minmax(41px,1fr)); gap:3px; font-size:var(--fs-xs); min-width:0; }
 .week-corner { }
-.week-head { text-align:center; color:var(--accent); padding:6px 0; font-weight:600; }
+.week-head { text-align:center; color:var(--accent); padding:6px 0; font-weight:600; white-space:nowrap; }
 /* 表头日期：翻到第 13 周时光看「周一…周日」不知道是哪几天，补上 M/D */
 .week-head-date { display:block; font-size:var(--fs-2xs); font-weight:400; color:var(--text-dim); font-family:var(--font-mono); margin-top:1px; }
+/* 左栏原来写「第一 大 节」，52px 放不下就一个字一行，6 个大节各占 10 行，
+   整列被拉成一条竖线。改成只留序号「一」，完整说法交给 aria-label（读屏仍读得到）。 */
 .week-sec { background:var(--bg-card); border-radius:6px; padding:6px 2px; text-align:center; color:var(--text-secondary); line-height:1.2; }
-.week-sec-time { font-size:var(--fs-2xs); color:var(--text-dim); font-family:var(--font-mono); }
+.week-sec-idx { display:block; font-size:var(--fs-sm); font-weight:600; color:var(--text-secondary); }
+/* 时间串「08:10-09:50」在 30px 左栏里横着放不下（等宽字体下要 65~77px）。
+   让它按 word-break 换行成几段，比 nowrap 被裁掉强 —— 裁掉等于时间看不见，
+   那是信息丢失，不是排版问题。
+   字号必须用 --fs-2xs 令牌：曾写过 0.625rem(10px)，既绕过了令牌体系，
+   也低于套件强制的 12px 下限，被 mobile-audit 判失败。
+   反正 65px 的串在 26px 里怎么都要换行，12px 与 10px 的行数一样，没有理由再用 10px。 */
+.week-sec-time { display:block; font-size:var(--fs-2xs); color:var(--text-dim); font-family:var(--font-mono); line-height:1.1; word-break:break-all; }
 .week-cell { background:var(--bg-card); border-radius:6px; min-height:46px; padding:4px; }
-.week-cell-course { background:color-mix(in srgb, var(--accent) 8%, transparent); border:1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius:4px; padding:4px; margin-bottom:3px; color:var(--text-primary); line-height:1.2; word-break:break-all; }
+.week-cell-course { background:color-mix(in srgb, var(--accent) 8%, transparent); border:1px solid color-mix(in srgb, var(--accent) 20%, transparent); border-radius:4px; padding:4px; margin-bottom:3px; color:var(--text-primary); line-height:1.25; word-break:normal; overflow-wrap:anywhere; }
 .week-cell-loc { font-size:var(--fs-2xs); color:var(--text-dim); }
 .daily-next-class { background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:12px; font-size:var(--fs-sm); color:var(--accent); cursor:pointer; }
 
@@ -8138,7 +8163,7 @@ function renderCourseWeek(week) {
   const el = document.getElementById('course-week-view');
   const days = DAY_NAMES.slice(1).concat(['星期日']);
   const dates = getWeekDates(week);
-  let html = '<div class="week-grid"><div class="week-corner"></div>';
+  let html = '<div class="week-scroll"><div class="week-grid"><div class="week-corner"></div>';
   days.forEach((d, i) => {
     const hol = holidayForDate(dates[i]);
     const makeup = MAKEUP_DAYS[localDate(dates[i])];
@@ -8149,7 +8174,9 @@ function renderCourseWeek(week) {
   });
   for (let s = 1; s <= 6; s++) {
     const st = getCurrentSchedule();
-    html += `<div class="week-sec">第${SEC_CN[s - 1]}大节<br><span class="week-sec-time">${st[s].start}-${st[s].end}</span></div>`;
+    // 左栏只留序号：38px 宽放不下「第一 大 节」，硬塞会一个字一行。
+    // 完整读法放 aria-label，读屏和长按选中都还能拿到。
+    html += `<div class="week-sec" aria-label="第${SEC_CN[s - 1]}大节 ${st[s].start} 至 ${st[s].end}"><span class="week-sec-idx">${SEC_CN[s - 1]}</span><span class="week-sec-time">${st[s].start}-${st[s].end}</span></div>`;
     days.forEach((d, i) => {
       const hol = holidayForDate(dates[i]);
       const cs = hol ? [] : getCourses().filter(c => c.day === d && c.section === s && courseMatches(c, week));
@@ -8159,7 +8186,7 @@ function renderCourseWeek(week) {
       html += `<div class="week-cell${hol ? ' week-cell-holiday' : ''}">${inner}</div>`;
     });
   }
-  html += '</div>';
+  html += '</div></div>';
   el.innerHTML = html;
 }
 
