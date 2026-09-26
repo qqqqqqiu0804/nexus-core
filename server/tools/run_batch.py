@@ -9,10 +9,12 @@
 
 设计要点：
 
-1. **只下音频，不下视频**
-   实测：18.8 分钟视频 = 116MB，抽音频后 9.3MB（12.5x）。
-   但抖音只给视频流地址，所以必须「下载视频 → 立刻抽音频 → 删视频」。
-   下载期间磁盘峰值 = 单个视频大小，处理完立即释放。
+1. **不落地视频文件，ffmpeg 直接从网络流抽音频**
+   抖音只给视频流地址（`mime_type=video_mp4`），拿不到纯人声轨道，
+   所以「直接下音频」在抖音这儿不存在。但**不必把视频先存下来**：
+   ffmpeg 自己就是下载器，`-i <URL> -vn` 边读边丢视频数据，只留音频。
+   实测 18.8 分钟视频 = 116MB，产出音频 9.3MB，**全程磁盘零峰值**。
+   改之前是「curl 下完整 116MB → 写盘 → 再读回 → 抽音频」，多一轮 I/O。
 
 2. **每条独立 try，一条失败不影响其他**
    长跑任务最怕「跑到第 30 条崩了，前 29 条白跑」。
@@ -49,49 +51,70 @@ UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
       'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
 
 
-def download_audio(url, workdir, timeout=300):
-    """下载视频 → 抽音频 → 删视频。返回音频路径。
+def extract_audio(url, workdir, timeout=300, clip=None):
+    """ffmpeg 直接从 CDN 流里抽音频 —— 视频数据不落盘。
+
+    url   : CDN 直链（video_mp4 流，含人声）
+    clip  : (start_sec, duration_sec) 只处理片段，None = 全部
+            用途：长视频可以只转写前 N 分钟先看效果，省钱。
+
+    返回 (音频路径, 音频时长秒, 拉取字节数)。
 
     为什么不用 yt-dlp：实测 yt-dlp 对抖音必 403（它走详情接口，需要签名）。
-    而 CDN 直链**不需要签名**，curl 带上 Referer 就能下。
+    而 CDN 直链**不需要签名**，带上 UA + Referer 就能拿（实测支持 Range，206）。
+
+    为什么不再 curl 落盘：抖音的音频和画面在同一条流里，要拿到人声
+    就必须经过这条流。但「经过」不等于「存下来」—— ffmpeg 的
+    http 输入是流式的，`-vn` 读到音频轨结束就收工，视频字节边读边丢。
+    结果：磁盘占用从「峰值 116MB」降到「全程 ~9MB」，也省掉一轮写读 I/O。
     """
-    mp4 = workdir / 'v.mp4'
     m4a = workdir / 'v.m4a'
 
-    p = subprocess.run([
-        'curl', '-s', '-L', '--max-time', str(timeout),
-        '-o', str(mp4),
-        '-H', 'User-Agent: ' + UA,
-        '-H', 'Referer: https://www.douyin.com/',
-        url,
-    ], capture_output=True, text=True)
+    cmd = [
+        'ffmpeg', '-y',
+        '-nostdin',                      # 别等 stdin，否则被 ssh 挂住
+        '-user_agent', UA,               # ffmpeg 原生支持，不用额外头文件
+        '-headers', 'Referer: https://www.douyin.com/\r\n',
+        '-rw_timeout', str(timeout * 1000 * 1000),   # 微秒；网络卡死时能退出
+    ]
+    if clip:
+        cmd += ['-ss', str(clip[0]), '-t', str(clip[1])]
+    cmd += ['-i', url, '-vn', '-c:a', 'aac', '-b:a', '64k',
+            '-movflags', '+faststart', str(m4a)]
 
-    if not mp4.exists() or mp4.stat().st_size < 10000:
-        # 分情况给提示，别让用户猜
-        raise RuntimeError('下载失败（%d 字节）—— 地址可能已过期，请重新采集'
-                           % (mp4.stat().st_size if mp4.exists() else 0))
-
-    # 抽音频：体积小 12 倍，ASR 上传也快
-    r = subprocess.run([
-        'ffmpeg', '-y', '-i', str(mp4), '-vn',
-        '-c:a', 'aac', '-b:a', '64k', str(m4a),
-    ], capture_output=True, text=True)
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 60)
 
     if not m4a.exists() or m4a.stat().st_size < 1000:
-        raise RuntimeError('抽音频失败：%s' % (r.stderr or '')[-200:])
+        # 把 ffmpeg 的真实报错挖出来。403 / 过期在这里能看出来，
+        # 别吞掉错误信息让调用方猜。
+        err = (r.stderr or '')
+        hint = ''
+        for line in err.splitlines():
+            if any(k in line for k in ('403', 'Forbidden', '404', 'Not Found',
+                                       'Server returned', 'Invalid data')):
+                hint = line.strip()[:160]
+                break
+        last = err.strip().splitlines()[-1][:200] if err.strip() else '无输出'
+        raise RuntimeError('抽音频失败%s：%s' %
+                           ('（%s）' % hint if hint else '', last))
 
-    vsecs = 0
+    secs = probe_duration(m4a)
+    try:
+        size = m4a.stat().st_size
+    except OSError:
+        size = 0
+    return m4a, secs, size
+
+
+def probe_duration(path):
+    """读媒体时长（秒）。取不到返回 0 —— 不瞎猜。"""
     try:
         pr = subprocess.run(['ffprobe', '-v', 'error', '-show_entries',
                              'format=duration', '-of', 'default=nw=1:nk=1',
-                             str(mp4)], capture_output=True, text=True)
-        vsecs = float((pr.stdout or '0').strip() or 0)
+                             str(path)], capture_output=True, text=True, timeout=30)
+        return float((pr.stdout or '0').strip() or 0)
     except Exception:
-        pass
-
-    # 立刻删视频，省磁盘
-    mp4.unlink(missing_ok=True)
-    return m4a, vsecs
+        return 0
 
 
 def main():
@@ -109,6 +132,8 @@ def main():
     ap.add_argument('--dry-run', action='store_true', help='只列出来，不跑')
     ap.add_argument('--delay', type=float, default=2.0, help='每条之间间隔秒')
     ap.add_argument('--budget-seconds', type=int, default=P.ASR_FREE_SECONDS_PER_MONTH)
+    ap.add_argument('--clip', default='',
+                    help='只处理前 N 秒，如 --clip 300（省钱试效果用）')
     args = ap.parse_args()
 
     key = os.environ.get('DASHSCOPE_API_KEY', '').strip()
@@ -188,8 +213,11 @@ def main():
         work = Path(tempfile.mkdtemp(prefix='dy-b-'))
         public = None
         try:
-            audio, vsecs = download_audio(it['play_url'], work)
-            print('       下载+抽音频 OK（%.1f MB）' % (audio.stat().st_size / 1024 / 1024))
+            clip = (0, float(args.clip)) if args.clip else None
+            audio, asecs, abytes = extract_audio(it['play_url'], work, clip=clip)
+            print('       抽音频 OK（%.1f MB / %.1f 分钟%s）' %
+                  (abytes / 1024 / 1024, asecs / 60,
+                   '，只取前 %s 秒' % args.clip if clip else ''))
 
             token = secrets.token_hex(12)
             public = ASR_TMP / (token + '.m4a')

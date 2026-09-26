@@ -36,12 +36,30 @@ agent_created: true
 ```
 用户浏览器采集（含 CDN 播放地址）  ← 唯一能拿到视频的入口
   → 导出 JSON → 粘给我
-  → run_batch.py：下载 → 抽音频(删视频) → ASR → LLM → 入库
+  → run_batch.py：流式抽音频 → ASR → LLM → 入库
 ```
 
-**CDN 直链服务器可直接下**：`curl` 带 `Referer: https://www.douyin.com/` 即可，
-**不需要签名、不需要 cookie**。
+**CDN 直链服务器可直接下**：带 `Referer: https://www.douyin.com/` 即可，
+**不需要签名、不需要 cookie**。实测支持 Range 请求（`206`）。
 > 别用 `aweme/v1/play/` 接口 —— 返回 200 但 0 字节（是 302 入口）。
+
+**「直接下音频」在抖音不存在 —— 但也不必把视频落盘**（容易搞错的一点）：
+- 抖音只给 `mime_type=video_mp4` 的流，**人声和画面在同一条流里**，没有纯人声轨道。
+- 导出里的 `*.douyinstatic.com/.../*.mp3` 是**背景音乐**，不是人说话的声音，
+  拿去转写会得到空文本（或 `SUCCESS_WITH_NO_VALID_FRAGMENT`）。
+- 正确做法：**让 ffmpeg 直接吃 URL**，`-vn` 丢视频轨，边读边丢、视频不落盘：
+  ```bash
+  ffmpeg -y -nostdin -user_agent "<UA>" \
+         -headers "Referer: https://www.douyin.com/\r\n" \
+         -i "$URL" -vn -c:a aac -b:a 64k out.m4a
+  ```
+  `-nostdin` 必须加，否则 ffmpeg 会等 stdin 把 ssh 挂住。
+  实测 15 秒视频耗时 1.1 秒，磁盘上只有 `v.m4a`，没有 mp4。
+- 附带收益：**报错更准**。旧写法（curl 落盘）过期地址只能报「0 字节」，
+  新写法直接报 `HTTP error 403 Forbidden`。
+
+> 早期版本是「curl 下完整 mp4 → 写盘 → ffmpeg 读回来抽音频」，能用但多一轮 I/O，
+> 且磁盘峰值 = 视频大小（18.8 分钟 ≈ 116MB）。已改为流式。
 
 ## 三、用户侧操作（5 分钟）
 
@@ -57,13 +75,17 @@ agent_created: true
 
 ```bash
 cd /root/nexus-core/server/tools
-export DASHSCOPE_API_KEY=$(grep -oP "DASHSCOPE_API_KEY=\K.*" ../.env)
+set -a && . /root/nexus-core/server/.env && set +a   # key 在 ../.env，不是 /root/.env
 
-./venv/bin/python db_status.py                              # 看库状态
-./venv/bin/python run_batch.py x.json --collection "名字" --dry-run
-./venv/bin/python run_batch.py x.json --collection "名字" --limit 5
-./venv/bin/python run_batch.py x.json --summary-model deepseek-v4.1-flash
+python3 db_status.py                                # 看库状态
+python3 run_batch.py x.json --collection "名字" --dry-run
+python3 run_batch.py x.json --collection "名字" --limit 5
+python3 run_batch.py x.json --collection "名字" --clip 300   # 只转写前 5 分钟（省钱）
+python3 run_batch.py x.json --summary-model deepseek-v4.1-flash
 ```
+
+**key 的位置别猜**：`/root/nexus-core/server/.env`，且用 `set -a; . .env` 加载。
+`grep -oP` 取出来会掺进引号，容易把 116 字符的 key 搞坏。
 
 **长任务必须脱离 ssh**（`nohup &` 会随连接被杀）：
 ```bash
@@ -87,6 +109,20 @@ setsid nohup ./venv/bin/python run_batch.py x.json < /dev/null > /tmp/b.log 2>&1
 
 **省钱的核心机制**：转写按 `aweme_id` 存，`get_transcript()` 非 None 就跳过 ASR。
 换摘要模型时**不重付 ASR**（ASR 0.6 元/时 vs LLM 每百万 token 几毛钱）。
+
+**长视频不见得要看全部**：`--clip 300` 只转写前 5 分钟。
+判断「这条值不值得全转」用它 —— 界面全是知识类，前 5 分钟的信息量就够了。
+
+## 五之二、已验证事实（可放心引用）
+
+| 事实 | 验证方式 |
+|---|---|
+| CDN 支持 Range | `curl -r 0-200000` → `206`，`size=200001` |
+| ffmpeg 能直读 https | `ffmpeg -protocols` 输出含 `https` / `tls` |
+| 流式抽音频不落 mp4 | 抽完目录里只有 `v.m4a`（8 项断言全过）|
+| clip 生效 | `--clip 5` → 5.0 秒 / 42KB（原 15.1 秒）|
+| 过期地址报 403 | `HTTP error 403 Forbidden`（不是「0 字节」）|
+| 人声和画面同流 | 导出的 `.mp3` 是 BGM；`video_mp4` 才是含人声的 |
 
 ## 六、模型选择（实测）
 
