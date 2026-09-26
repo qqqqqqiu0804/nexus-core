@@ -195,25 +195,9 @@ body {
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 .card:hover { border-color: var(--accent-line); }
-.card-header {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 8px;
-}
 .card-title {
   font-size:var(--fs-base); font-weight: 600;
   color: var(--text-primary);
-}
-.card-subtitle { font-size:var(--fs-sm); color: var(--text-dim); }
-
-/* === Progress Bar === */
-.progress-bar {
-  height: 6px; background: var(--bg-deep); border-radius: 3px;
-  overflow: hidden; margin: 8px 0;
-}
-.progress-fill {
-  height: 100%; border-radius: 3px;
-  background: var(--accent);
-  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* === Status Badge === */
@@ -221,13 +205,6 @@ body {
   display: inline-block; padding: 2px 8px; border-radius: 999px;
   font-size:var(--fs-2xs); font-weight: 500;
 }
-.badge-cyan { background: var(--accent-soft); color: var(--accent); }
-.badge-magenta { background: color-mix(in srgb, var(--accent-2) 14%, transparent); color: var(--accent-2); }
-.badge-green { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); }
-.badge-yellow { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
-.badge-red { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
-.badge-purple { background: color-mix(in srgb, var(--violet) 14%, transparent); color: var(--violet); }
-.badge-orange { background: color-mix(in srgb, var(--orange) 14%, transparent); color: var(--orange); }
 
 /* === Buttons === */
 .btn {
@@ -272,10 +249,6 @@ label {
 .form-row { display: flex; gap: 12px; }
 .form-row .form-group { flex: 1; }
 
-/* === Grid Layouts === */
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-
 /* === Stats Row === */
 .stats-row {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -293,10 +266,6 @@ label {
 
 /* === Level Display === */
 
-
-
-
-.level-xp { font-size:var(--fs-xs); color: var(--text-dim); margin-top: 4px; }
 
 /* === Task List === */
 .task-item {
@@ -371,14 +340,6 @@ label {
 }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 
-/* === Charts Area === */
-.chart-container {
-  background: var(--bg-card); border: 1px solid var(--border-subtle);
-  border-radius: 6px; padding: 16px; margin-bottom: 12px;
-  min-height: 200px; position: relative;
-}
-.chart-container canvas { width: 100%; }
-
 /* === Toast === */
 .toast-container {
   position: fixed; top: 16px; right: 16px; z-index: 200;
@@ -425,23 +386,23 @@ a { color: var(--accent); text-underline-offset: 2px; }
   transition: border-color 0.15s, color 0.15s;
 }
 .sync-btn:hover { border-color: var(--accent); color: var(--accent); }
-.sync-btn.synced { border-color: color-mix(in srgb, var(--success) 40%, transparent); color: var(--success); }
 .sync-btn.syncing { border-color: color-mix(in srgb, var(--warn) 40%, transparent); color: var(--warn); }
 .sync-btn.error { border-color: color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger); }
 .srv-dot { width:7px; height:7px; border-radius:50%; background:var(--text-dim); display:inline-block; flex:none; }
 .srv-dot.ok { background:var(--success); box-shadow:0 0 6px var(--success); }
 .srv-dot.err { background:#e5484d; }
-.sync-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: currentColor; animation: syncPulse 2s infinite;
-}
-@keyframes syncPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-.checkbox-label {
-  display: flex; align-items: center; gap: 8px;
-  font-family: var(--font-sans); font-size:var(--fs-sm);
-  cursor: pointer; letter-spacing: 0;
-}
-.checkbox-label input[type="checkbox"] { width: auto; margin: 0; }
+
+/* === 排版工具类 ===
+   这几组「字号 + 颜色」的组合在标记里重复了 40 多次（最多的一个出现 11 次）。
+   抽成类之后，改设计令牌只需动一处，也省掉了大段重复的内联 style。
+   命名：t- = text 排版；只收录**重复 ≥3 次**的组合，一次性写法保持内联。 */
+.t-dim-xs  { font-size:var(--fs-xs);   color:var(--text-dim); }
+.t-dim-2xs { font-size:var(--fs-2xs);  color:var(--text-dim); }
+.t-dim-sm  { font-size:var(--fs-sm);   color:var(--text-dim); }
+.t-sec-sm  { font-size:var(--fs-sm);   color:var(--text-secondary); }
+.t-pri-base{ font-size:var(--fs-base); color:var(--text-primary); }
+/* 表单里的「标题 + 输入框」小标签，之前每处都内联了 display:block 等 */
+.t-field-label { font-size:var(--fs-xs); color:var(--text-dim); display:block; margin-bottom:4px; }
 
 /* === Daily Hub Styles === */
 .daily-date-header {
@@ -788,7 +749,6 @@ a { color: var(--accent); text-underline-offset: 2px; }
 
 /* === Responsive === */
 @media (max-width: 768px) {
-  .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .form-row { flex-direction: column; gap: 0; }
   .stats-row { grid-template-columns: repeat(2, 1fr); }
   .header-title { font-size:var(--fs-lg); }
@@ -927,7 +887,6 @@ a { color: var(--accent); text-underline-offset: 2px; }
   margin: 8px 0 12px;
   font-variant-numeric: tabular-nums;
 }
-.wallet-balance-actions { position: relative; }
 
 .wallet-stats-row {
   display: grid;
@@ -1196,6 +1155,20 @@ a { color: var(--accent); text-underline-offset: 2px; }
       </div>
     </div>
 
+    <!-- ⑤ 随手记（输入入口）—— 紧贴饮食下方，属于「记一笔」的连续动作
+         记录内容本身在下方「当日记录」里展示，这里只放写入口，避免长列表顶开下面 -->
+    <div class="daily-section" id="sec-journal-input">
+      <div class="section-header">
+        <span class="section-title">随手记</span>
+        <span id="journal-input-hint" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-dim);"></span>
+      </div>
+      <textarea id="daily-journal" placeholder="记一句…（Ctrl/⌘ + Enter 直接存）" style="min-height: 56px;" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter')addJournalItem()"></textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:6px;">
+        <button class="btn btn-sm btn-primary" onclick="addJournalItem()">记下</button>
+      </div>
+      <div id="journal-sync-hint" style="display:none;font-size:var(--fs-2xs);color:var(--warn);margin-top:6px;line-height:1.5;"></div>
+    </div>
+
     <!-- ⑦ Today Expense -->
     <div class="daily-section collapsible" id="sec-expense" style="cursor: pointer;" onclick="switchTab('data')">
       <div class="section-header">
@@ -1227,23 +1200,20 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div class="daily-section collapsible" id="sec-chess">
       <div class="section-header">
         <span class="section-title">每日残局</span>
-        <span id="daily-chess-hint" style="font-size:var(--fs-xs);color:var(--text-dim);"></span>
+        <span id="daily-chess-hint" class="t-dim-xs"></span>
       </div>
       <div id="daily-chess-body"></div>
     </div>
 
-    <!-- ⑧ Journal（随手记：一天可多条，Ctrl/⌘+Enter 或点按钮即存）-->
-    <div class="daily-section">
+    <!-- ⑪ 当日记录（随手记的内容展示区）
+         写入口在上方「饮食记录」下面；这里只展示今天已记的内容。
+         放在最底部是有意的：列表会随记录条数变长，压在最下面就不会挤占上面各模块。 -->
+    <div class="daily-section" id="sec-journal-today">
       <div class="section-header">
-        <span class="section-title">随手记</span>
+        <span class="section-title">当日记录</span>
         <span id="journal-today-count" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-dim);"></span>
       </div>
-      <textarea id="daily-journal" placeholder="记一句…" style="min-height: 56px;" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter')addJournalItem()"></textarea>
-      <div style="display:flex;justify-content:flex-end;margin-top:6px;">
-        <button class="btn btn-sm btn-primary" onclick="addJournalItem()">记下</button>
-      </div>
-      <div id="journal-today-list" style="margin-top:10px;font-size:var(--fs-sm);color:var(--text-secondary);line-height:1.9;"></div>
-      <div id="journal-sync-hint" style="display:none;font-size:var(--fs-2xs);color:var(--warn);margin-top:6px;line-height:1.5;"></div>
+      <div id="journal-today-list" style="font-size:var(--fs-sm);color:var(--text-secondary);line-height:1.9;"></div>
     </div>
 
   </div>
@@ -1276,6 +1246,18 @@ a { color: var(--accent); text-underline-offset: 2px; }
         </div>
         <button class="btn btn-primary btn-sm" onclick="importCourses()" style="padding:4px 12px;"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true" style="width:1em;height:1em;vertical-align:-0.15em;stroke:currentColor;"><path d="M12 4v10M8.5 10.5 12 14l3.5-3.5M5 19h14"/></svg> 导入/更新课表</button>
       </div>
+
+      <!-- 作息季节：默认按日期自动套用，也可手动锁定以预览另一套作息的时间。
+           注意 #schedule-mode-group 是 renderScheduleModeButtons() 的目标 ——
+           删掉这个容器会让那函数静默失效、setScheduleOverride 变成不可达代码。 -->
+      <div style="font-size:var(--fs-xs);color:var(--text-dim);margin:4px 0 10px;line-height:1.5;">
+        默认按日期自动套用（5–9 月夏季，其余春秋冬季）。可手动锁定某套作息以预览课表时间。
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;" id="schedule-mode-group">
+        <button class="btn btn-sm" data-mode="auto" onclick="setScheduleOverride('auto')" style="padding:4px 12px;">自动</button>
+        <button class="btn btn-sm" data-mode="summer" onclick="setScheduleOverride('summer')" style="padding:4px 12px;">夏季</button>
+        <button class="btn btn-sm" data-mode="standard" onclick="setScheduleOverride('standard')" style="padding:4px 12px;">春秋冬季</button>
+      </div>
     </details>
 
   </div>
@@ -1303,22 +1285,22 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div onclick="openInvest('cash')" style="cursor:pointer;padding:8px 0;min-height:44px;display:flex;flex-direction:column;justify-content:center;">
         <div class="wallet-balance-label">可用现金 <span style="opacity:0.5;">›</span></div>
         <div class="wallet-balance-amount" id="wallet-balance">¥ 0.00</div>
-        <div id="wallet-cash-sub" style="font-size:var(--fs-2xs);color:var(--text-dim);">点进去看每一笔明细 ›</div>
+        <div id="wallet-cash-sub" class="t-dim-2xs">点进去看每一笔明细 ›</div>
       </div>
       <!-- 投资市值 = 台账里所有持仓的市值之和（点进去看明细 / 收益率 / 回本还差多少）。
            以前这里是个手填的数字，回答不了"赚了还是亏了"；现在改成台账汇总。 -->
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border-subtle);cursor:pointer;"
            onclick="openInvest()">
         <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
-          <span style="font-size:var(--fs-xs);color:var(--text-dim);">投资市值</span>
+          <span class="t-dim-xs">投资市值</span>
           <span id="wallet-invest" style="font-size:var(--fs-md);color:var(--text-secondary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;">¥ 0.00</span>
-          <span style="font-size:var(--fs-xs);color:var(--text-dim);">›</span>
+          <span class="t-dim-xs">›</span>
         </div>
         <div id="wallet-invest-sub" style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:5px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;"></div>
       </div>
       <!-- 现金 + 投资市值 的总和 -->
       <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px dashed var(--border-subtle);">
-        <span style="font-size:var(--fs-xs);color:var(--text-dim);">总资产</span>
+        <span class="t-dim-xs">总资产</span>
         <span id="wallet-total" style="font-size:var(--fs-xl);font-weight:700;color:var(--text-primary);font-family:var(--font-mono);font-variant-numeric:tabular-nums;">¥ 0.00</span>
       </div>
     </div>
@@ -1347,7 +1329,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div id="budget-section" style="display:none;margin-bottom:16px;">
       <div class="card" style="padding:14px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <span style="font-size:var(--fs-base);color:var(--text-primary);">本月预算</span>
+          <span class="t-pri-base">本月预算</span>
           <button class="btn btn-sm" onclick="setBudget()" style="padding:2px 10px;font-size:var(--fs-xs);">设置</button>
         </div>
         <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:var(--fs-sm);">
@@ -1363,7 +1345,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div style="margin-bottom:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
         <span class="section-title">快速记账</span>
-        <span style="font-size:var(--fs-2xs);color:var(--text-dim);">点分类 → 输金额</span>
+        <span class="t-dim-2xs">点分类 → 输金额</span>
       </div>
       <div class="quick-add" id="quick-cats"></div>
       <div id="quick-input-row" style="display:none;margin-top:8px;gap:8px;align-items:center;">
@@ -1410,7 +1392,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <!-- 交易复盘 (投资思考日记) -->
     <div class="section-header" style="margin-top: 16px;">
       <span class="section-title">交易复盘</span>
-      <span style="font-size:var(--fs-xs);color:var(--text-dim);">记录你的投资思考</span>
+      <span class="t-dim-xs">记录你的投资思考</span>
     </div>
     <div class="card">
       <textarea id="invest-journal" placeholder="今天对市场/基金/股票有什么想法？记录下来方便以后回顾..." style="min-height:100px;" oninput="saveInvestJournal()"></textarea>
@@ -1464,7 +1446,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div class="daily-date-header" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:20px;margin:16px 0;">
       <div>
         <div style="font-size:var(--fs-3xl);font-weight:bold;color:var(--text-primary);margin:4px 0;">每日统计</div>
-        <div style="font-size:var(--fs-sm);color:var(--text-dim);">打卡合集 · <span id="history-year"></span></div>
+        <div class="t-dim-sm">打卡合集 · <span id="history-year"></span></div>
       </div>
       <div style="text-align:right;">
         <div id="history-total-days" style="font-family:var(--font-mono);font-size:var(--fs-hero);color:var(--text-dim);opacity:0.3;">365</div>
@@ -1481,14 +1463,14 @@ a { color: var(--accent); text-underline-offset: 2px; }
 
     <!-- Entries List -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span id="history-entry-count" style="font-size:var(--fs-xs);color:var(--text-dim);"></span>
+      <span id="history-entry-count" class="t-dim-xs"></span>
     </div>
     <div id="history-entries-list"></div>
 
     <!-- 日记回顾 -->
     <div class="section-header" style="margin-top:20px;">
       <span class="section-title">日记回顾</span>
-      <span id="journal-arch-stats" style="font-size:var(--fs-xs);color:var(--text-dim);"></span>
+      <span id="journal-arch-stats" class="t-dim-xs"></span>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
       <button class="btn btn-sm" onclick="journalMonthShift(-1)">‹</button>
@@ -1501,7 +1483,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <!-- AI 周报 / 月报（本地 Ollama，经后端 SSE 代理） -->
     <div class="section-header" style="margin-top:20px;">
       <span class="section-title">AI 报告</span>
-      <span id="ai-week-status" style="font-size:var(--fs-xs);color:var(--text-dim);"></span>
+      <span id="ai-week-status" class="t-dim-xs"></span>
     </div>
     <div class="card" style="padding:12px;">
       <!-- 粒度切换：周报看节奏，月报看趋势。切换后自动回到「当前」，不会停在上周的偏移上 -->
@@ -1538,7 +1520,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
         <i data-ic="cloud" data-size="1"></i>
         <span style="font-size:var(--fs-base);color:var(--text-primary);flex:1;">服务器同步</span>
         <span id="srv-dot" class="srv-dot"></span>
-        <span id="srv-status-text" style="font-size:var(--fs-2xs);color:var(--text-dim);">未连接</span>
+        <span id="srv-status-text" class="t-dim-2xs">未连接</span>
       </div>
       <div id="health-bar" style="margin-top:8px;font-size:var(--fs-xs);color:var(--text-dim);line-height:1.7;"></div>
       <details style="margin-top:8px;">
@@ -1574,7 +1556,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div style="display:flex;align-items:center;gap:12px;">
         <i data-ic="film" data-size="1.3"></i>
         <div style="flex:1;">
-          <div style="font-size:var(--fs-base);color:var(--text-primary);">视频收藏</div>
+          <div class="t-pri-base">视频收藏</div>
           <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:2px;" id="video-entry-count">收藏想看的视频</div>
         </div>
         <span style="color:var(--text-dim);font-size:var(--fs-sm);">→</span>
@@ -1586,7 +1568,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div style="display:flex;align-items:center;gap:12px;">
         <span class="icn" style="width:1.4rem;height:1.4rem;color:var(--accent);"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/></svg></span>
         <div style="flex:1;">
-          <div style="font-size:var(--fs-base);color:var(--text-primary);">灵感库</div>
+          <div class="t-pri-base">灵感库</div>
           <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:2px;" id="insp-entry-count">记下想法和素材</div>
         </div>
         <span style="color:var(--text-dim);font-size:var(--fs-sm);">→</span>
@@ -1599,7 +1581,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div style="display:flex;align-items:center;gap:12px;">
         <i data-ic="book" data-size="1.3"></i>
         <div style="flex:1;">
-          <div style="font-size:var(--fs-base);color:var(--text-primary);">高性价比人生指南</div>
+          <div class="t-pri-base">高性价比人生指南</div>
           <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:2px;">花掉什么、换回什么 —— 可筛选的生活决策库</div>
         </div>
         <span style="color:var(--text-dim);font-size:var(--fs-sm);">↗</span>
@@ -1614,7 +1596,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div style="display:flex;align-items:center;gap:12px;">
         <span class="icn" style="width:1.4rem;height:1.4rem;color:var(--accent);"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><path d="M4 19V5M4 19h16M8 16V9M12.5 16v-4M17 16V7"/></svg></span>
         <div style="flex:1;">
-          <div style="font-size:var(--fs-base);color:var(--text-primary);">月报 / 周报</div>
+          <div class="t-pri-base">月报 / 周报</div>
           <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:2px;">记账、投资、任务、日记的趋势汇总</div>
         </div>
         <span style="color:var(--text-dim);font-size:var(--fs-sm);">↗</span>
@@ -1627,7 +1609,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div style="display:flex;align-items:center;gap:12px;">
         <i data-ic="library" data-size="1.3"></i>
         <div style="flex:1;">
-          <div style="font-size:var(--fs-base);color:var(--text-primary);">私人书库</div>
+          <div class="t-pri-base">私人书库</div>
           <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:2px;">自己放书，干净排版的阅读器</div>
         </div>
         <span style="color:var(--text-dim);font-size:var(--fs-sm);">↗</span>
@@ -1638,9 +1620,9 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div style="margin-top:16px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
         <i data-ic="disk" data-size="1"></i>
-        <span style="font-size:var(--fs-base);color:var(--text-primary);">数据管理</span>
+        <span class="t-pri-base">数据管理</span>
       </div>
-      <div class="card" style="cursor:pointer;padding:12px;" onclick="exportAllData()">
+      <div class="card" style="cursor:pointer;padding:12px;" onclick="exportData()">
         <div style="display:flex;align-items:center;gap:10px;">
           <i data-ic="upload" data-size="1"></i>
           <span style="flex:1;font-size:var(--fs-base);">导出数据</span>
@@ -1665,7 +1647,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
 
     <!-- 关于 -->
     <div style="margin-top:20px;text-align:center;padding:12px;">
-      <div style="font-size:var(--fs-xs);color:var(--text-dim);">Nexus Core · v2.0</div>
+      <div class="t-dim-xs">Nexus Core · v2.0</div>
       <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:4px;">个人管理面板</div>
     </div>
   </div>
@@ -1788,7 +1770,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <button class="btn btn-primary btn-sm" onclick="videoSave()">保存</button>
         <button class="btn btn-sm" onclick="videoToggleForm()">取消</button>
-        <span id="video-fetch-hint" style="font-size:var(--fs-2xs);color:var(--text-dim);"></span>
+        <span id="video-fetch-hint" class="t-dim-2xs"></span>
       </div>
     </div>
 
@@ -1866,12 +1848,12 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div class="modal-title" id="invest-edit-title">添加持仓</div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">名称</label>
+      <label class="t-field-label">名称</label>
       <input id="inv-name" placeholder="例：华安黄金ETF联接C" style="width:100%;">
     </div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">类型</label>
+      <label class="t-field-label">类型</label>
       <select id="inv-type" onchange="investFormTypeChanged()" style="width:100%;">
         <option value="fund">场外基金（支付宝 / 理财通里买的基金）</option>
         <option value="stock">股票 / 场内 ETF（券商账户里的）</option>
@@ -1882,25 +1864,25 @@ a { color: var(--accent); text-underline-offset: 2px; }
     </div>
 
     <div id="inv-code-row" style="margin-bottom:12px;">
-      <label id="inv-code-label" style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">基金代码（6 位数字）</label>
+      <label id="inv-code-label" class="t-field-label">基金代码（6 位数字）</label>
       <input id="inv-code" placeholder="例：000217" inputmode="numeric" maxlength="6" style="width:100%;">
       <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:4px;">填了代码才能每天自动更新市值</div>
     </div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">现在值多少钱（持有金额）</label>
+      <label class="t-field-label">现在值多少钱（持有金额）</label>
       <input type="number" id="inv-value" placeholder="例：4120.30" inputmode="decimal" step="0.01" style="width:100%;">
       <div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:4px;">就是产品页面上那个「持有金额」，照抄</div>
     </div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">持仓收益（可选）</label>
+      <label class="t-field-label">持仓收益（可选）</label>
       <input type="number" id="inv-profit" placeholder="例：-379.70（亏了就填负数）" inputmode="decimal" step="0.01" style="width:100%;">
       <div id="inv-profit-hint" style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:4px;line-height:1.6;"></div>
     </div>
 
     <div style="margin-bottom:16px;">
-      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">备注（可选）</label>
+      <label class="t-field-label">备注（可选）</label>
       <input id="inv-note" placeholder="例：2025 年 3 月开始定投" style="width:100%;">
     </div>
 
@@ -1917,23 +1899,23 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <div class="modal-title" id="gadget-edit-title">添加一件</div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">名称</label>
+      <label class="t-field-label">名称</label>
       <input id="gd-name" placeholder="例：机械革命蛟龙16 pro" style="width:100%;">
     </div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">买的时候多少钱</label>
+      <label class="t-field-label">买的时候多少钱</label>
       <input type="number" id="gd-price" placeholder="例：6479.20" inputmode="decimal" step="0.01" style="width:100%;">
     </div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">购买日期</label>
+      <label class="t-field-label">购买日期</label>
       <input type="date" id="gd-date" style="width:100%;">
       <div id="gd-hint" style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:4px;">填了日期才算得出「已用多少天」和日均成本</div>
     </div>
 
     <div style="margin-bottom:16px;">
-      <label style="font-size:var(--fs-xs);color:var(--text-dim);display:block;margin-bottom:4px;">备注（可选）</label>
+      <label class="t-field-label">备注（可选）</label>
       <input id="gd-note" placeholder="例：国补买的 / 二手" style="width:100%;">
     </div>
 
@@ -2000,28 +1982,6 @@ function kvTouch(key) {
   const m = kvMeta();
   m[key] = Date.now();
   try { localStorage.setItem(KV_META_KEY, JSON.stringify(m)); } catch {}
-}
-
-// 本机现有几项数据（用于覆盖前警告）
-function countLocalDataKeys() {
-  let n = 0;
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(k)) n++;
-  }
-  return n;
-}
-
-// 还原「上次拉取前的本机数据」
-function restorePrePullBackup() {
-  const snap = JSON.parse(localStorage.getItem('nexus_backup_before_pull') || 'null');
-  if (!snap || !snap.data) { showToast('没有可还原的备份', 'warning'); return; }
-  const n = Object.keys(snap.data).length;
-  const when = new Date(snap.at).toLocaleString('zh-CN');
-  if (!confirm('把本机数据还原到「' + when + '」拉取前的状态（' + n + ' 项）？\n\n当前数据会被替换。还原后如需覆盖云端，请点「↑ 上传」。')) return;
-  Object.entries(snap.data).forEach(([k, v]) => localStorage.setItem(k, v));
-  showToast('已还原 ' + n + ' 项，即将刷新页面', 'success');
-  setTimeout(() => location.reload(), 600);
 }
 
 // === 服务器同步（KV 存储）===
@@ -2187,19 +2147,6 @@ const KVSync = {
   }
 };
 
-// ---------- 导出 / 导入（备份用；日常同步已由 KV 承担）----------
-function exportAllData() {
-  const data = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith('nexus_') && !SYNC_SKIP_KEYS.includes(k)) {
-      try { data[k] = JSON.parse(localStorage.getItem(k)); }
-      catch { data[k] = localStorage.getItem(k); }
-    }
-  }
-  return { app: 'nexus-core', version: '2.0', timestamp: Date.now(), data: data };
-}
-
 // ---------- 导入值校验 ----------
 // 背景：导入是唯一「把外部文件里的任意内容写进 localStorage」的入口。
 // Store.get 对 JSON.parse 失败是吞掉的（返回默认值），所以坏 JSON 不会立刻炸；
@@ -2358,6 +2305,11 @@ function importResultMessage(r) {
   return bad ? base + '，跳过 ' + bad + ' 项（数据格式不符）' : base;
 }
 
+// ⚠️ 手动还原入口，**故意不挂 UI**：导入会先用 importAllData() 把当前数据
+// 存进 nexus_backup_before_import，这个函数把那份快照读回来。
+// 场景是「导入后发现数据不对，但页面已经刷新、来不及点撤销」——
+// 此时在浏览器控制台敲 restorePreImportBackup() 即可回到导入前。
+// 不要因为「搜索不到调用点」就删掉它。
 function restorePreImportBackup() {
   const raw = localStorage.getItem('nexus_backup_before_import');
   if (!raw) { alert('没有可还原的备份'); return; }
@@ -2661,7 +2613,7 @@ function inspPickImage(input) {
   const file = input.files && input.files[0];
   if (!file) return;
   const prev = document.getElementById('insp-preview');
-  prev.innerHTML = '<div style="font-size:var(--fs-xs);color:var(--text-dim);">处理中…</div>';
+  prev.innerHTML = '<div class="t-dim-xs">处理中…</div>';
   compressImage(file).then(function (dataUrl) {
     prev.innerHTML = '<img src="' + dataUrl + '" style="max-height:140px;border-radius:var(--radius-sm);">';
     return uploadImage(dataUrl, file.name).then(function (r) {
@@ -3967,6 +3919,9 @@ function xqIsRed(c) { return !!c && XQ_RED_SET.indexOf(c) >= 0; }
 function xqSide(c) { return c ? (xqIsRed(c) ? 'r' : 'b') : null; }
 function xqInBoard(x, y) { return x >= 0 && x <= 8 && y >= 0 && y <= 9; }
 
+// 把坐标棋子表摊成 10×9 的二维棋盘（null = 空位）。
+// 注意：前端渲染不直接用它，但 tests/xiangqi-moves.test.js 的导出契约里有它
+// （测试用它构造局面做走法验算），**删了会让象棋测例整体起不来**。
 function xqBoard(pieces) {
   const b = [];
   for (let y = 0; y < 10; y++) b.push(new Array(9).fill(null));
@@ -4120,7 +4075,7 @@ function renderDailyEnglish() {
       '<div class="en-eg">' + escHtml(word.e) + '</div>' +
     '</div>' +
     '<div class="en-block">' +
-      '<div class="en-head"><span style="font-size:var(--fs-sm);color:var(--text-dim);">今日一句</span>' +
+      '<div class="en-head"><span class="t-dim-sm">今日一句</span>' +
         '<button class="en-say" aria-label="朗读句子" onclick="speakEnSentence()">' + mkIcon('mic', 0.85) + '</button>' +
       '</div>' +
       '<div class="en-sent-en">' + escHtml(sent.en) + '</div>' +
@@ -4875,10 +4830,19 @@ function removeJournalItem(i) {
 
 function renderJournalToday() {
   const items = journalItems(TODAY());
+  const n = items.length;
+  // 两处各显示各的：写入口那行提示「今天记了几条」（让人知道下面有内容），
+  // 下方列表那行显示条数。两者同步更新，不会出现一处新一处旧。
   const cnt = document.getElementById('journal-today-count');
-  if (cnt) cnt.textContent = items.length ? items.length + ' 条' : '';
+  if (cnt) cnt.textContent = n ? n + ' 条' : '';
+  const hint = document.getElementById('journal-input-hint');
+  if (hint) hint.textContent = n ? '今天已记 ' + n + ' 条 ↓' : '';
   const list = document.getElementById('journal-today-list');
   if (!list) return;
+  if (!n) {
+    list.innerHTML = '<div style="color:var(--text-dim);font-size:var(--fs-sm);">今天还没有记录。上面「随手记」写一句，就会出现在这里。</div>';
+    return;
+  }
   list.innerHTML = items.map((it, i) =>
     '<div style="display:flex;gap:8px;align-items:baseline;">' +
       '<span style="color:var(--text-dim);font-size:var(--fs-xs);flex:none;font-family:var(--font-mono);">' + journalTimeLabel(it.ts) + '</span>' +
@@ -5505,12 +5469,6 @@ function switchTab(panel) {
   renderPanel(panel);
 }
 
-function showPanel(id) {
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  const el = document.getElementById(id);
-  if (el) el.classList.add('active');
-}
-
 // === Toast System ===
 // durationMs 可选：默认 2000ms 够看一句短提示；
 // 课表点击展开这类要读一行的场景传长一点（手机上读字更慢）。
@@ -6049,7 +6007,7 @@ function renderInvestHistory() {
     return `<details class="card" style="padding:10px;margin-bottom:8px;">
       <summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;">
         <span style="font-family:var(--font-mono);font-size:var(--fs-sm);color:var(--accent);">${label}</span>
-        <span style="font-size:var(--fs-xs);color:var(--text-dim);">›</span>
+        <span class="t-dim-xs">›</span>
       </summary>
       <div style="font-size:var(--fs-sm);color:var(--text-secondary);line-height:1.5;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-subtle);white-space:pre-wrap;">${escHtml(text)}</div>
     </details>`;
@@ -6128,7 +6086,7 @@ function renderHistory() {
       <summary style="cursor:pointer;list-style:none;display:flex;gap:12px;align-items:flex-start;">
         <div style="text-align:center;min-width:44px;">
           <div style="font-family:var(--font-mono);font-size:var(--fs-lg);font-weight:bold;color:${isToday ? 'var(--accent)' : 'var(--text-primary)'};">${month} / ${day}</div>
-          <div style="font-size:var(--fs-2xs);color:var(--text-dim);">${weekday}</div>
+          <div class="t-dim-2xs">${weekday}</div>
         </div>
         <div style="flex:1;min-width:0;">
           ${badges ? `<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:var(--fs-sm);color:var(--text-secondary);margin-bottom:4px;">${badges}</div>` : ''}
@@ -6875,7 +6833,7 @@ function investGroupHtml(def, items, quotes) {
   return `<details class="inv-group">
     <summary class="inv-group-sum">
       <span class="inv-group-head">
-        <span style="font-size:var(--fs-base);color:var(--text-primary);">${def.label}</span>
+        <span class="t-pri-base">${def.label}</span>
         <span class="inv-group-num">
           ${items.length} 笔 · ¥${fmtAmount(val)}
           ${cost > 0 ? `<span style="color:${tone.color};">${tone.sign}${fmtPct(Math.abs(profit / cost))}</span>` : ''}
@@ -6990,7 +6948,7 @@ function cashGroupHtml() {
   return `<details class="inv-group" id="cash-group">
     <summary class="inv-group-sum">
       <span class="inv-group-head">
-        <span style="font-size:var(--fs-base);color:var(--text-primary);">可用现金</span>
+        <span class="t-pri-base">可用现金</span>
         <span class="inv-group-num" style="color:var(--text-primary);">¥${fmtAmount(total)}</span>
       </span>
     </summary>
@@ -7005,14 +6963,6 @@ function cashGroupHtml() {
       </div>
     </div>
   </details>`;
-}
-
-function _recalcCash(w) {
-  const list = Array.isArray(w.cashAccounts) ? w.cashAccounts : [];
-  w.cash = Math.round(list.reduce((s, x) => s + (Number(x.amount) || 0), 0) * 100) / 100;
-  w.cashCheckedAt = Date.now();
-  w.initialSet = true;
-  return w;
 }
 
 // 记账（收入/支出）走的池账户：没指定具体账户时，钱就进这里，保证「现金总额 = Σ账户」恒成立。
@@ -7133,7 +7083,7 @@ function gadgetGroupHtml() {
         </div>
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;font-family:var(--font-mono);font-variant-numeric:tabular-nums;">
           <span style="font-size:var(--fs-md);color:var(--text-primary);">¥${fmtAmount(g.price)}</span>
-          ${per ? `<span style="font-size:var(--fs-sm);color:var(--text-secondary);">日均 ¥${per.toFixed(2)}</span>` : ''}
+          ${per ? `<span class="t-sec-sm">日均 ¥${per.toFixed(2)}</span>` : ''}
         </div>
         ${g.note ? `<div style="font-size:var(--fs-2xs);color:var(--text-dim);margin-top:5px;">${escHtml(g.note)}</div>` : ''}
       </div>`;
@@ -7145,7 +7095,7 @@ function gadgetGroupHtml() {
   return `<details class="inv-group">
     <summary class="inv-group-sum">
       <span class="inv-group-head">
-        <span style="font-size:var(--fs-base);color:var(--text-primary);">电子资产</span>
+        <span class="t-pri-base">电子资产</span>
         <span class="inv-group-num">
           ${list.length} 件 · ¥${fmtAmount(total)}${daySum ? ` · 日均 ¥${daySum.toFixed(2)}` : ''}
         </span>
@@ -7427,7 +7377,7 @@ function renderShots() {
       <button class="btn btn-sm" style="flex:0 0 auto;white-space:nowrap;" onclick="deleteShot('${s.id}')">删</button>
     </div>`;
   }).join('') + (list.length > 12
-    ? `<div style="font-size:var(--fs-2xs);color:var(--text-dim);">还有 ${list.length - 12} 张没显示</div>`
+    ? `<div class="t-dim-2xs">还有 ${list.length - 12} 张没显示</div>`
     : '');
 }
 
