@@ -46,22 +46,54 @@ if (offenders.length === 0) {
       `\n      应改用 --fs-* 令牌，否则调字号要满文件找`);
 }
 
-console.log('【3】--fs-* 令牌换算后不得低于 12px');
+console.log('【3】--fs-* 令牌在滑条两端都不得低于 12px');
+// ★ 2026-09-26 改：令牌体系从「全部 rem」变成两层：
+//   · 小字（2xs / xs）：绝对 px，不跟随滑条
+//   · 其余：calc(基准px * var(--fs-r)) 或 max(下限px, calc(...))
+// 所以不能再只匹配 rem。新检查要覆盖**滑条两端**：
+//   最不利的情形是 --fs-r 取最小值（13/16 = 0.8125），此时所有 calc 都缩到最小。
+// 只要「最小值那一端」全部 ≥12px，就说明铁律守住了。
 const rootPx = rootM ? parseFloat(rootM[1]) : 16;
-const tokens = [...html.matchAll(/--fs-([a-z0-9]+):\s*([\d.]+)rem/g)];
-if (!tokens.length) {
+const FONT_MIN_PX = 13;                     // 滑条下限（与 JS 里 FONT_MIN 保持一致）
+const minRatio = FONT_MIN_PX / rootPx;      // 最小缩放比 = 0.8125
+
+// 抽出令牌定义行：--fs-xxx: <值>;
+const tokenLines = [...html.matchAll(/--fs-([a-z0-9]+):\s*([^;]+);/g)]
+  .map(([, name, expr]) => ({ name, expr: expr.trim() }));
+
+if (!tokenLines.length) {
   bad('没找到任何 --fs-* 令牌');
 } else {
-  let tiny = [];
-  for (const [, name, val] of tokens) {
-    const px = parseFloat(val) * rootPx;
-    if (px < 12) tiny.push(`--fs-${name} = ${px.toFixed(1)}px`);
+  const tiny = [];
+  const report = [];
+  for (const { name, expr } of tokenLines) {
+    if (name === 'r') continue;             // --fs-r 是缩放比本身，不是字号
+    let px = null;
+
+    // 形态一：纯 px 字面量（如 12px）—— 不跟随滑条
+    const pxLit = expr.match(/^([\d.]+)px$/);
+    // 形态二：calc(Npx * var(--fs-r)) —— 跟随滑条，取最小值那端
+    const calcLit = expr.match(/^calc\(\s*([\d.]+)px\s*\*\s*var\(--fs-r\)\s*\)$/);
+    // 形态三：max(Npx, calc(...)) —— 有下限，取「下限与缩到底」中的较大者
+    const maxLit = expr.match(/^max\(\s*([\d.]+)px\s*,\s*calc\(\s*([\d.]+)px\s*\*\s*var\(--fs-r\)\s*\)\s*\)$/);
+
+    if (pxLit) px = parseFloat(pxLit[1]);
+    else if (calcLit) px = parseFloat(calcLit[1]) * minRatio;
+    else if (maxLit) px = Math.max(parseFloat(maxLit[1]), parseFloat(maxLit[2]) * minRatio);
+
+    if (px === null) {
+      // 没认出来的写法：不静默放过，提示去更新这个检查
+      report.push(`--fs-${name}: 无法解析「${expr}」，请更新 mobile-audit 的解析`);
+      continue;
+    }
+    report.push(`--fs-${name}=${px.toFixed(1)}px`);
+    if (px < 12 - 0.01) tiny.push(`--fs-${name} 最小渲染 ${px.toFixed(1)}px（表达式：${expr}）`);
   }
+
   if (tiny.length === 0) {
-    const list = tokens.map(([, n, v]) => `--fs-${n}=${(parseFloat(v) * rootPx).toFixed(0)}px`);
-    ok(`${tokens.length} 个令牌全部 ≥12px  [${list.join(' ')}]`);
+    ok(`${report.length} 个令牌滑到最小档也全部 ≥12px  [${report.join(' ')}]`);
   } else {
-    bad(`以下令牌渲染后小于 12px，手机上读起来累：\n      ${tiny.join('\n      ')}`);
+    bad(`滑条拉到最小时，以下令牌会小于 12px，手机上读起来累：\n      ${tiny.join('\n      ')}`);
   }
 }
 

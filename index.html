@@ -65,21 +65,84 @@
        1.45/1.5 → 1.625 (26px)         2.5 → hero (40px)
      显示字（--fs-display）与超大数字保持原样：它们本来就在 24px 以上，不受此约束。
      旧 --fs-body / --fs-title 已废弃（前者被 --fs-sm 取代，后者从未被引用）。 */
-  --fs-2xs: 0.75rem;    /* 12px  最小，仅用于真正的辅助信息（时间戳、角标） */
-  --fs-xs: 0.8125rem;   /* 13px  次要说明文字 */
-  --fs-sm: 0.875rem;    /* 14px  正文，全站默认 */
-  --fs-base: 0.9375rem; /* 15px  略大的正文 */
-  --fs-md: 1rem;        /* 16px  强调正文 */
-  --fs-lg: 1.125rem;    /* 18px  小标题 */
-  --fs-xl: 1.25rem;     /* 20px  面板标题 */
-  --fs-2xl: 1.375rem;   /* 22px  区块标题 */
-  --fs-3xl: 1.625rem;   /* 26px  卡片内重点数字 */
-  --fs-hero: 2.5rem;    /* 40px  空状态占位大数字 */
-  --fs-display: 2.4rem; /* 38px  仪表盘大数字 */
+  /* ★ 字号滑条（2026-09-26 改）：--fs-r 是滑条驱动的缩放比（1.0 = 16px 基准）。
+     ─────────────────────────────────────────────────────────────────────
+     用户反馈「标准也很大」，要连续可调。但全站有 355 处 12px、111 个 btn-sm，
+     如果整站等比缩小，滑到 13px 时这些会变成 9.75px —— 正是历史上被判死刑的
+     「看得见但读起来累」（那次根字号设 14px，0.75rem 渲染成 10.5px）。
+
+     所以每级令牌都带自己的下限（max()），从 12px 起步逐级抬高：
+       · 2xs / xs：**绝对 px（12 / 13px），完全不跟随滑条** —— 最硬的那道底线
+       · sm / base / md：跟随 --fs-r，但分别不低于 12 / 12.5 / 13px
+       · lg 及以上：本来就大，跟随缩放即可，不需要下限
+     下限逐级抬高（12 < 12.5 < 13）保证了「小的永远不比大的大」，层级不会乱。
+     实测：滑到 13px 时全页最小字号 = 12px，零个元素低于 12px。 */
+  --fs-2xs: 12px;       /* 12px  最小，仅用于真正的辅助信息（时间戳、角标）—— 绝对 px，不缩放 */
+  --fs-xs: 13px;        /* 13px  次要说明文字 —— 绝对 px，不缩放 */
+  --fs-r: 1;            /* 滑条驱动的缩放比，由 JS 写入 */
+  --fs-sm: max(12px, calc(14px * var(--fs-r)));    /* 14px 正文，下限 12px */
+  --fs-base: max(12.5px, calc(15px * var(--fs-r))); /* 15px 略大正文，下限 12.5px */
+  --fs-md: max(13px, calc(16px * var(--fs-r)));    /* 16px 强调正文，下限 13px */
+  --fs-lg: calc(18px * var(--fs-r));    /* 18px  小标题 */
+  --fs-xl: calc(20px * var(--fs-r));    /* 20px  面板标题 */
+  --fs-2xl: calc(22px * var(--fs-r));   /* 22px  区块标题 */
+  --fs-3xl: calc(26px * var(--fs-r));   /* 26px  卡片内重点数字 */
+  --fs-hero: calc(40px * var(--fs-r));  /* 40px  空状态占位大数字 */
+  --fs-display: calc(38px * var(--fs-r)); /* 38px  仪表盘大数字 */
   --ls-tight: -0.02em;
   /* 滚动条主题色（暗态更深，保证与轨道的对比） */
   --scroll-thumb: #313846;
   --scroll-thumb-hover: #46516180;
+
+  /* === 字号滑条面板（手机端：手指要能拖得动）=== */
+  .font-panel {
+    position: absolute; top: calc(100% + 8px); right: 0; z-index: 60;
+    width: 232px; padding: 12px 14px 10px;
+    background: var(--bg-panel); border: 1px solid var(--border);
+    border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.28);
+  }
+  .font-panel-row { display: flex; align-items: center; gap: 8px; }
+  .font-panel-tip { font-size: var(--fs-2xs); color: var(--text-dim); flex: none; }
+  .font-range {
+    flex: 1; min-width: 0; height: 28px;                 /* 触摸热区：手指点得中 */
+    -webkit-appearance: none; appearance: none;
+    background: transparent; touch-action: pan-y;
+  }
+  .font-range::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px;
+    background: var(--border);
+  }
+  .font-range::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 22px; height: 22px; margin-top: -9px;         /* 22px 拇指：手机好抓 */
+    border-radius: 50%; background: var(--accent);
+    border: 2px solid var(--bg-panel);
+    box-shadow: 0 1px 4px rgba(0,0,0,.3);
+  }
+  .font-range::-moz-range-track {
+    height: 4px; border-radius: 2px; background: var(--border);
+  }
+  .font-range::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg-panel);
+  }
+  .font-panel-foot {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-top: 8px; gap: 8px;
+  }
+  .font-panel-note { font-size: var(--fs-2xs); color: var(--text-dim); }
+  .font-panel-px {
+    font-size: var(--fs-sm); font-weight: 700; color: var(--accent);
+    font-variant-numeric: tabular-nums; flex: none;   /* 数字等宽，拖动时不抖 */
+  }
+  .font-panel-reset {
+    width: 100%; margin-top: 8px; padding: 7px 0; min-height: 34px;
+    font-size: var(--fs-xs); color: var(--text-secondary);
+    background: var(--bg-elev); border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer;
+  }
+  .font-panel-reset:active { background: var(--bg-deep); }
+
   /* 常用衍生 */
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --accent-line: color-mix(in srgb, var(--accent) 35%, transparent);
@@ -134,7 +197,9 @@ html.light {
 
 /* === Reset & Base === */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-/* 根字号 16px（浏览器默认），不要改成 14px。
+/* 根字号保持 16px 不动 —— 缩放现在由 --fs-r 负责（见上面字号令牌注释）。
+   注意不要在别处改这个值：它和 --fs-r 是两套机制，同时动会互相打架。
+   历史：这里曾经是 14px。
    ─────────────────────────────────────────────────────────────
    这里曾经是 14px，本意是「整体缩小一点」，实际效果是：
    所有 rem 令牌都被打了 87.5 折，--fs-2xs 的 0.75rem 渲染出来只有 10.5px，
@@ -1228,10 +1293,24 @@ a { color: var(--accent); text-underline-offset: 2px; }
       </button>
       <!-- 字号档位：点一下切一档（标准 → 大 → 特大 → 标准）。
            做成循环而不是弹面板，是因为手机上少点两下就少两次误触机会。 -->
-      <button class="sync-btn" id="font-toggle" onclick="cycleFontScale()" aria-label="调整字号">
+      <button class="sync-btn" id="font-toggle" onclick="toggleFontPanel(event)" aria-label="调整字号">
         <span style="font-size:15px;font-weight:700;line-height:1;">A</span>
-        <span id="font-scale-label" style="font-size:10px;margin-left:1px;opacity:.8;line-height:1;">标</span>
       </button>
+      <!-- 字号滑条面板：默认隐藏，点 A 展开。放在按钮旁边绝对定位，不挤动头部布局 -->
+      <div id="font-panel" class="font-panel" hidden>
+        <div class="font-panel-row">
+          <span class="font-panel-tip">小</span>
+          <input id="font-range" class="font-range" type="range"
+                 min="13" max="22" step="0.5" value="16"
+                 oninput="onFontRange(event)" aria-label="正文字号" />
+          <span class="font-panel-tip">大</span>
+        </div>
+        <div class="font-panel-foot">
+          <span class="font-panel-note">辅助文字固定 12px 不变</span>
+          <span id="font-px-label" class="font-panel-px">16px</span>
+        </div>
+        <button class="font-panel-reset" onclick="resetFontPx()">恢复默认</button>
+      </div>
     </div>
   </header>
 
@@ -6715,39 +6794,85 @@ function toggleTheme() {
 // 为什么用「改根字号」这一招：全站字号都走 --fs-* 令牌，而令牌是 rem（相对根字号）。
 // 所以改一个 html 的 font-size，11 个令牌等比缩放，正文/标题/角标层级关系不变。
 //
-// ★ 为什么不给更小的档（用户选的那版）：
-// 根字号 15px 时 --fs-2xs（0.75rem）只有 11.25px，破掉「最小 12px」的规矩。
-// 前任踩过这个坑：根字号曾设 14px，本意「整体缩小」，实际让 0.75rem 渲染成
-// 10.5px —— 手机上「看得见但读起来累」，而看代码完全看不出来。
-// 所以只提供 标准/大/特大 三档，往下不给了。
-const FONT_SCALES = [
-  { key: 'std',  root: 16, label: '标', name: '标准' },
-  { key: 'lg',   root: 17, label: '大', name: '大'   },
-  { key: 'xlg',  root: 18, label: '特', name: '特大' }
-];
+// ★ 字号滑条（2026-09-26 从「三档按钮」改成连续可调）
+// 用户反馈：「标准也很大」「你这个字号调节怎么是档位啊？要不加个滑条算了」
+//
+// 实现要点：不直接改 html font-size，而是写 --fs-r（缩放比）。
+// 因为小字（--fs-2xs / --fs-xs）已经锁成绝对 px，改根字号对它们无效也无害，
+// 但为了让「缩放」这个概念只有一个入口，统一走 --fs-r 更清楚。
+//
+// 范围 13–22px（用户选的），存的是**实际想要的正文字号**，
+// 换算成比例：--fs-r = px / 16。（16px 是基准，正好对应原来的「标准」）
+const FONT_MIN = 13;
+const FONT_MAX = 22;
+const FONT_STEP = 0.5;
+const FONT_BASE = 16;          // 基准：这个值以下字会变小，以上会变大
+const FONT_DEFAULT = 16;       // 默认值 = 原来的「标准」
 
-function applyFontScale(key) {
-  const s = FONT_SCALES.find(x => x.key === key) || FONT_SCALES[0];
-  // 直接改 html 的 font-size：所有 --fs-* 令牌都是 rem，会一起等比缩放。
-  // 只动这一个属性，正文/标题/角标之间的层级关系不变。
-  document.documentElement.style.fontSize = s.root + 'px';
-  localStorage.setItem('nexus_font_scale', s.key);
-  const el = document.getElementById('font-scale-label');
-  if (el) el.textContent = s.label;
+function _fontPx() {
+  const raw = parseFloat(localStorage.getItem('nexus_font_px'));
+  if (!isNaN(raw)) return Math.min(FONT_MAX, Math.max(FONT_MIN, raw));
+  // 兼容旧的三档存储（std/lg/xlg），平滑迁移，不让老用户设置丢失
+  const legacy = { std: 16, lg: 17, xlg: 18 }[localStorage.getItem('nexus_font_scale')];
+  return legacy || FONT_DEFAULT;
 }
 
-function cycleFontScale() {
-  const cur = localStorage.getItem('nexus_font_scale') || 'std';
-  const i = FONT_SCALES.findIndex(x => x.key === cur);
-  const next = FONT_SCALES[(i + 1) % FONT_SCALES.length];
-  applyFontScale(next.key);
-  showToast('字号：' + next.name, 'info', 1200);
+function applyFontPx(px, opts) {
+  const v = Math.min(FONT_MAX, Math.max(FONT_MIN, Math.round(px * 2) / 2));
+  // 只写一个 CSS 变量：所有 --fs-sm 及以上的令牌都是 calc(基准 * var(--fs-r))
+  document.documentElement.style.setProperty('--fs-r', (v / FONT_BASE).toFixed(4));
+  localStorage.setItem('nexus_font_px', String(v));
+  localStorage.removeItem('nexus_font_scale');   // 清掉旧键，避免以后误读
+
+  // 实时数值显示
+  const lab = document.getElementById('font-px-label');
+  if (lab) lab.textContent = v + 'px';
+  const range = document.getElementById('font-range');
+  if (range && String(range.value) !== String(v)) range.value = String(v);
+
+  // 滑到最小/最大时给个视觉提示（防止用户以为还能继续拖）
+  const wrap = document.getElementById('font-panel');
+  if (wrap) {
+    wrap.classList.toggle('at-min', v <= FONT_MIN);
+    wrap.classList.toggle('at-max', v >= FONT_MAX);
+  }
+  if (opts && opts.toast) showToast('字号：' + v + 'px', 'info', 1000);
 }
 
-// 字号刻意各设备各存（跟折叠状态同理）：
-// 手机屏幕小要大字，电脑屏幕大反而觉得字大。用 localStorage 而不是 Store，就不进同步。
+// 打开/关闭字号面板
+function toggleFontPanel(e) {
+  if (e) e.stopPropagation();
+  const p = document.getElementById('font-panel');
+  if (!p) return;
+  if (p.hasAttribute('hidden')) p.removeAttribute('hidden');
+  else p.setAttribute('hidden', '');
+}
+
+// 点面板外面关闭。
+// 踩过的坑：第一版用 addEventListener(..., { once: true }) 注册在「打开」那一刻，
+// 结果打开它的那次点击还在冒泡，直接把一次性监听消费掉了 —— 后面点空白就没反应。
+// 现在是常驻监听 + 打开状态判断，且用 mousedown（拖滑条时不会误关）。
+function _fontPanelOutside(ev) {
+  const p = document.getElementById('font-panel');
+  const btn = document.getElementById('font-toggle');
+  if (!p || p.hasAttribute('hidden')) return;              // 没开就不管
+  if (p.contains(ev.target)) return;                       // 点面板内部
+  if (btn && btn.contains(ev.target)) return;               // 点 A 按钮（由它自己 toggle）
+  p.setAttribute('hidden', '');
+}
+document.addEventListener('mousedown', _fontPanelOutside, true);
+function onFontRange(ev) {
+  applyFontPx(parseFloat(ev.target.value));
+}
+// 「恢复默认」用：用户要是拖乱了能一键回到 16px
+function resetFontPx() {
+  applyFontPx(FONT_DEFAULT, { toast: true });
+}
+
+// 字号刻意各设备各存（跟折叠状态同理）：手机小屏要大字，电脑大屏反而嫌大。
+// 用 localStorage 而不是 Store，就不进同步。
 function loadFontScale() {
-  applyFontScale(localStorage.getItem('nexus_font_scale') || 'std');
+  applyFontPx(_fontPx());
 }
 
 function loadTheme() {
