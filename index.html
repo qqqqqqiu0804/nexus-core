@@ -2023,9 +2023,12 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
 
     <!-- 数据管理（可折叠：用户要求「数据管理，也可以搞一个收起来的」）-->
     <div class="collapsible collapsed" id="sec-settings-data" style="margin-top:16px;">
+      <!-- 不要把 <i data-ic> 塞进 .section-header：
+           .section-title::before 已经生成了一条强调色竖条，前面再挂图标就是两个装饰挤一起，
+           实测会渲染成「| 数据管理」这种被挤歪的样子。
+           全站其他折叠头都只靠那条竖条，这里保持一致。 -->
       <div class="section-header">
-        <i data-ic="disk" data-size="1"></i>
-        <span class="section-title" style="margin-left:8px;">数据管理</span>
+        <span class="section-title">数据管理</span>
         <span class="t-dim-2xs">导出 / 导入 / 复制</span>
       </div>
       <div class="card" style="cursor:pointer;padding:12px;" onclick="exportData()">
@@ -2847,10 +2850,12 @@ function sectionCountText(key) {
       const n = el ? (el.textContent || '').trim() : '';
       return n ? n + ' 天' : '';
     }
-    if (key === 'data-journal-arch') {
-      const el = document.getElementById('journal-arch-stats');
-      return el ? ((el.textContent || '').trim()) : '';
-    }
+    // 日记回顾自己有 #journal-arch-stats 写在标题行里，所以不给它算 badge。
+    // ★ 原来这里回过一次 'N 篇 · 共 M 字'，而它又在 SECTIONS_WITH_OWN_COUNT 之外，
+    //   结果折叠时标题行出现两份一模一样的统计（截图 shots/05 里看到的）。
+    //   现在统一由只读的 #journal-arch-stats 负责显示（它在折叠态也可见，
+    //   因为它在 .section-header 里，不受「隐藏非 header 子级」规则影响）。
+    if (key === 'data-journal-arch') return '';
   } catch (e) { /* 数据还没准备好就算了，条数不是关键信息 */ }
   return '';
 }
