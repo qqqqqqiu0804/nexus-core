@@ -538,6 +538,26 @@ body.compact .en-block { padding: 8px 10px; }
 body.compact .en-block + .en-block { margin-top: 6px; }
 body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bottom: 6px; }
 
+
+/* 物品面板的位置筛选 chip。跟观点库的标签条同款手感，
+   但点击热区按手机端要求给到 40px 高（手机上 32px 以下点着费劲）。 */
+.inv-locchip {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-family: inherit;
+  cursor: pointer;
+}
+.inv-locchip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.inv-item { transition: opacity .15s; }
+
 /* === 每日英语 === */
 .en-block {
   padding: 10px 12px; background: var(--bg-panel);
@@ -1359,9 +1379,9 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
       <svg class="tab-icon icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M3.5 9.5h17M8.5 4.5v5M15.5 4.5v5"/></svg>
       <span class="tab-label">今日</span>
     </button>
-    <button class="tab-item" data-panel="points">
-      <svg class="tab-icon icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2c1.6 0 2.6 1 3 2.2.1.4.5.6.9.6h1.4a2 2 0 0 1 2 2v1.4c0 .4.2.8.6.9 1.2.4 2.2 1.4 2.2 3s-1 2.6-2.2 3c-.4.1-.6.5-.6.9V19a2 2 0 0 1-2 2h-1.4c-.4 0-.8.2-.9.6-.4 1.2-1.4 2.2-3 2.2"/><path d="M12 3.2c-1.6 0-2.6 1-3 2.2-.1.4-.5.6-.9.6H6.7a2 2 0 0 0-2 2v1.4c0 .4-.2.8-.6.9-1.2.4-2.2 1.4-2.2 3s1 2.6 2.2 3c.4.1.6.5.6.9V19a2 2 0 0 0 2 2h1.4c.4 0 .8.2.9.6.4 1.2 1.4 2.2 3 2.2"/><circle cx="12" cy="12" r="2.6"/></svg>
-      <span class="tab-label">观点</span>
+    <button class="tab-item" data-panel="inventory">
+      <svg class="tab-icon icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5 12 3.5l8.5 4v9L12 20.5l-8.5-4Z"/><path d="M3.5 7.5 12 11.5l8.5-4M12 11.5v9"/></svg>
+      <span class="tab-label">物品</span>
     </button>
     <button class="tab-item" data-panel="courses">
       <svg class="tab-icon icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c-2.5-1.5-5.5-1.5-8 0v11c2.5-1.5 5.5-1.5 8 0 2.5-1.5 5.5-1.5 8 0V5c-2.5-1.5-5.5-1.5-8 0Z"/><path d="M12 5v11"/></svg>
@@ -1406,6 +1426,10 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
 
     <!-- ⓪ Next Class Banner（单行速览，点一下进「课表」看完整安排） -->
     <div class="daily-next-class" id="daily-next-class" style="display:none;" onclick="switchTab('courses')"></div>
+
+    <!-- 物品快过期提醒。默认 display:none，由 renderInvAlertCard() 决定要不要显示。
+         这是「看不见就不存在」的解法：主动推给用户，而不是等他来查。 -->
+    <div id="inv-alert-card" style="display:none;"></div>
 
     <!-- ⑫ 每日观点（来自服务器观点库，每天一条，同一天刷新不变） -->
     <div class="daily-section collapsible" id="sec-daily-point">
@@ -1469,7 +1493,7 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
         <span class="section-title">随手记</span>
         <span id="journal-input-hint" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-dim);"></span>
       </div>
-      <textarea id="daily-journal" placeholder="记一句…（Ctrl/⌘ + Enter 直接存）" style="min-height: 56px;" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter')addJournalItem()"></textarea>
+      <textarea id="daily-journal" placeholder="记一句…" style="min-height: 56px;" ></textarea>
       <div style="display:flex;justify-content:flex-end;margin-top:6px;">
         <button class="btn btn-sm btn-primary" onclick="addJournalItem()">记下</button>
       </div>
@@ -1568,29 +1592,72 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
   </div>
 
 
-  <!-- Panel: Points（观点库）—— 内容来自服务器 /api/points，
-       不是 localStorage。所以换手机、换浏览器看到的都一样。 -->
-  <div class="panel" id="panel-points">
-    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:4px;">
-      <div style="font-size:var(--fs-xl);font-weight:bold;color:var(--text-primary);">观点库</div>
-      <div id="points-count" class="t-dim-xs"></div>
+  <!-- 观点库：现在是全屏浮层（跟灵感库一个模式），不再是底部 tab。
+       为什么改：用户要「物品」占那一格，而观点日常只需要「每日观点」一条，
+       想翻全部时从今日页卡片点「全部观点」进来即可。
+       注意：必须在 .panel 外面 —— .panel 是 display:none，套在里面永远打不开。 -->
+  <div id="points-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:var(--bg-deep);overflow-y:auto;-webkit-overflow-scrolling:touch;">
+    <div style="max-width:720px;margin:0 auto;padding:14px 14px 80px;">
+    <div style="display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg-deep);padding:8px 0 12px;z-index:2;">
+      <span class="icn" style="width:1.3rem;height:1.3rem;color:var(--accent);"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><path d="M12 3.2c1.6 0 2.6 1 3 2.2.1.4.5.6.9.6h1.4a2 2 0 0 1 2 2v1.4c0 .4.2.8.6.9 1.2.4 2.2 1.4 2.2 3s-1 2.6-2.2 3c-.4.1-.6.5-.6.9V19a2 2 0 0 1-2 2h-1.4c-.4 0-.8.2-.9.6-.4 1.2-1.4 2.2-3 2.2"/><path d="M12 3.2c-1.6 0-2.6 1-3 2.2-.1.4-.5.6-.9.6H6.7a2 2 0 0 0-2 2v1.4c0 .4-.2.8-.6.9-1.2.4-2.2 1.4-2.2 3s1 2.6 2.2 3c.4.1.6.5.6.9V19a2 2 0 0 0 2 2h1.4c.4 0 .8.2.9.6.4 1.2 1.4 2.2 3 2.2"/><circle cx="12" cy="12" r="2.6"/></svg></span>
+      <span style="font-size:var(--fs-lg);font-weight:bold;color:var(--text-primary);flex:1;">观点库</span>
+      <button class="btn btn-sm" onclick="pointsLoad(true)">刷新</button>
+      <button class="btn btn-sm" onclick="closePoints()" aria-label="关闭"><i data-ic="close" data-size="0.9"></i></button>
     </div>
     <div class="t-dim-xs" style="margin-bottom:12px;line-height:1.6;">
       从收藏的短视频里提炼出来的观点。点卡片看要点，点「看原视频」跳回抖音。
     </div>
-
-    <!-- 搜索 + 刷新 -->
-    <div style="display:flex;gap:8px;margin-bottom:10px;">
-      <input id="points-search" placeholder="搜观点 / 作者…" oninput="pointsOnSearch()"
-             style="flex:1;min-width:0;">
-      <button class="btn btn-sm" onclick="pointsLoad(true)" style="flex:none;padding:0 14px;">刷新</button>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px;">
+      <div id="points-count" class="t-dim-xs"></div>
     </div>
+
+    <input id="points-search" placeholder="搜观点 / 作者…" oninput="pointsOnSearch()"
+           style="width:100%;margin-bottom:10px;">
 
     <!-- 标签筛选条 -->
     <div id="points-tagbar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
 
     <div id="points-list"></div>
     <div id="points-more" style="text-align:center;margin-top:4px;"></div>
+    </div>
+  </div>
+
+
+  <!-- Panel: Inventory（物品管理）
+       设计要点（对着用户原话来的）：
+         · 「如果东西没有在你的视野里出现，你感觉它不存在」→ 快过期的排最上、有颜色
+         · 「填表单比较麻烦」→ 底部一条输入框，说人话，不打表单
+         · 「我不知道保质期，你得自己去找」→ 内置参考表 + 标清「参考」
+       数据走 KV 的 inventory 键，跟别的数据一样跨设备同步。 -->
+  <div class="panel" id="panel-inventory">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;">
+      <div style="font-size:var(--fs-xl);font-weight:bold;color:var(--text-primary);">物品</div>
+      <div id="inv-count" class="t-dim-xs"></div>
+    </div>
+
+    <!-- 三个计数徽章：一眼看出该先吃什么（来自 open-pantry 的设计） -->
+    <div id="inv-stats" style="display:flex;gap:8px;margin-bottom:12px;"></div>
+
+    <!-- 一句话录入。规则：说人话就行，解析不出来也能存 -->
+    <div class="card" style="padding:12px;margin-bottom:12px;">
+      <textarea id="inv-input" oninput="invOnInput()"
+                placeholder="说一句就行，比如：鸡蛋 10个 冷藏"
+                style="width:100%;min-height:44px;margin-bottom:8px;"></textarea>
+      <div id="inv-preview" style="display:none;margin-bottom:8px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary btn-sm" onclick="invSubmit()" style="flex:1;">记下来</button>
+        <button class="btn btn-sm" onclick="invResetInput()">清空</button>
+      </div>
+      <div class="t-dim-xs" style="margin-top:8px;line-height:1.5;">
+        能认出：位置（冷藏/冷冻/常温/储物柜）、数量、天数（<b>3天</b>/<b>一周</b>）、日期（<b>9月30日</b>）。
+        没说的会自动按参考保质期补上。
+      </div>
+    </div>
+
+    <!-- 位置筛选 -->
+    <div id="inv-locbar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
+
+    <div id="inv-list"></div>
   </div>
 
   <!-- 原「任务」面板已改为浮层（#task-overlay，见文件末尾），底部导航不再单列一格。
@@ -2287,7 +2354,7 @@ const SYNC_KEYS = [
   'tasks', 'wallet', 'courses', 'completionLog', 'dailyLog',
   'dailyTemplates', 'profile', 'aiReports', 'aiModel',
   'investJournal', 'scheduleOverride', 'budget', 'inspirations', 'videos',
-  'investments', 'investShots', 'gadgets'
+  'investments', 'investShots', 'gadgets', 'inventory'
 ];
 // 注意 journal（日记）**不在**白名单：它由日记 API + 服务器 SQLite 负责，
 // 两个通道同时写同一条数据会互相覆盖。
@@ -2498,6 +2565,7 @@ const IMPORT_SCHEMA = {
   investments:     'array',
   investShots:     'array',
   gadgets:         'array',
+  inventory:       'array',
   // 下面这些既可能是对象也可能显式存 null（表示「清空」），所以用 'object|null'
   scheduleOverride: 'object|null',
   completionLog:   'object',
@@ -2985,6 +3053,743 @@ function renderFinanceInsights() {
 // === 财务洞察 END ===
 
 
+// === 物品管理 / 库存 START ===
+//
+// 为什么是这个设计（踩过的坑 + 想清楚的事）：
+//   · 用户的原话是「很多时候我没有保质期数据，你得自己去找」——
+//     所以内置一张参考表，但必须标成「参考」而不是「事实」。
+//     青菜能放几天取决于季节/湿度/有没有套袋，任何表都只能是参考值。
+//     grocy 也是这么处理的（叫「默认保质天数」，是默认不是断言）。
+//   · 用户还说过「我不想学格式，填表单太麻烦」——所以录入是一句话自然语言。
+//     解析器在本地跑（0 延迟、断网可用），解析不出来就整句当名称存，绝不报错阻塞。
+//   · 数据本身走 KV（键名 inventory），跟其他数据一样跨设备同步。
+
+// --- 保质期参考表 ---------------------------------------------------
+// 格式：[名称, 别名(逗号分隔), 分类, 常温天数, 冷藏天数, 冷冻天数]
+// 天数 = -1 表示「该储存方式不适用 / 没意义」
+// 数值取自通用生活常识的保守值，故意偏保守（宁可提示早，不要让它烂在冰箱里）
+const FOOD_SHELF_RAW = [
+  // ---- 蔬菜 ----
+  ['青菜', '小白菜,油菜,上海青,鸡毛菜', '蔬菜', 1, 4, -1],
+  ['菠菜', '菠薐', '蔬菜', 1, 4, 240],
+  ['生菜', '莴苣,油麦菜', '蔬菜', 1, 4, -1],
+  ['白菜', '大白菜,娃娃菜', '蔬菜', 7, 14, -1],
+  ['卷心菜', '包菜,圆白菜,甘蓝', '蔬菜', 7, 14, -1],
+  ['芹菜', '西芹', '蔬菜', 2, 7, -1],
+  ['韭菜', '', '蔬菜', 1, 4, -1],
+  ['香菜', '芫荽', '蔬菜', 1, 5, 120],
+  ['葱', '小葱,香葱,大葱', '蔬菜', 3, 10, 180],
+  ['姜', '生姜', '蔬菜', 14, 30, 180],
+  ['蒜', '大蒜,蒜瓣', '蔬菜', 30, 60, 180],
+  ['辣椒', '青椒,尖椒,彩椒', '蔬菜', 3, 10, -1],
+  ['西红柿', '番茄,圣女果,小番茄', '蔬菜', 3, 10, -1],
+  ['黄瓜', '', '蔬菜', 2, 7, -1],
+  ['茄子', '', '蔬菜', 3, 7, -1],
+  ['萝卜', '白萝卜,胡萝卜', '蔬菜', 7, 21, 240],
+  ['土豆', '马铃薯,洋芋', '蔬菜', 14, 30, -1],
+  ['洋葱', '', '蔬菜', 30, 60, -1],
+  ['山药', '铁棍山药', '蔬菜', 10, 21, -1],
+  ['莲藕', '藕', '蔬菜', 3, 10, -1],
+  ['南瓜', '', '蔬菜', 14, 30, -1],
+  ['冬瓜', '', '蔬菜', 10, 21, -1],
+  ['丝瓜', '', '蔬菜', 3, 7, -1],
+  ['苦瓜', '', '蔬菜', 3, 7, -1],
+  ['西葫芦', '', '蔬菜', 4, 10, -1],
+  ['蘑菇', '香菇,平菇,金针菇,杏鲍菇', '蔬菜', 1, 5, -1],
+  ['木耳', '干木耳,黑木耳', '蔬菜', 180, 365, -1],
+  ['豆芽', '黄豆芽,绿豆芽', '蔬菜', 1, 3, -1],
+  ['豆腐', '嫩豆腐,老豆腐', '豆制品', 1, 4, 90],
+  ['豆皮', '千张,豆腐皮', '豆制品', 1, 5, 90],
+  ['腐竹', '干腐竹', '豆制品', 180, 365, -1],
+  ['玉米', '甜玉米,玉米棒', '蔬菜', 2, 5, 240],
+  ['豌豆', '青豆', '蔬菜', 2, 5, 240],
+  ['西兰花', '花椰菜,菜花', '蔬菜', 2, 5, -1],
+  ['豆角', '四季豆,豇豆', '蔬菜', 2, 5, -1],
+
+  // ---- 水果 ----
+  ['苹果', '', '水果', 14, 30, -1],
+  ['梨', '雪梨,香梨', '水果', 10, 21, -1],
+  ['香蕉', '', '水果', 3, 7, -1],
+  ['橘子', '桔子,蜜桔', '水果', 10, 21, -1],
+  ['橙子', '脐橙', '水果', 14, 30, -1],
+  ['柠檬', '', '水果', 14, 30, -1],
+  ['葡萄', '提子', '水果', 2, 7, -1],
+  ['草莓', '', '水果', 1, 3, 120],
+  ['蓝莓', '', '水果', 1, 5, 240],
+  ['樱桃', '车厘子', '水果', 1, 4, 240],
+  ['西瓜', '', '水果', 3, 7, -1],
+  ['哈密瓜', '甜瓜,香瓜', '水果', 5, 10, -1],
+  ['桃子', '水蜜桃,油桃', '水果', 2, 5, -1],
+  ['李子', '', '水果', 3, 7, -1],
+  ['猕猴桃', '奇异果', '水果', 3, 14, -1],
+  ['芒果', '', '水果', 3, 7, -1],
+  ['菠萝', '凤梨', '水果', 3, 7, -1],
+  ['火龙果', '', '水果', 5, 10, -1],
+  ['柚子', '', '水果', 14, 30, -1],
+  ['石榴', '', '水果', 14, 30, -1],
+  ['柿子', '', '水果', 5, 14, 240],
+  ['枣', '鲜枣,冬枣', '水果', 3, 10, -1],
+  ['牛油果', '鳄梨', '水果', 3, 7, -1],
+  ['百香果', '', '水果', 5, 14, -1],
+
+  // ---- 肉蛋水产 ----
+  ['鸡蛋', '蛋,土鸡蛋', '蛋类', 14, 35, -1],
+  ['鸭蛋', '', '蛋类', 14, 35, -1],
+  ['咸鸭蛋', '', '蛋类', 30, 60, -1],
+  ['猪肉', '里脊,五花肉,排骨,猪蹄', '肉类', -1, 3, 180],
+  ['牛肉', '牛腩,牛排', '肉类', -1, 3, 240],
+  ['羊肉', '', '肉类', -1, 3, 240],
+  ['鸡肉', '鸡腿,鸡翅,鸡胸', '肉类', -1, 2, 270],
+  ['鸭肉', '', '肉类', -1, 2, 180],
+  ['香肠', '腊肠', '肉类', -1, 14, 60],
+  ['培根', '', '肉类', -1, 7, 30],
+  ['火腿', '火腿肠', '肉类', 30, 60, 90],
+  ['鱼', '鲈鱼,鲫鱼,草鱼', '水产', -1, 2, 90],
+  ['虾', '基围虾,对虾', '水产', -1, 2, 120],
+  ['螃蟹', '大闸蟹', '水产', -1, 1, 30],
+  ['贝类', '蛤蜊,花甲,扇贝', '水产', -1, 2, 90],
+
+  // ---- 主食 / 烘焙 ----
+  ['面包', '吐司,切片面包', '烘焙', 2, 5, 60],
+  ['馒头', '花卷', '烘焙', 2, 5, 60],
+  ['包子', '', '烘焙', 1, 3, 60],
+  ['米饭', '剩饭', '主食', 1, 3, 30],
+  ['面条', '挂面,鲜面条', '主食', 180, 7, -1],
+  ['饺子', '速冻饺子,水饺', '主食', -1, 2, 90],
+  ['汤圆', '', '主食', -1, 2, 180],
+  ['大米', '米,稻米', '主食', 180, 365, -1],
+  ['面粉', '', '主食', 180, 365, -1],
+  ['燕麦', '燕麦片', '主食', 180, 365, -1],
+  ['饼干', '', '零食', 180, 240, -1],
+
+  // ---- 奶 / 饮品 ----
+  ['牛奶', '纯牛奶,鲜奶', '奶制品', 1, 5, -1],
+  ['酸奶', '', '奶制品', 1, 14, -1],
+  ['奶酪', '芝士,起司', '奶制品', -1, 30, 120],
+  ['黄油', '', '奶制品', 2, 60, 270],
+  ['豆浆', '', '饮品', 1, 3, -1],
+  ['果汁', '', '饮品', 1, 5, -1],
+  ['可乐', '汽水,碳酸饮料', '饮品', 180, 270, -1],
+  ['啤酒', '', '饮品', 120, 180, -1],
+  ['茶叶', '绿茶,红茶', '饮品', 365, 540, -1],
+  ['咖啡', '咖啡豆,咖啡粉', '饮品', 180, 365, -1],
+  ['蜂蜜', '', '调味', 540, 730, -1],
+  ['水', '矿泉水,纯净水,白开水', '饮品', 3, 7, -1],
+
+  // ---- 调味 ----
+  ['酱油', '生抽,老抽', '调味', 365, 540, -1],
+  ['醋', '陈醋,香醋,白醋', '调味', 365, 540, -1],
+  ['盐', '食盐', '调味', 730, 1095, -1],
+  ['糖', '白糖,砂糖,红糖', '调味', 365, 540, -1],
+  ['油', '食用油,花生油,菜籽油', '调味', 365, 540, -1],
+  ['料酒', '黄酒', '调味', 365, 540, -1],
+  ['蚝油', '', '调味', 180, 365, -1],
+  ['番茄酱', '番茄沙司', '调味', 180, 365, -1],
+  ['辣椒酱', '辣酱,老干妈', '调味', 180, 365, -1],
+  ['豆瓣酱', '黄豆酱,甜面酱', '调味', 180, 365, -1],
+  ['芝麻酱', '', '调味', 180, 365, -1],
+  ['味精', '鸡精,鸡粉', '调味', 365, 540, -1],
+  ['胡椒', '胡椒粉,花椒', '调味', 365, 540, -1],
+  ['淀粉', '生粉,玉米淀粉', '调味', 365, 540, -1],
+
+  // ---- 日用品 ----
+  ['纸巾', '卫生纸,卷纸,抽纸', '日用品', 1095, -1, -1],
+  ['湿巾', '湿纸巾', '日用品', 730, -1, -1],
+  ['洗衣液', '洗衣粉', '日用品', 730, -1, -1],
+  ['洗手液', '', '日用品', 730, -1, -1],
+  ['洗发水', '洗发露', '日用品', 730, -1, -1],
+  ['沐浴露', '', '日用品', 730, -1, -1],
+  ['牙膏', '', '日用品', 730, -1, -1],
+  ['牙刷', '', '日用品', 730, -1, -1],
+  ['洗洁精', '洗涤剂', '日用品', 730, -1, -1],
+  ['垃圾袋', '', '日用品', 1095, -1, -1],
+  ['创可贴', '', '日用品', 1095, -1, -1],
+  ['口罩', '', '日用品', 1095, -1, -1],
+  ['电池', '', '日用品', 730, -1, -1]
+];
+
+// 粗分类兜底：名字在表里查不到时，按这个分类给个保守值。
+// 宁可保守 —— 提示早了最多是看一眼，提示晚了东西就烂了。
+const CAT_SHELF = {
+  '蔬菜':   { amb: 2,  fridge: 5,  freeze: -1  },
+  '水果':   { amb: 5,  fridge: 10, freeze: -1  },
+  '肉类':   { amb: -1, fridge: 3,  freeze: 180 },
+  '水产':   { amb: -1, fridge: 2,  freeze: 90  },
+  '蛋类':   { amb: 14, fridge: 35, freeze: -1  },
+  '奶制品': { amb: -1, fridge: 7,  freeze: -1  },
+  '豆制品': { amb: 1,  fridge: 4,  freeze: 90  },
+  '主食':   { amb: 30, fridge: 7,  freeze: 90  },
+  '烘焙':   { amb: 2,  fridge: 5,  freeze: 60  },
+  '调味':   { amb: 365,fridge: 540,freeze: -1  },
+  '饮品':   { amb: 180,fridge: 270,freeze: -1  },
+  '零食':   { amb: 180,fridge: 240,freeze: -1  },
+  '日用品': { amb: 730,fridge: -1, freeze: -1  }
+};
+
+// --- 位置定义 -------------------------------------------------------
+// 用户说的「买完就记」——位置是必填的心智锚点，但也别让他打字。
+const INV_LOCATIONS = [
+  { id: 'fridge',  name: '冷藏',  icon: 'fridge',  shelfKey: 'fridge' },
+  { id: 'freeze',  name: '冷冻',  icon: 'snow',    shelfKey: 'freeze' },
+  { id: 'ambient', name: '常温',  icon: 'box',     shelfKey: 'amb'    },
+  { id: 'cabinet', name: '储物柜', icon: 'cabinet', shelfKey: 'amb'    }
+];
+function invLocName(id) {
+  const l = INV_LOCATIONS.find(x => x.id === id);
+  return l ? l.name : '常温';
+}
+
+// 把紧凑数组展开成查询用的索引（模块加载时一次性建好）
+const FOOD_INDEX = (() => {
+  const idx = new Map();
+  for (const row of FOOD_SHELF_RAW) {
+    const [name, aliasStr, cat, amb, fridge, freeze] = row;
+    const entry = { name, cat, amb, fridge, freeze };
+    idx.set(name, entry);
+    if (aliasStr) {
+      for (const a of aliasStr.split(',')) {
+        if (a && !idx.has(a)) idx.set(a, entry);
+      }
+    }
+  }
+  return idx;
+})();
+
+// 模糊查表：先精确，再「包含」——「小番茄」能命中「番茄」的别名，「有机菠菜」能命中「菠菜」
+function invLookupShelf(query) {
+  if (!query) return null;
+  const q = String(query).trim();
+  if (!q) return null;
+  if (FOOD_INDEX.has(q)) return FOOD_INDEX.get(q);
+  // 长名优先，避免「白菜」把「大白菜」抢走
+  let best = null, bestLen = 0;
+  for (const [k, v] of FOOD_INDEX) {
+    if (q.indexOf(k) >= 0 && k.length > bestLen) { best = v; bestLen = k.length; }
+  }
+  if (best) return best;
+  // 再反着来：查的比表里长（「菠菜叶」→ 表里的「菠菜」已覆盖，这里兜「嫩豆腐」→「豆腐」之类）
+  for (const [k, v] of FOOD_INDEX) {
+    if (k.indexOf(q) >= 0 && q.length > bestLen) { best = v; bestLen = q.length; }
+  }
+  return best;
+}
+
+// 根据「名称 + 位置」推出参考保质天数。返回 { days, src, cat }
+// src = 'exact'(表里查到) | 'cat'(按分类兜底) | null(查不到)
+function invSuggestDays(name, locId) {
+  const loc = INV_LOCATIONS.find(x => x.id === locId) || INV_LOCATIONS[2]; // 默认常温
+  const key = loc.shelfKey;   // amb / fridge / freeze
+  const hit = invLookupShelf(name);
+  if (hit) {
+    const d = hit[key];
+    if (d > 0) return { days: d, src: 'exact', cat: hit.cat, matched: hit.name };
+    // 表里有这个名字，但这个位置的天数是 -1（比如青菜冷冻）
+    // → 换一个有值的档位，并告诉用户「你选的位置可能不对」
+    for (const alt of ['fridge', 'amb', 'freeze']) {
+      if (hit[alt] > 0) return { days: hit[alt], src: 'exact', cat: hit.cat, matched: hit.name, movedFrom: key, movedTo: alt };
+    }
+  }
+  // 分类兜底：用户可能输入「有机青菜」这种带前缀的，用包含关系猜分类
+  for (const cat in CAT_SHELF) {
+    if (name.indexOf(cat) >= 0) {
+      const c = CAT_SHELF[cat];
+      if (c[key] > 0) return { days: c[key], src: 'cat', cat };
+    }
+  }
+  return { days: 0, src: null };
+}
+
+// --- 一句话解析器 ---------------------------------------------------
+// 支持的说法（都是人自然会说的，不需要学格式）：
+//   「鸡蛋 10个 冷藏」          → 名称=鸡蛋 数量=10个 位置=冷藏
+//   「面包 常温 3天」            → 名称=面包 位置=常温 到期=今天+3
+//   「牛奶 9月30日」             → 名称=牛奶 到期=9/30
+//   「两提纸巾 储物柜」          → 中文数字也认
+//   「西红柿2斤 冷藏 一周」       → 相对时间也认
+//
+// 关键原则：**永远返回一个可用的结果**。解析不出来的部分就留空/用默认值，
+// 由用户在预览条上改。绝不抛错、绝不弹「格式不对」。
+
+const CN_NUM = { '零':0,'一':1,'两':2,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10 };
+
+function cnNumToInt(s) {
+  if (!s) return NaN;
+  if (/^\d+$/.test(s)) return parseInt(s, 10);
+  // 处理「十」「十五」「二十」「二十三」这类
+  if (s === '十') return 10;
+  if (s.indexOf('十') === 0) {
+    const rest = s.slice(1);
+    return 10 + (rest ? (CN_NUM[rest] || 0) : 0);
+  }
+  if (s.indexOf('十') > 0) {
+    const [a, b] = s.split('十');
+    return (CN_NUM[a] || 1) * 10 + (b ? (CN_NUM[b] || 0) : 0);
+  }
+  if (s.length === 1 && CN_NUM[s] !== undefined) return CN_NUM[s];
+  return NaN;
+}
+
+// 把一句话切成 tokens（中文没有空格，所以用正则直接抽，而不是 split）
+function parseItemSentence(input) {
+  const raw = String(input || '').trim();
+  const out = {
+    raw,
+    name: '',
+    qty: '',
+    unit: '',
+    loc: '',
+    expireAt: '',      // YYYY-MM-DD
+    days: 0,           // 用户显式说的天数
+    shelfSrc: null,    // 保质天数的来源：exact / cat / null
+    shelfHint: '',
+    ok: false
+  };
+  if (!raw) return out;
+
+  let rest = raw;
+
+  // ---- 1. 位置 ----
+  // 位置词可能是「冷藏」「冰箱」「冷冻」「冰箱冷冻」「常温」「柜子」「储物柜」
+  const LOC_RULES = [
+    { re: /(冷冻|冰柜|冰冻)/,             id: 'freeze'  },
+    { re: /(冷藏|冰箱|保鲜层|保鲜)/,       id: 'fridge'  },
+    { re: /(储物柜|柜子|柜里|抽屉|收纳箱)/, id: 'cabinet' },
+    { re: /(常温|室温|外面|台面|桌上|厨房)/, id: 'ambient' }
+  ];
+  for (const r of LOC_RULES) {
+    if (r.re.test(rest)) {
+      out.loc = r.id;
+      rest = rest.replace(r.re, ' ');
+      break;
+    }
+  }
+
+  // ---- 2. 到期日 / 存放天数 ----
+  const today = new Date();
+  const mk = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + dd;
+  };
+  const addDays = (n) => { const d = new Date(today.getTime()); d.setDate(d.getDate() + n); return d; };
+
+  // 2a. 绝对日期：9月30日 / 9/30 / 2026-09-30 / 9月30号
+  let m = rest.match(/(\d{4})[-\/年](\d{1,2})[-\/月](\d{1,2})/);
+  if (m) {
+    out.expireAt = m[1] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[3]).padStart(2, '0');
+    rest = rest.replace(m[0], ' ');
+  } else {
+    m = rest.match(/(\d{1,2})[月\/](\d{1,2})[日号]?/);
+    if (m) {
+      const mm = parseInt(m[1], 10), dd = parseInt(m[2], 10);
+      if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+        // 已经过去的月份 → 理解为明年（比如现在 11 月，说「1月5日」）
+        let yy = today.getFullYear();
+        const cand = new Date(yy, mm - 1, dd);
+        const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        if (cand < todayZero) yy += 1;
+        out.expireAt = yy + '-' + String(mm).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
+        rest = rest.replace(m[0], ' ');
+      }
+    }
+  }
+
+  // 2b. 相对时间：3天 / 一周 / 两周 / 半个月 / 3个月 / 明天 / 后天
+  if (!out.expireAt) {
+    const relHit = rest.match(/(\d+|[一两二三四五六七八九十]+)\s*(天|日|周|星期|个?月|年)/);
+    if (relHit) {
+      const n = cnNumToInt(relHit[1]);
+      const unit = relHit[2];
+      if (!isNaN(n)) {
+        let days = 0;
+        if (unit === '天' || unit === '日') days = n;
+        else if (unit === '周' || unit === '星期') days = n * 7;
+        else if (unit.indexOf('月') >= 0) days = n * 30;
+        else if (unit === '年') days = n * 365;
+        if (days > 0) {
+          out.days = days;
+          out.expireAt = mk(addDays(days));
+          rest = rest.replace(relHit[0], ' ');
+        }
+      }
+    } else if (/(明天|明日)/.test(rest)) {
+      out.days = 1; out.expireAt = mk(addDays(1));
+      rest = rest.replace(/(明天|明日)/, ' ');
+    } else if (/(后天)/.test(rest)) {
+      out.days = 2; out.expireAt = mk(addDays(2));
+      rest = rest.replace(/(后天)/, ' ');
+    }
+  }
+
+  // ---- 3. 数量 + 单位 ----
+  // 单位表：越长的越先匹配（「公斤」要排在「斤」前面）
+  const UNITS = ['公斤','千克','毫升','kg','KG','ml','ML','个','只','枚','颗','袋','包','盒','瓶','罐','桶','斤','两','片','根','把','捆','提','卷','条','块','箱','杯','份','支','张','双','碗'];
+  const unitAlt = UNITS.map(u => u.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const numAlt = '(\\d+(?:\\.\\d+)?|[一两二三四五六七八九十]+)';
+  const qtyRe = new RegExp(numAlt + '\\s*(' + unitAlt + ')');
+  const qh = rest.match(qtyRe);
+  if (qh) {
+    out.qty = qh[1];
+    out.unit = qh[2];
+    rest = rest.replace(qh[0], ' ');
+  } else {
+    // 没有单位也可能有纯数字： 「鸡蛋 10」
+    const qh2 = rest.match(/(?:^|\s)(\d+)(?:\s|$)/);
+    if (qh2) { out.qty = qh2[1]; rest = rest.replace(qh2[0], ' '); }
+  }
+
+  // ---- 4. 剩下的就是名称 ----
+  out.name = rest.replace(/[\s,，、。；;·]+/g, ' ').trim();
+  // 去掉可能残留的「买了」「买」「的」这类口语词
+  out.name = out.name.replace(/^(买了?|新买了?|刚买了?|一?共)/, '').trim();
+
+  // ---- 5. 位置默认值 + 保质期推算 ----
+  if (!out.loc) out.loc = 'ambient';
+
+  if (!out.expireAt) {
+    const s = invSuggestDays(out.name, out.loc);
+    if (s.days > 0) {
+      out.days = s.days;
+      out.expireAt = mk(addDays(s.days));
+      out.shelfSrc = s.src;
+      out.shelfMatched = s.matched || '';
+      out.shelfCat = s.cat || '';
+      if (s.movedFrom) out.shelfHint = '这个位置不适合放它，改用「' + invLocName(
+        s.movedTo === 'fridge' ? 'fridge' : s.movedTo === 'freeze' ? 'freeze' : 'ambient') + '」的天数';
+    }
+  }
+
+  out.ok = !!out.name;
+  return out;
+}
+
+// 把解析结果转成一条库存记录
+function invMakeItem(p) {
+  return {
+    id: 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    name: p.name || '未命名',
+    qty: p.qty || '',
+    unit: p.unit || '',
+    loc: p.loc || 'ambient',
+    expireAt: p.expireAt || '',
+    createdAt: new Date().toISOString(),
+    note: ''
+  };
+}
+
+// 剩余天数（负数 = 已过期）
+function invDaysLeft(item) {
+  if (!item || !item.expireAt) return null;
+  const t = new Date();
+  const todayZero = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  const ex = new Date(item.expireAt + 'T00:00:00');
+  if (isNaN(ex.getTime())) return null;
+  return Math.round((ex - todayZero) / 86400000);
+}
+
+// 到期状态分档 —— 前端配色就靠这个
+function invStatus(item) {
+  const d = invDaysLeft(item);
+  if (d === null) return 'none';     // 没填到期日
+  if (d < 0)  return 'expired';      // 已过期
+  if (d <= 3) return 'soon';         // 3天内
+  if (d <= 7) return 'week';         // 本周内
+  return 'ok';
+}
+
+
+// --- 数据读写 -------------------------------------------------------
+// 数据放 KV 的 inventory 键，跨设备同步。默认空数组。
+function invData() { return Store.get('inventory', []); }
+function invSaveData(list) {
+  Store.set('inventory', list);
+  if (typeof kvMarkDirty === 'function') kvMarkDirty('inventory');
+}
+
+// --- 面板渲染 -------------------------------------------------------
+let _invLocFilter = '';
+
+function renderInventory() {
+  const list = invData();
+
+  // 三计数：已过期 / 3天内 / 本周内
+  let nExpired = 0, nSoon = 0, nWeek = 0;
+  for (const it of list) {
+    const st = invStatus(it);
+    if (st === 'expired') nExpired++;
+    else if (st === 'soon') nSoon++;
+    else if (st === 'week') nWeek++;
+  }
+  const stats = document.getElementById('inv-stats');
+  if (stats) {
+    const badge = (n, label, cls) =>
+      '<div style="flex:1;text-align:center;padding:10px 6px;border-radius:var(--radius-sm);' +
+      'background:var(--bg-raised);border:1px solid ' + (n > 0 ? cls.border : 'var(--border-subtle)') + ';">' +
+      '<div style="font-size:var(--fs-xl);font-weight:bold;color:' + (n > 0 ? cls.text : 'var(--text-dim)') + ';">' + n + '</div>' +
+      '<div class="t-dim-xs" style="margin-top:2px;">' + label + '</div></div>';
+    stats.innerHTML =
+      badge(nExpired, '已过期', { border: 'var(--danger,#e5484d)', text: 'var(--danger,#e5484d)' }) +
+      badge(nSoon, '3天内', { border: '#e8a33d', text: '#e8a33d' }) +
+      badge(nWeek, '本周内', { border: 'var(--accent)', text: 'var(--accent)' });
+  }
+
+  const cnt = document.getElementById('inv-count');
+  if (cnt) cnt.textContent = list.length ? '共 ' + list.length + ' 件' : '';
+
+  // 位置筛选条
+  const bar = document.getElementById('inv-locbar');
+  if (bar) {
+    const counts = {};
+    for (const it of list) counts[it.loc || 'ambient'] = (counts[it.loc || 'ambient'] || 0) + 1;
+    let h = '<button class="inv-locchip' + (_invLocFilter === '' ? ' active' : '') +
+            '" onclick="invSetLoc(\'\')">全部 ' + list.length + '</button>';
+    for (const l of INV_LOCATIONS) {
+      const n = counts[l.id] || 0;
+      if (!n) continue;
+      h += '<button class="inv-locchip' + (_invLocFilter === l.id ? ' active' : '') +
+           '" onclick="invSetLoc(\'' + l.id + '\')">' + l.name + ' ' + n + '</button>';
+    }
+    bar.innerHTML = h;
+  }
+
+  // 清单：按到期日升序（最快过期在最上，没填到期日的排最后）
+  const box = document.getElementById('inv-list');
+  if (!box) return;
+  let rows = list.slice();
+  if (_invLocFilter) rows = rows.filter(it => (it.loc || 'ambient') === _invLocFilter);
+  if (!rows.length) {
+    box.innerHTML = '<div class="t-dim-xs" style="text-align:center;padding:24px 12px;line-height:1.7;">' +
+      (list.length ? '这个位置没有东西' : '还没有记录。<br>上面说一句就记下来了，比如「鸡蛋 10个 冷藏」') + '</div>';
+    return;
+  }
+  rows.sort((a, b) => {
+    const da = invDaysLeft(a), db = invDaysLeft(b);
+    if (da === null && db === null) return 0;
+    if (da === null) return 1;
+    if (db === null) return -1;
+    return da - db;
+  });
+
+  const STATUS_STYLE = {
+    expired: { c: 'var(--danger,#e5484d)', t: '已过期' },
+    soon:    { c: '#e8a33d',               t: '快过期' },
+    week:    { c: 'var(--accent)',         t: '本周'   },
+    ok:      { c: 'var(--text-dim)',       t: ''       },
+    none:    { c: 'var(--text-dim)',       t: '无日期' }
+  };
+
+  box.innerHTML = rows.map(it => {
+    const st = invStatus(it);
+    const sty = STATUS_STYLE[st] || STATUS_STYLE.none;
+    const d = invDaysLeft(it);
+    let dayTxt = '';
+    if (d !== null) {
+      if (d < 0) dayTxt = '过期 ' + Math.abs(d) + ' 天';
+      else if (d === 0) dayTxt = '今天到期';
+      else dayTxt = '还剩 ' + d + ' 天';
+    }
+    const qty = (it.qty || '') + (it.unit || '');
+    const idSafe = String(it.id).replace(/'/g, "\\'");
+    return '' +
+      '<div class="card inv-item" style="padding:11px 12px;margin-bottom:8px;border-left:3px solid ' + sty.c + ';">' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-size:var(--fs-base);color:var(--text-primary);word-break:break-all;">' +
+              '<b>' + invEsc(it.name) + '</b>' +
+              (qty ? ' <span class="t-dim-xs">' + invEsc(qty) + '</span>' : '') +
+            '</div>' +
+            '<div class="t-dim-xs" style="margin-top:3px;">' +
+              invLocName(it.loc) +
+              (dayTxt ? ' · <span style="color:' + sty.c + ';">' + dayTxt + '</span>' : '') +
+              (it.expireAt ? ' · ' + it.expireAt.slice(5).replace('-', '/') : '') +
+            '</div>' +
+          '</div>' +
+          '<button class="btn btn-sm" onclick="invConsume(\'' + idSafe + '\')" aria-label="用完了" style="flex:none;padding:0 10px;min-height:32px;">吃完</button>' +
+          '<button class="btn btn-sm" onclick="invOpenEdit(\'' + idSafe + '\')" aria-label="编辑" style="flex:none;padding:0 10px;min-height:32px;">改</button>' +
+        '</div>' +
+      '</div>';
+  }).join('');
+}
+
+function invEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function invSetLoc(id) {
+  _invLocFilter = id;
+  renderInventory();
+}
+
+// --- 一句话录入 -----------------------------------------------------
+let _invPending = null;   // 解析出来的待确认记录
+
+function invResetInput() {
+  const el = document.getElementById('inv-input');
+  if (el) el.value = '';
+  _invPending = null;
+  invHidePreview();
+}
+
+function invHidePreview() {
+  const p = document.getElementById('inv-preview');
+  if (p) { p.style.display = 'none'; p.innerHTML = ''; }
+}
+
+// 输入时实时预览（让用户看到系统理解成了什么，不用等提交才知道）
+function invOnInput() {
+  const el = document.getElementById('inv-input');
+  if (!el) return;
+  const raw = el.value.trim();
+  if (!raw) { invHidePreview(); _invPending = null; return; }
+  const p = parseItemSentence(raw);
+  if (!p.ok) { invHidePreview(); _invPending = null; return; }
+  _invPending = p;
+  const box = document.getElementById('inv-preview');
+  if (!box) return;
+  const srcLabel = p.shelfSrc === 'exact' ? '参考表' : p.shelfSrc === 'cat' ? '按分类估算' : '';
+  box.style.display = 'block';
+  box.innerHTML =
+    '<div style="padding:10px;border-radius:var(--radius-sm);background:var(--bg-raised);border:1px solid var(--border-subtle);">' +
+      '<div class="t-dim-xs" style="margin-bottom:6px;">识别为：</div>' +
+      '<div style="font-size:var(--fs-sm);color:var(--text-primary);line-height:1.8;">' +
+        '名称 <b>' + invEsc(p.name) + '</b>' +
+        (p.qty ? ' · 数量 <b>' + invEsc(p.qty + p.unit) + '</b>' : '') +
+        ' · 位置 <b>' + invLocName(p.loc) + '</b>' +
+        (p.expireAt ? ' · 到期 <b>' + p.expireAt.slice(5).replace('-', '/') + '</b>' : '') +
+      '</div>' +
+      (srcLabel && !p.days_explicit
+        ? '<div class="t-dim-xs" style="margin-top:6px;">保质期按' + srcLabel + '给的参考值' +
+          (p.shelfMatched && p.shelfMatched !== p.name ? '（匹配到「' + invEsc(p.shelfMatched) + '」）' : '') +
+          '，不准就点「改」</div>'
+        : '') +
+      (p.shelfHint ? '<div class="t-dim-xs" style="margin-top:4px;color:#e8a33d;">' + invEsc(p.shelfHint) + '</div>' : '') +
+    '</div>';
+}
+
+function invSubmit() {
+  const el = document.getElementById('inv-input');
+  if (!el) return;
+  const raw = el.value.trim();
+  if (!raw) return;
+  // 用输入时的解析结果；如果用户是直接回车（没触发 input 事件），现场再解析一次
+  let p = _invPending;
+  if (!p || p.raw !== raw) p = parseItemSentence(raw);
+  if (!p.ok) {
+    // 极端兜底：整句当名称，仍然存下去，绝不弹错让用户重填
+    p = { ok: true, raw, name: raw, qty: '', unit: '', loc: 'ambient', expireAt: '' };
+  }
+  const item = invMakeItem(p);
+  const list = invData();
+  list.push(item);
+  invSaveData(list);
+  invResetInput();
+  renderInventory();
+  if (typeof toast === 'function') toast('已记下：' + item.name);
+}
+
+// --- 条目操作 -------------------------------------------------------
+function invConsume(id) {
+  const list = invData();
+  const i = list.findIndex(x => String(x.id) === String(id));
+  if (i < 0) return;
+  const name = list[i].name;
+  list.splice(i, 1);
+  invSaveData(list);
+  renderInventory();
+  if (typeof toast === 'function') toast('已用完：' + name);
+}
+
+function invOpenEdit(id) {
+  const list = invData();
+  const it = list.find(x => String(x.id) === String(id));
+  if (!it) return;
+  const name = prompt('名称', it.name);
+  if (name === null) return;
+  const qtyRaw = prompt('数量（如 10个，可留空）', (it.qty || '') + (it.unit || ''));
+  if (qtyRaw === null) return;
+  const locNames = INV_LOCATIONS.map(l => l.name).join(' / ');
+  const locRaw = prompt('位置（' + locNames + '）', invLocName(it.loc));
+  if (locRaw === null) return;
+  const expRaw = prompt('到期日（YYYY-MM-DD，留空=没有）', it.expireAt || '');
+  if (expRaw === null) return;
+
+  it.name = name.trim() || it.name;
+  // 从「10个」里拆数量与单位
+  const qm = String(qtyRaw).trim().match(/^([\d.]+|[一两二三四五六七八九十百]+)\s*(.*)$/);
+  if (qm) { it.qty = qm[1]; it.unit = (qm[2] || '').trim(); }
+  else { it.qty = ''; it.unit = ''; }
+  const hitLoc = INV_LOCATIONS.find(l => l.name === String(locRaw).trim());
+  it.loc = hitLoc ? hitLoc.id : it.loc;
+  const e = String(expRaw).trim();
+  it.expireAt = /^\d{4}-\d{2}-\d{2}$/.test(e) ? e : (e ? it.expireAt : '');
+  it.updatedAt = new Date().toISOString();
+
+  invSaveData(list);
+  renderInventory();
+}
+
+// --- 今日页「快过期」卡片 -------------------------------------------
+// 只在真的有东西要过期时才渲染 —— 没东西就完全不占地方。
+function renderInvAlertCard() {
+  const box = document.getElementById('inv-alert-card');
+  if (!box) return;
+  const list = invData();
+  const urgent = list.filter(it => {
+    const st = invStatus(it);
+    return st === 'expired' || st === 'soon';
+  });
+  if (!urgent.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  urgent.sort((a, b) => (invDaysLeft(a) || 0) - (invDaysLeft(b) || 0));
+  const nExp = urgent.filter(x => invStatus(x) === 'expired').length;
+  const head = nExp
+    ? nExp + ' 样已经过期了'
+    : urgent.length + ' 样快过期了';
+  box.style.display = 'block';
+  box.innerHTML =
+    '<div class="card" style="padding:12px;margin-bottom:12px;border-left:3px solid var(--danger,#e5484d);cursor:pointer;" onclick="switchTab(\'inventory\')">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+        '<span style="font-size:var(--fs-base);color:var(--text-primary);font-weight:bold;flex:1;">⏰ ' + head + '</span>' +
+        '<span class="t-dim-xs">去处理 →</span>' +
+      '</div>' +
+      urgent.slice(0, 4).map(it => {
+        const d = invDaysLeft(it);
+        const t = d < 0 ? '过期 ' + Math.abs(d) + ' 天' : d === 0 ? '今天到期' : '还剩 ' + d + ' 天';
+        return '<div class="t-dim-xs" style="line-height:1.7;">· ' + invEsc(it.name) +
+               '（' + invLocName(it.loc) + '，' + t + '）</div>';
+      }).join('') +
+      (urgent.length > 4 ? '<div class="t-dim-xs" style="margin-top:4px;">…还有 ' + (urgent.length - 4) + ' 样</div>' : '') +
+    '</div>';
+}
+
+// --- 观点库浮层 -----------------------------------------------------
+function openPoints() {
+  const ov = document.getElementById('points-overlay');
+  if (!ov) return;
+  ov.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  if (typeof pointsLoad === 'function') pointsLoad(false);
+}
+function closePoints() {
+  const ov = document.getElementById('points-overlay');
+  if (!ov) return;
+  ov.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+// 点浮层空白处（不是里面的内容）关闭。
+// 用 mousedown 而不是 click，并且判断 target === overlay 本身 ——
+// 内容区在 overlay 里的内层 div 中，所以点内容不会误触关闭。
+document.addEventListener('mousedown', function (ev) {
+  const ov = document.getElementById('points-overlay');
+  if (!ov || ov.style.display === 'none') return;
+  if (ev.target === ov) closePoints();
+}, true);
+
+// === 物品管理 / 库存 END ===
+
 // === 灵感库 ===
 // 图片本体存服务器（走 /api/files），元数据进 KV 同步 —— 换设备能看到卡片，图按需拉。
 let _inspKind = 'thought';
@@ -3422,7 +4227,7 @@ function paintDailyPoint(it) {
         : '')
     + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
     +   '<a href="' + pointsEsc(pointsVideoUrl(it)) + '" target="_blank" rel="noopener noreferrer" class="btn btn-sm">看原视频</a>'
-    +   '<button class="btn btn-sm" onclick="switchTab(\'points\')" style="font-size:var(--fs-2xs);">看全部观点</button>'
+    +   '<button class="btn btn-sm" onclick="openPoints()" style="font-size:var(--fs-2xs);">全部观点 →</button>'
     + '</div>';
 }
 // === 观点库 END ===
@@ -6093,8 +6898,8 @@ function deleteAiReport(id) {
 // 导航只渲染目标面板（启动时的 renderAll 已把所有面板渲染过一次，数据变更路径也都各自
 // 触发 renderAll / 具体 render，所以切 tab 不必每次全量重渲——避免移动端卡顿与冗余服务端请求）。
 function renderPanel(name) {
-  if (name === 'daily') { renderDailyHub(); }
-  else if (name === 'points') { pointsLoad(false); }
+  if (name === 'daily') { renderDailyHub(); renderInvAlertCard(); }
+  else if (name === 'inventory') { renderInventory(); }
   else if (name === 'courses') { renderCourses(); renderNextClassBanner(); renderScheduleModeButtons(); }
   else if (name === 'data') { renderWallet(); renderInvestJournal(); renderHistory(); renderJournalArchive(); }
   else if (name === 'settings') { renderSettings(); renderAiWeek(); }
@@ -6339,6 +7144,7 @@ function saveTask() {
 // === Render Functions ===
 function renderAll() {
   renderDailyHub();  renderTasks();
+  renderInvAlertCard();   // 首次加载/全量刷新时也要算快过期 —— 这是最该显示的场景
   renderWallet();
   renderInvestJournal();
   renderHistory();
