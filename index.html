@@ -793,12 +793,21 @@ a { color: var(--accent); text-underline-offset: 2px; }
    没数据时折成一行（标题变暗 + 箭头朝右），点标题展开；
    有数据时默认展开。用户手动点过就记住他的选择。 */
 .daily-section.collapsible > .section-header { cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+/* 折叠条右侧的条数角标（只在折叠时出现，由 applySectionCounts() 插入） */
+.sec-count-badge {
+  font-family: var(--font-mono); font-size: var(--fs-2xs);
+  color: var(--text-dim); margin-left: auto; padding-left: 8px; flex: none;
+}
+
 /* 折叠指示符：原来是 0.62em（约 10px，低于 12px 下限）。
    它是纯装饰，但仍然要能看清，所以用绝对值而不是相对父级的 em。 */
 .daily-section.collapsible > .section-header .section-title::after { content: ' ▾'; font-size:var(--fs-2xs); opacity: .45; }
 .daily-section.collapsible.collapsed > .section-header .section-title::after { content: ' ▸'; }
 .daily-section.collapsible.collapsed > .section-header { opacity: .55; }
-.daily-section.collapsible.collapsed > *:not(.section-header) { display: none !important; }
+.daily-section.collapsible.collapsed > *:not(.section-header):not(.sec-always-show) { display: none !important; }
+/* 个别区块有「折了也要看得见」的部分（如每日观点的主句）。
+   挂上 .sec-always-show 就绕开上面的隐藏规则。 */
+.daily-section.collapsible.collapsed > .sec-always-show { margin-top: 10px; }
 
 
 /* === 财务洞察（2026-09-16 新增）=== */
@@ -1217,6 +1226,12 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <button class="sync-btn" id="theme-toggle" onclick="toggleTheme()" aria-label="切换主题">
         <span id="theme-icon" class="icn" style="display:inline-flex;"></span>
       </button>
+      <!-- 字号档位：点一下切一档（标准 → 大 → 特大 → 标准）。
+           做成循环而不是弹面板，是因为手机上少点两下就少两次误触机会。 -->
+      <button class="sync-btn" id="font-toggle" onclick="cycleFontScale()" aria-label="调整字号">
+        <span style="font-size:15px;font-weight:700;line-height:1;">A</span>
+        <span id="font-scale-label" style="font-size:10px;margin-left:1px;opacity:.8;line-height:1;">标</span>
+      </button>
     </div>
   </header>
 
@@ -1274,8 +1289,35 @@ a { color: var(--accent); text-underline-offset: 2px; }
     <!-- ⓪ Next Class Banner（单行速览，点一下进「课表」看完整安排） -->
     <div class="daily-next-class" id="daily-next-class" style="display:none;" onclick="switchTab('courses')"></div>
 
-    <!-- ③ Daily Check-in -->
-    <div class="daily-section">
+    <!-- ⑫ 每日观点（来自服务器观点库，每天一条，同一天刷新不变） -->
+    <div class="daily-section collapsible" id="sec-daily-point">
+      <div class="section-header">
+        <span class="section-title">每日观点</span>
+        <span id="daily-point-from" class="t-dim-xs"></span>
+      </div>
+      <!-- 主句常显（用 .sec-always-show 绕开折叠隐藏）：
+           把它提到页面最上面，就是为了「打开就看到今天这一句」。
+           跟着一起折成一行的话，只剩标题，等于白提。
+           只把 3 条要点和按钮收进折叠区。 -->
+      <div id="daily-point-lead" class="sec-always-show"
+           style="font-size:var(--fs-md);line-height:1.65;color:var(--text-primary);"></div>
+      <div id="daily-point-body"></div>
+    </div>
+
+    <!-- ⑨ Daily English（每日一词 + 每日一句，按天轮换；发音走浏览器自带语音）-->
+    <div class="daily-section collapsible" id="sec-english">
+      <div class="section-header">
+        <span class="section-title">每日英语</span>
+        <span id="daily-en-hint" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-dim);"></span>
+      </div>
+      <div id="daily-english-body"></div>
+    </div>
+
+    <!-- ③ Daily Check-in
+         用户说「这个其实没啥用，我都想删了」—— 先折起来不删。
+         折起来只占一行，效果跟删了差不多；但哪天想用还在。
+         删了就真没了，折起来是免费的。 -->
+    <div class="daily-section collapsible" id="sec-today-tasks">
       <div class="section-header">
         <span class="section-title">今日任务</span>
         <span class="section-count" id="today-tasks-count"></span>
@@ -1334,15 +1376,6 @@ a { color: var(--accent); text-underline-offset: 2px; }
       </div>
     </div>
 
-    <!-- ⑨ Daily English（每日一词 + 每日一句，按天轮换；发音走浏览器自带语音）-->
-    <div class="daily-section collapsible" id="sec-english">
-      <div class="section-header">
-        <span class="section-title">每日英语</span>
-        <span id="daily-en-hint" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-dim);"></span>
-      </div>
-      <div id="daily-english-body"></div>
-    </div>
-
     <!-- ⑩ Daily Chess（每日残局，可自己走子）-->
     <div class="daily-section collapsible" id="sec-chess">
       <div class="section-header">
@@ -1352,19 +1385,10 @@ a { color: var(--accent); text-underline-offset: 2px; }
       <div id="daily-chess-body"></div>
     </div>
 
-    <!-- ⑫ 每日观点（来自服务器观点库，每天一条，同一天刷新不变） -->
-    <div class="daily-section" id="sec-daily-point" style="display:none;">
-      <div class="section-header">
-        <span class="section-title">每日观点</span>
-        <span id="daily-point-from" class="t-dim-xs"></span>
-      </div>
-      <div id="daily-point-body"></div>
-    </div>
-
     <!-- ⑪ 当日记录（随手记的内容展示区）
          写入口在上方「饮食记录」下面；这里只展示今天已记的内容。
          放在最底部是有意的：列表会随记录条数变长，压在最下面就不会挤占上面各模块。 -->
-    <div class="daily-section" id="sec-journal-today">
+    <div class="daily-section collapsible" id="sec-journal-today">
       <div class="section-header">
         <span class="section-title">当日记录</span>
         <span id="journal-today-count" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-dim);"></span>
@@ -2533,33 +2557,122 @@ Store.onSet((key) => {
 
 
 // === 今日面板：区块折叠 ===
-// 规则：有数据默认展开、无数据默认折叠（折成一行，点标题即展开）。
-// 用户手动点过就记住他的选择 —— 存本地，且刻意不进 SYNC_KEYS（折叠是每台设备各自的偏好）。
-const COLLAPSIBLE_SECTIONS = ['meals', 'expense', 'english', 'chess'];
+//
+// 规则（2026-09-26 按用户要求整体反过来）：
+//   **一律默认折叠，要用的时候自己展开。**
+//
+// 之前是「有数据就展开、没数据才折」，用户的原话是：
+//   「给每一条加个折叠选项，默认折叠，要用的就打开」
+//   「像每日残局和当日记录、今日任务都要默认折叠」
+//   「字体有点大…其实我感觉这个没啥用」—— 指今日任务
+//
+// 为什么不给「有数据就自动展开」留例外：用户明确选了「默认折叠」，
+// 而且被点到的那几块（任务/残局/当日记录）恰恰是「回头才看」的内容，
+// 一屏全是展开的反而找不到重点。
+//
+// **唯一不折叠的是随手记**（sec-journal-input）：它是写入口，
+// 折起来等于让人没法写，那是功能残废不是简洁。
+const COLLAPSIBLE_SECTIONS = ['today-tasks', 'meals', 'expense', 'english', 'chess', 'daily-point', 'journal-today'];
+
+// 折叠状态存在本地，且刻意不进 SYNC_KEYS：
+// 手机和电脑屏幕尺寸不同，「该折哪些」是每台设备各自的偏好。
+//
+// ★ 结构是 { 日期: { 区块: bool } } 而不是拍平的 { 区块: bool }。
+// 因为用户要求「跨天重置」（当天打开过，第二天进来又是折的）——
+// 所以必须知道「这个选择是哪天做的」。拍平的存法没法判断日期。
+function _collapseStore() {
+  const raw = Store.get('sectionOpenByDay', {});
+  const today = TODAY();
+  return { date: today, map: (raw && raw.date === today) ? (raw.map || {}) : {} };
+}
 
 function sectionHasData(key) {
   const today = TODAY();
-  if (key === 'meals')   return (((Store.get('dailyLog', {})[today]) || {}).meals || []).length > 0;
-  if (key === 'expense') return (Store.get('wallet', {}).transactions || []).some(t => dateOf(t.date) === today);
+  if (key === 'meals')         return (((Store.get('dailyLog', {})[today]) || {}).meals || []).length > 0;
+  if (key === 'expense')       return (Store.get('wallet', {}).transactions || []).some(t => dateOf(t.date) === today);
+  if (key === 'journal-today') return journalItems(today).length > 0;
+  if (key === 'today-tasks')   return true;
   return true;
+}
+
+// 折叠时标题右侧显示的条数。用户要求「留条数」——
+// 不然折起来全是光秃秃一行，不知道自己今天到底记了没有。
+function sectionCountText(key) {
+  const today = TODAY();
+  try {
+    if (key === 'meals') {
+      const n = (((Store.get('dailyLog', {})[today]) || {}).meals || []).length;
+      return n ? n + ' 条' : '';
+    }
+    if (key === 'expense') {
+      const list = (Store.get('wallet', {}).transactions || []).filter(t => dateOf(t.date) === today);
+      return list.length ? list.length + ' 笔' : '';
+    }
+    if (key === 'journal-today') {
+      const n = journalItems(today).length;
+      return n ? n + ' 条' : '';
+    }
+    if (key === 'today-tasks') {
+      const el = document.getElementById('today-tasks-count');
+      return el ? (el.textContent || '') : '';
+    }
+  } catch (e) { /* 数据还没准备好就算了，条数不是关键信息 */ }
+  return '';
 }
 
 function toggleSection(key) {
   const el = document.getElementById('sec-' + key);
   if (!el) return;
   const collapsed = el.classList.toggle('collapsed');
-  const st = Store.get('sectionOpen', {});
-  st[key] = !collapsed;
-  Store.set('sectionOpen', st);
+  const st = _collapseStore();
+  st.map[key] = !collapsed;
+  Store.set('sectionOpenByDay', { date: st.date, map: st.map });
+  applySectionCounts();
 }
 
 function updateSectionCollapse() {
-  const saved = Store.get('sectionOpen', {});
+  const st = _collapseStore();
   for (const key of COLLAPSIBLE_SECTIONS) {
     const el = document.getElementById('sec-' + key);
     if (!el) continue;
-    const open = Object.prototype.hasOwnProperty.call(saved, key) ? saved[key] : sectionHasData(key);
+    // 没有今天的记录 = 默认折叠（用户的「默认折叠」）
+    const open = Object.prototype.hasOwnProperty.call(st.map, key) ? st.map[key] : false;
     el.classList.toggle('collapsed', !open);
+  }
+  applySectionCounts();
+}
+
+// 把条数写到折叠条右侧。折叠时才显示 —— 展开着还挂个「5 条」是废话。
+// 这几个区块的标题行本来就有自己的计数字段（各自的 render 函数在写），
+// 不要再挂 badge —— 会变成「5 条 5 条」两份并排。
+// 踩过的坑：第一版没排除，当日记录就显示了两遍条数。
+const SECTIONS_WITH_OWN_COUNT = ['journal-today', 'today-tasks', 'daily-point'];
+
+function applySectionCounts() {
+  for (const key of COLLAPSIBLE_SECTIONS) {
+    const el = document.getElementById('sec-' + key);
+    if (!el) continue;
+    const header = el.querySelector(':scope > .section-header');
+    if (!header) continue;
+    // 已有自带计数的，只负责清掉可能残留的 badge，不新建
+    if (SECTIONS_WITH_OWN_COUNT.indexOf(key) >= 0) {
+      const stray = header.querySelector('.sec-count-badge');
+      if (stray) stray.remove();
+      continue;
+    }
+    let badge = header.querySelector('.sec-count-badge');
+    const n = sectionCountText(key);
+    const collapsed = el.classList.contains('collapsed');
+    if (collapsed && n) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'sec-count-badge';
+        header.appendChild(badge);
+      }
+      badge.textContent = n;
+    } else if (badge) {
+      badge.remove();
+    }
   }
 }
 
@@ -3180,11 +3293,11 @@ function paintDailyPoint(it) {
   sec.style.display = '';
   if (from) from.textContent = it.author ? ('来自 ' + it.author) : '';
   const pts = it.points || [];
+  // 主句写进常显区（折叠也看得见），要点和按钮留在折叠区
+  const lead = document.getElementById('daily-point-lead');
+  if (lead) lead.textContent = it.point || '';
   body.innerHTML =
-      '<div style="font-size:var(--fs-lg);line-height:1.6;color:var(--text-primary);font-weight:600;margin-bottom:10px;">'
-    +   pointsEsc(it.point)
-    + '</div>'
-    + (pts.length
+      (pts.length
         ? '<ol style="margin:0 0 10px;padding-left:20px;font-size:var(--fs-sm);color:var(--text-secondary);line-height:1.8;">'
           + pts.map(p => '<li style="margin-bottom:3px;">' + pointsEsc(p) + '</li>').join('')
           + '</ol>'
@@ -4969,8 +5082,6 @@ function renderDailyHub() {
   // ⑩ Daily Chess（每日残局，可自己走子）
   renderDailyChess();
 
-  updateSectionCollapse();
-
   // ⑫ 每日观点（异步拉服务器，不阻塞下面同步渲染）
   renderDailyPoint();
 
@@ -4980,6 +5091,12 @@ function renderDailyHub() {
   // 不再每次 renderDailyHub（也就是每次 renderAll）都打服务器，避免冗余请求与竞态。
   if (journalApiOn()) syncJournalToday();
   updateJournalSyncHint();
+
+  // ★ 折叠状态必须最后算。
+  // 踩过的坑：原来这句夹在中间（renderDailyChess 之后、renderJournalToday 之前），
+  // 而它内部要读「当日记录几条」和「今日任务完成几项」来填折叠条上的角标 ——
+  // 跑早了读到的是上一轮的数字，条数会慢一拍。
+  updateSectionCollapse();
 }
 
 // --- 今日任务：唯一数据源是 tasks（周期任务 + 今天到期/逾期的限时任务） ---
@@ -6590,6 +6707,47 @@ function toggleTheme() {
   const isLight = html.classList.toggle('light');
   localStorage.setItem('nexus_theme', isLight ? 'light' : 'dark');
   setThemeIcon(isLight);
+}
+
+// === 字号档位 ===
+// 用户说「目前字体有点大，加一个能让我自己调的地方」。
+//
+// 为什么用「改根字号」这一招：全站字号都走 --fs-* 令牌，而令牌是 rem（相对根字号）。
+// 所以改一个 html 的 font-size，11 个令牌等比缩放，正文/标题/角标层级关系不变。
+//
+// ★ 为什么不给更小的档（用户选的那版）：
+// 根字号 15px 时 --fs-2xs（0.75rem）只有 11.25px，破掉「最小 12px」的规矩。
+// 前任踩过这个坑：根字号曾设 14px，本意「整体缩小」，实际让 0.75rem 渲染成
+// 10.5px —— 手机上「看得见但读起来累」，而看代码完全看不出来。
+// 所以只提供 标准/大/特大 三档，往下不给了。
+const FONT_SCALES = [
+  { key: 'std',  root: 16, label: '标', name: '标准' },
+  { key: 'lg',   root: 17, label: '大', name: '大'   },
+  { key: 'xlg',  root: 18, label: '特', name: '特大' }
+];
+
+function applyFontScale(key) {
+  const s = FONT_SCALES.find(x => x.key === key) || FONT_SCALES[0];
+  // 直接改 html 的 font-size：所有 --fs-* 令牌都是 rem，会一起等比缩放。
+  // 只动这一个属性，正文/标题/角标之间的层级关系不变。
+  document.documentElement.style.fontSize = s.root + 'px';
+  localStorage.setItem('nexus_font_scale', s.key);
+  const el = document.getElementById('font-scale-label');
+  if (el) el.textContent = s.label;
+}
+
+function cycleFontScale() {
+  const cur = localStorage.getItem('nexus_font_scale') || 'std';
+  const i = FONT_SCALES.findIndex(x => x.key === cur);
+  const next = FONT_SCALES[(i + 1) % FONT_SCALES.length];
+  applyFontScale(next.key);
+  showToast('字号：' + next.name, 'info', 1200);
+}
+
+// 字号刻意各设备各存（跟折叠状态同理）：
+// 手机屏幕小要大字，电脑屏幕大反而觉得字大。用 localStorage 而不是 Store，就不进同步。
+function loadFontScale() {
+  applyFontScale(localStorage.getItem('nexus_font_scale') || 'std');
 }
 
 function loadTheme() {
@@ -8751,6 +8909,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   boot('主题', loadTheme);
+  boot('字号', loadFontScale);
   boot('配置迁移', migrateLegacyConfig);
   boot('默认数据', initData);
   boot('模板迁移', migrateDailyTemplatesToTasks);
