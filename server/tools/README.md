@@ -81,10 +81,30 @@ DASHSCOPE_API_KEY=... python3 douyin_pipeline.py \
 | 模型 | 免费额度 | 有效期 | 超出后 |
 |---|---|---|---|
 | Paraformer-V2 | **10 小时/月** | **每月 1 日 0 点重置** | 0.6 元/小时 |
-| qwen-plus | 100 万 Token | 90 天，不续发 | 入 0.8 / 出 2.0 元/百万 Token |
+| 文本模型 | 每个 100 万 Token | 90 天（各模型不同） | 视模型而定 |
 
 **100 条视频（平均 2 分钟）**：ASR 3.3 小时（33%，且月月重置）+ LLM 13.5 万 Token（13.5%）
 → **0 元**。即使平均 5 分钟（8.3 小时）仍在免费内。
+
+## ⚠️ 模型名不能写死（2026-09-26 踩过）
+
+原来总结模型硬编码成 `qwen-plus`，**用户账号里根本没有这个模型**。
+百炼一直在下线旧命名（2026-07-13 下线 `qwen-turbo` 等 10 个，
+2026-10-10 还有一批），**今天能用的名字下个月可能就是 404**。
+
+现在的做法：
+
+```bash
+# ① 先问「我这个 key 能用什么」（每模型只发 1 token，几乎不花钱）
+DASHSCOPE_API_KEY=sk-xxx python3 douyin_pipeline.py --list-models
+
+# ② 明确指定
+python3 douyin_pipeline.py --url "..." --summary-model qwen3.8-flash
+```
+
+内置候选链：`qwen3.8-flash` → `qwen3.8-max-0902` → `qwen-plus`。
+**只在「模型不存在/无权限」时降级**；网络错误直接抛（降级也没用，抛出来更诚实）。
+结果里带 `summary_model` 字段，记录这条是谁总结的，方便对比质量。
 
 ### 成本闸门（防止「跑完才发现扣钱」）
 
@@ -111,7 +131,12 @@ python3 douyin_pipeline.py --urls-file /tmp/urls.txt --budget-seconds 0
 另建议在阿里云控制台把 Paraformer 的 **「免费额度用完即停」** 打开，
 作为云端双保险 —— 即使本地记账有偏差也不会被扣钱。
 
-计量逻辑的测试：`python3 test_usage.py`（14 项，已接入 `npm test`）。
+### 测试
+
+- `python3 test_usage.py`（14 项）—— 计量、跨月归零、预算边界
+- `python3 test_summarize.py`（16 项）—— 候选链降级、错误分类、JSON 容错
+
+两个都已接入 `npm test`。
 
 ## 设计原则（改这个脚本时请遵守）
 

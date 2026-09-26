@@ -340,7 +340,57 @@ SUMMARY_PROMPT = """你是一个帮人提炼成长类短视频观点的助手。
 - 如果文稿内容太碎、没有实质信息，point 写「（内容过短，无法提炼）」并让 points 为空数组"""
 
 
-def summarize(transcript, api_key, model='qwen-plus'):
+# 总结用的模型。**必须可配置**，原因见下方注释。
+#
+# ⚠️ 2026-09-26 教训：我原来把 'qwen-plus' 硬编码在这里，
+# 结果用户把自己控制台的免费额度列表发过来，里面**根本没有 qwen-plus** ——
+# 他的账号有 qwen3.8-flash / qwen3.8-max / deepseek / glm 等的额度，
+# 但没有旧命名的 qwen-plus。硬编码一个「我以为是默认」的模型名，
+# 等于把一个必然失败换成另一个必然失败。
+#
+# 更糟的是：百炼一直在下线旧命名模型（2026-07-13 下线 qwen-turbo 等 10 个，
+# 2026-10-10 还要再下线一批）。今天能用的名字，下个月可能就是 404。
+#
+# 所以：
+#   1. 模型名走环境变量 / 命令行参数，不写死
+#   2. 带一个**候选链**，主模型 404/无权限就自动降级到下一个
+#   3. 提供 --list-models 让你直接问「我这个 key 到底能用哪些」
+DEFAULT_SUMMARY_MODELS = [
+    'qwen3.8-flash',      # 用户额度列表里确认有 1M
+    'qwen3.8-max-0902',   # 备选，额度列表里也有
+    'qwen-plus',          # 旧命名，兼容老账号
+]
+
+
+def summarize(transcript, api_key, models):
+    """按候选链依次尝试，第一个成功的就返回。
+
+    models 可以是字符串（单个）或列表（候选链）。
+    这样做的理由：模型下线/无权限是**这个平台最常见的失败**，
+    不该让用户因为「模型名过期」而拿到一个空结果。
+    """
+    if isinstance(models, str):
+        models = [models]
+    errs = []
+    for model in models:
+        try:
+            return _summarize_one(transcript, api_key, model)
+        except Exception as e:
+            msg = str(e)
+            # 只对「模型不存在/无权限」这类错误降级；
+            # 别的错误（比如网络断了）降级也没用，直接抛出来更诚实
+            if 'Model not exist' in msg or 'model not found' in msg.lower() \
+                    or 'AccessDenied' in msg or 'InvalidParameter' in msg \
+                    or 'HTTP 404' in msg:
+                errs.append(f'{model}: {msg[:160]}')
+                continue
+            raise
+    raise RuntimeError(
+        '所有候选模型都不可用，请用 --list-models 查你账号能用哪些，'
+        '再用 --summary-model 指定。\n明细：\n  ' + '\n  '.join(errs))
+
+
+def _summarize_one(transcript, api_key, model):
     payload = {
         'model': model,
         'input': {'messages': [
@@ -365,9 +415,36 @@ def summarize(transcript, api_key, model='qwen-plus'):
     if not m:
         raise RuntimeError(f'LLM 返回的不是 JSON：{txt[:200]}')
     try:
-        return json.loads(m.group(0))
+        summary = json.loads(m.group(0))
     except Exception:
         raise RuntimeError(f'LLM JSON 解析失败：{m.group(0)[:200]}')
+    summary['_model'] = model      # 记下这条是谁总结的，方便排查质量差异
+    return summary
+
+
+def probe_models(api_key, candidates):
+    """逐个试探候选模型，报告哪个能用。
+
+    这是我能给用户的最实用的一个命令：与其猜「我的 key 能用什么」，
+    不如直接问。用最小 token 请求，几乎不花钱。
+    """
+    results = []
+    for m in candidates:
+        row = {'model': m, 'ok': False, 'detail': ''}
+        try:
+            payload = {
+                'model': m,
+                'input': {'messages': [{'role': 'user', 'content': 'hi'}]},
+                'parameters': {'result_format': 'message', 'max_tokens': 1},
+            }
+            post_json(f'{DASHSCOPE_BASE}/services/aigc/text-generation/generation',
+                      payload, api_key)
+            row['ok'] = True
+            row['detail'] = '可用'
+        except Exception as e:
+            row['detail'] = str(e)[:200]
+        results.append(row)
+    return results
 
 
 # ---------- 主流程 ----------
@@ -388,7 +465,8 @@ def process_one(url, args, api_key):
         audio = fetch_audio(url, args.cookies, args.ytdlp, workdir)
         result['steps']['download'] = f'ok ({audio.stat().st_size} bytes)'
 
-        transcript, used_sec = transcribe(audio, api_key, args.asr_public)
+        transcript, used_sec = transcribe(audio, api_key, args.asr_public,
+                                         model=args.asr_model)
         result['transcript_len'] = len(transcript)
         result['asr_seconds'] = used_sec
         result['steps']['asr'] = f'ok ({used_sec}s 计费)'
@@ -401,11 +479,12 @@ def process_one(url, args, api_key):
             result['ok'] = True
             return result
 
-        summary = summarize(transcript, api_key)
+        summary = summarize(transcript, api_key, args.summary_models)
         result['point'] = summary.get('point', '')
         result['points'] = summary.get('points', [])
         result['tags'] = summary.get('tags', [])
-        result['steps']['summary'] = 'ok'
+        result['summary_model'] = summary.get('_model', '')
+        result['steps']['summary'] = f"ok ({summary.get('_model', '?')})"
         result['ok'] = True
         return result
     except Exception as e:
@@ -432,9 +511,38 @@ def main():
                          '超过就拒绝启动，防止意外扣费。传 0 表示不限制')
     ap.add_argument('--avg-seconds', type=int, default=120,
                     help='批量预估用的单条平均时长（秒），默认 120')
+    ap.add_argument('--summary-model',
+                    help='总结用哪个模型（单个）。不给就用内置候选链依次试')
+    ap.add_argument('--asr-model', default=ASR_MODEL,
+                    help=f'ASR 模型名，默认 {ASR_MODEL}')
+    ap.add_argument('--list-models', action='store_true',
+                    help='逐个试探候选模型，报告你账号能用哪些（几乎不花钱）')
     args = ap.parse_args()
 
     api_key = os.environ.get('DASHSCOPE_API_KEY', '').strip()
+
+    # 「我这个 key 到底能用什么模型」—— 与其猜，不如直接问。
+    # 这个分支放在最前面，因为它连 yt-dlp 和音频目录都不需要。
+    if args.list_models:
+        if not api_key:
+            print('错误：需要 DASHSCOPE_API_KEY 环境变量', file=sys.stderr)
+            sys.exit(2)
+        cands = ([args.summary_model] if args.summary_model
+                 else DEFAULT_SUMMARY_MODELS)
+        print('逐个试探候选模型（每个只发 1 个 token 的请求）：\n', file=sys.stderr)
+        rows = probe_models(api_key, cands)
+        for r in rows:
+            mark = '✅' if r['ok'] else '❌'
+            print(f'  {mark} {r["model"]:<24} {r["detail"]}', file=sys.stderr)
+        good = [r['model'] for r in rows if r['ok']]
+        print(f'\n可用 {len(good)}/{len(rows)}：{", ".join(good) or "（全不可用）"}',
+              file=sys.stderr)
+        sys.exit(0 if good else 1)
+
+    # 候选链：--summary-model 优先（用户明确指定），否则用内置链
+    args.summary_models = ([args.summary_model] if args.summary_model
+                           else DEFAULT_SUMMARY_MODELS)
+
     need_asr = not args.meta_only
     if need_asr and not api_key:
         print('错误：需要 DASHSCOPE_API_KEY 环境变量（ASR 和总结都依赖它）', file=sys.stderr)
