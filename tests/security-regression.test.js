@@ -208,6 +208,63 @@ console.log('【P1-a】分类名 / 标签必须「属性 + 正文」双转义');
     else ok(fn + ' 没有属性位拼接（不进 onclick，攻击面为零）');
   }
 
+  // ---- 饮食记录的渲染：名称同样是用户原话，必须转义 ----
+  // 2026-09-26 改造后，饮食也走「一句话输入」，name 直接来自输入框。
+  // 跟记账同一个攻击面：name 里可以塞 <img onerror>，渲染进 innerHTML 就是存储型 XSS。
+  // 实测过：往 dailyLog 里塞一条 name='<img src=x onerror=...>'，
+  // 若不过滤会立刻执行（verify-meal-mobile.js 第 6 组断言专门守这个）。
+  //
+  // ★ 这里不用「先筛拼接行再查」的策略，改成**逐行扫全部含裸值的行**。
+  //   踩过的坑：第一版照抄记账那边的 `if (!/\+=\s*['"]|\.push\(/.test(line)) continue;`
+  //   预筛，结果**变异测试直接漏过一个真漏洞** ——
+  //   meal-list 那行是 `.map(m => { ... return '<span>' + m.name + kcal + ... })`
+  //   里的**裸字符串续行**，既没有 `+=` 也没有 `.push(`，被预筛跳过了。
+  //   去掉 escHtml 之后测试依然全绿，说明守卫是假的。
+  //   教训：预筛条件本身就是断言的一部分，必须对着真实代码形状验证，
+  //   不能凭「我印象里拼接都长这样」来写。
+  for (const fn of ['renderMeals', 'renderMealPreview']) {
+    const body = fnBody(HTML, fn);
+    if (!body) { bad('抠不出 ' + fn + ' 的函数体（断言会静默失效）'); continue; }
+
+    let naked = null;
+    let checkedSites = 0;
+    for (const line of body.split('\n')) {
+      // 只看可能把值送进 HTML 的行：有字符串拼接迹象，或有 innerHTML 赋值。
+      // `\+` 这个条件就是用来抓住上面那种「裸字符串续行」的。
+      const htmlish = /['"]/.test(line) && (/\+\s*escHtml|\+\s*[A-Za-z_$]|['"]\s*\+\s*['"]|\+=\s*['"]/.test(line) || /innerHTML\s*=/.test(line));
+      if (!htmlish) continue;
+      if (!/\b(m\.name|p\.name|mealTypeLabel)\b/.test(line)) continue;
+      checkedSites++;
+
+      let stripped = (function stripEsc(s) {
+        let out = '', i = 0;
+        while (i < s.length) {
+          if (s.startsWith('escHtml(', i)) {
+            let d = 0, j = i + 'escHtml'.length;
+            for (; j < s.length; j++) {
+              if (s[j] === '(') d++;
+              else if (s[j] === ')') { d--; if (d === 0) { j++; break; } }
+            }
+            out += 'ESC'; i = j;
+          } else { out += s[i]; i++; }
+        }
+        return out;
+      })(line);
+      // 挖掉「属性位取 DOM 文本」的合法写法（取的是已渲染的 textContent，不是拼数据）
+      stripped = stripped.replace(/onclick="quickAddMeal\(this\.textContent\)"/g, 'SAFE_ATTR');
+      // 剩下的裸 m.name / p.name 上屏就是漏洞
+      if (/\bm\.name\b|\bp\.name\b/.test(stripped)) { naked = line.trim(); break; }
+    }
+    if (naked) bad(fn + ' 里有未经 escHtml 的食物名上屏 → ' + naked);
+    else if (checkedSites === 0) bad(fn + ' 一个插值点都没扫到 —— 守卫条件写错了，等于没守（危险：假绿）');
+    else ok(fn + ' 的食物名 ' + checkedSites + ' 个插值点都走了 escHtml');
+
+    // 餐次标签也来自数据（m.type 可以是任意字符串），必须过 mealTypeLabel 再转义
+    if (/mealTypeLabel\(m\.type\)/.test(body) && !/escHtml\(mealTypeLabel\(m\.type\)\)/.test(body))
+      bad(fn + ' 的餐次标签没走 escHtml（m.type 来自 KV，可被脏数据污染）');
+    else ok(fn + ' 的餐次标签渲染安全');
+  }
+
   // 转义函数本身不能被削弱
   const ea = fnBody(HTML, 'escAttr');
   const eh = fnBody(HTML, 'escHtml');

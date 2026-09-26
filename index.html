@@ -1495,13 +1495,23 @@ body.compact .daily-section.collapsible.collapsed { padding: 8px 12px; margin-bo
         <span id="daily-kcal-total" style="font-family: var(--font-mono); font-size:var(--fs-sm); color: var(--orange);"></span>
       </div>
       <div id="meal-list" style="font-size:var(--fs-sm);color:var(--text-secondary);line-height:1.9;"></div>
-      <div style="margin-top:10px;">
-        <div id="meal-type-row" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;"></div>
-        <div style="display:flex;gap:6px;">
-          <input id="meal-name" placeholder="吃了什么…" onkeydown="if(event.key==='Enter')addMeal()" style="flex:1;min-width:0;">
-          <input id="meal-kcal" placeholder="kcal" inputmode="numeric" style="width:64px;flex:none;">
-          <button class="btn btn-sm btn-primary" onclick="addMeal()" style="flex:none;">记下</button>
+      <!-- 一句话录入（2026-09-26 改造）：原来是「选餐次 → 填名字 → 填 kcal → 点记下」四步，
+           对一个「顺手记一下」的场景太重了。现在一格输入，餐次按时段猜、热量按参考表估。
+           依据：用户真实的 17 条记录里只有 3 条填了 kcal —— 没人会为顺手记一顿饭去查热量。 -->
+      <div class="card" id="meal-card" style="padding:12px;margin-top:10px;">
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <input type="text" id="meal-input" placeholder="吃了什么… 例：肉丝滑蛋饭"
+                 inputmode="text" autocomplete="off" enterkeyhint="done"
+                 oninput="mealOnInput()" onkeydown="mealOnKey(event)"
+                 style="flex:1;min-width:0;font-size:16px;">
+          <button class="btn btn-primary" id="meal-submit" onclick="mealSubmit()"
+                  style="flex:none;min-height:44px;padding:0 16px;">记下</button>
         </div>
+        <!-- 餐次 chip：默认是按时段猜的那个，点一下可以改 -->
+        <div id="meal-type-row" style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;"></div>
+        <!-- 实时预览：写完就告诉用户「我理解成什么、估了多少热量」 -->
+        <div id="meal-preview" class="exp-preview"></div>
+        <div id="meal-hint" class="exp-hint">例：肉丝滑蛋饭 · 酸奶加梨 · 烤鸭腿饭 西兰花 蒸蛋</div>
         <div id="meal-suggest" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"></div>
       </div>
     </div>
@@ -3603,6 +3613,336 @@ function walletMakeTxn(p) {
 }
 
 // === 记账一句话解析 END ===
+
+// === 饮食一句话解析 START ===
+//
+// 用户原话（这次改造的起因）：「饮食记录要不也搞成类似的吧」——
+// 「类似的」指记账那套：**一格输入 + 实时预览 + 猜**。
+//
+// 设计依据来自他真实的饮食记录（服务器 journal.db 里 2026-09-17 ~ 09-26，7 天 17 条）：
+//   · 只有 17 条，唯一食物名 16 个 —— 这功能用得轻，所以录入路径必须短到极致。
+//     原来的四件套是「选餐次 chip → 填名字 → 填 kcal → 点记下」，
+//     四步才能记一顿饭，对一个「顺手记一下」的场景太重了。
+//   · **17 条里只有 3 条填了 kcal（18%）** —— 这是最关键的发现。
+//     不是用户懒，是「查食物热量」这件事本身有成本，没人为顺手记一顿饭去查。
+//     所以热量必须由系统估，把「你得自己查」变成「我替你估」。
+//   · 真实备注形态很杂：「corn and egg」（中英混写）、「一点点藏青盐咸奶绿」（长商品名）、
+//     「肉丝滑蛋饭」「培根煎蛋堡」（描述性短语，不是标准菜名）、
+//     「烤鸭腿饭 西兰花 蒸蛋」（一条里多样东西，用户已确认不拆，按整条估）。
+//     所以匹配必须能容忍「菜名里含食材名」这种情况。
+//
+// 契约与另外两个解析器（记账 / 物品）一致：**永远返回可用结果，绝不抛错阻塞。**
+
+// --- 食物热量参考表 ------------------------------------------------
+// 格式：[名称, 别名(逗号分隔), 每份千卡]
+//
+// ★ 这是**参考值不是事实** —— 跟库存那张保质期表同一个原则。
+//   同一道菜，食堂和饭店能差一倍；「一份」到底多大也因人而异。
+//   所以界面上写「估 N kcal」而不是「N kcal」，措辞不能含糊。
+//   值取自通用食物成分表的常见区间中位数，故意取整到 10 的倍数 ——
+//   给出「480」这种精确值会让人误以为它准，取整反而诚实。
+//
+// 排序无关紧要，匹配时会按关键词长度降序处理。
+const FOOD_KCAL_RAW = [
+  // ---- 主食 / 饭类 ----
+  ['米饭', '白米饭,大米饭,饭,剩饭', 230],
+  ['炒饭', '蛋炒饭,扬州炒饭,炒米饭', 480],
+  ['盖饭', '盖浇饭,滑蛋饭,肉丝滑蛋饭,滑蛋牛肉饭', 620],
+  ['烤鸭饭', '烤鸭腿饭,鸭腿饭,烧鸭饭', 700],
+  ['煲仔饭', '', 700],
+  ['拌饭', '石锅拌饭,韩式拌饭', 600],
+  ['咖喱饭', '咖喱鸡肉饭,咖喱牛肉饭', 650],
+  ['便当', '盒饭,快餐,外卖', 600],
+  ['自助', '自助餐,自助饭,食堂', 800],
+  ['面条', '面,挂面,汤面,清汤面', 400],
+  ['炒面', '拌面,干拌面,热干面', 550],
+  ['河粉', '粉,米粉,米线,拌粉,螺蛳粉,渔粉,五谷渔粉', 450],
+  ['刀削面', '刀削,拉面,牛肉面,拉条子', 550],
+  ['饺子', '水饺,速冻饺子,蒸饺', 450],
+  ['馄饨', '云吞,抄手', 350],
+  ['包子', '肉包,菜包,花卷', 250],
+  ['馒头', '', 230],
+  ['粥', '白粥,稀饭,皮蛋瘦肉粥,小米粥', 180],
+  ['煎饼', '煎饼果子,手抓饼,鸡蛋灌饼', 450],
+  ['烧饼', '', 300],
+  ['面包', '吐司,切片面包,全麦面包', 280],
+  ['汉堡', '汉堡包,塔斯汀,麦当劳,肯德基,华莱士', 550],
+  ['披萨', '比萨,pizza', 700],
+  ['寿司', '饭团,紫菜包饭', 350],
+  ['三明治', 'sandwich,培根煎蛋堡,蛋堡', 400],
+
+  // ---- 荤菜 ----
+  ['鸡胸肉', '鸡胸,水煮鸡胸', 165],
+  ['鸡腿', '鸡腿肉,烤鸡腿,鸭腿', 220],
+  ['炸鸡', '鸡排,鸡米花,炸鸡腿', 500],
+  ['鸡肉', '鸡,鸡翅,鸡爪', 250],
+  ['猪肉', '里脊,五花肉,排骨,猪蹄,炒肉,肉丝,肉片', 300],
+  ['牛肉', '牛腩,牛排,肥牛,牛肉片', 280],
+  ['羊肉', '羊排,羊肉串', 300],
+  ['烤鸭', '烧鸭,片皮鸭', 400],
+  ['培根', 'bacon', 450],
+  ['香肠', '腊肠,火腿肠,火腿', 350],
+  ['鱼', '鱼肉,鲈鱼,鲫鱼,草鱼,烤鱼,酸菜鱼', 200],
+  ['虾', '基围虾,对虾,小龙虾', 150],
+  ['螃蟹', '大闸蟹,蟹', 120],
+  ['贝类', '蛤蜊,花甲,扇贝,生蚝', 100],
+
+  // ---- 蛋 / 豆制品 ----
+  ['鸡蛋', '蛋,土鸡蛋,水煮蛋,煎蛋,蒸蛋,荷包蛋,炒蛋', 75],
+  ['豆腐', '嫩豆腐,老豆腐,麻婆豆腐', 120],
+  ['豆皮', '千张,豆腐皮,腐竹', 200],
+  ['豆浆', '', 120],
+  ['鸡蛋羹', '', 90],
+
+  // ---- 蔬菜（单份量小，热量低）----
+  ['青菜', '小白菜,油菜,上海青,鸡毛菜,炒青菜', 60],
+  ['菠菜', '菠薐', 60],
+  ['生菜', '莴苣,油麦菜', 40],
+  ['白菜', '大白菜,娃娃菜', 50],
+  ['卷心菜', '包菜,圆白菜,甘蓝', 60],
+  ['西兰花', '花椰菜,菜花', 80],
+  ['西红柿', '番茄,圣女果,小番茄,番茄炒蛋', 80],
+  ['黄瓜', '拍黄瓜,凉拌黄瓜', 40],
+  ['茄子', '红烧茄子,鱼香茄子', 180],
+  ['土豆', '马铃薯,洋芋,土豆片,土豆丝', 200],
+  ['土豆片炒肉', '土豆炒肉,土豆丝炒肉', 320],
+  ['莲藕', '藕,莲藕片', 120],
+  ['南瓜', '', 80],
+  ['冬瓜', '', 50],
+  ['豆角', '四季豆,豇豆', 100],
+  ['蘑菇', '香菇,平菇,金针菇,杏鲍菇', 60],
+  ['木耳', '干木耳,黑木耳,凉拌木耳', 80],
+  ['豆芽', '黄豆芽,绿豆芽', 60],
+  ['芹菜', '西芹', 50],
+  ['韭菜', '', 80],
+  ['玉米', '甜玉米,玉米棒', 130],
+  ['蔬菜', '菜,炒菜,素菜,时蔬,清炒时蔬', 100],
+
+  // ---- 水果 ----
+  ['苹果', '', 95],
+  ['梨', '雪梨,香梨', 100],
+  ['香蕉', '', 110],
+  ['橘子', '桔子,蜜桔,橙子,脐橙', 90],
+  ['葡萄', '提子', 90],
+  ['草莓', '', 50],
+  ['蓝莓', '', 60],
+  ['西瓜', '', 120],
+  ['芒果', '', 150],
+  ['猕猴桃', '奇异果', 90],
+  ['桃子', '水蜜桃,油桃', 90],
+  ['火龙果', '', 120],
+  ['菠萝', '凤梨', 90],
+  ['柚子', '', 120],
+  ['牛油果', '鳄梨', 240],
+  ['枣', '鲜枣,冬枣', 80],
+  ['水果', '果盘,水果拼盘', 100],
+
+  // ---- 奶 / 饮品 ----
+  ['牛奶', '纯牛奶,鲜奶,全脂奶', 150],
+  ['酸奶', '老酸奶,希腊酸奶', 130],
+  ['奶茶', '奶绿,咸奶绿,藏青盐咸奶绿,一点点,珍珠奶茶,波霸奶茶', 450],
+  ['咖啡', 'coffee,拿铁,latte,美式,咖啡粉', 120],
+  ['可乐', '汽水,碳酸饮料,雪碧,芬达', 140],
+  ['果汁', '鲜榨果汁,橙汁', 120],
+  ['啤酒', 'beer', 150],
+  ['茶', '绿茶,红茶,乌龙茶,茶叶', 5],
+  ['水', '矿泉水,纯净水,白开水', 0],
+
+  // ---- 零食 / 甜点 ----
+  ['饼干', '', 150],
+  ['蛋糕', '奶油蛋糕,芝士蛋糕', 350],
+  ['冰淇淋', '雪糕,冰棍,甜筒', 200],
+  ['巧克力', 'chocolate', 250],
+  ['薯片', '薯条,chips', 300],
+  ['坚果', '花生,瓜子,杏仁,腰果,核桃', 200],
+  ['糖', '糖果,巧克力糖', 100],
+  ['绿豆沙', '龟苓膏,绿豆汤,甜品', 200],
+  ['烧烤', '烤串,串串,烤', 400],
+  ['火锅', '麻辣烫,冒菜,串串香', 800],
+  ['炸鸡块', '炸物,油炸', 450],
+  ['零食', '小吃,零嘴', 200]
+];
+
+// --- 餐次 -----------------------------------------------------------
+const MEAL_TYPES = [['breakfast', '早餐'], ['lunch', '午餐'], ['dinner', '晚餐'], ['snack', '零食']];
+
+// 用户手动点过餐次 chip 就存这里；null = 按当前时段猜。
+// 声明在这里（而不是 UI 层）是为了保证「先声明后使用」——
+// renderMeals() 会直接读它，不想赌启动时序。
+let _mealType = null;
+
+// 按时段猜餐次：早上记的就是早餐，不该每次让用户手选。
+// 边界取的是「正常人吃饭时间」，不是精确值 —— 猜错了点一下就能改。
+function defaultMealType(hour) {
+  const h = (hour === undefined || hour === null) ? new Date().getHours() : hour;
+  if (h < 4)  return 'snack';      // 凌晨算夜宵/零食
+  if (h < 10) return 'breakfast';
+  if (h < 15) return 'lunch';
+  if (h < 21) return 'dinner';
+  return 'snack';
+}
+
+// --- 解析器 ---------------------------------------------------------
+// 支持的说法：
+//   「肉丝滑蛋饭」          → 午餐（按时段）· 估 620 kcal
+//   「corn and egg」       → 早餐 · 估 150（命中 egg → 鸡蛋）
+//   「酸奶加梨」            → 估 230（酸奶 130 + 梨 100，多个命中取和）
+//   「烤鸭腿饭 西兰花 蒸蛋」 → 估 850（烤鸭饭 700 + 西兰花 80 + 蒸蛋 75）
+//   「奶茶 500」            → 估 500（用户手填的数字压过估算）
+//   「午餐 肉丝滑蛋饭」      → 午餐（句首餐次词优先于时段猜测）
+//
+// 关键契约：永远返回可用结果，绝不抛错阻塞。
+
+// 英文 → 中文的常见食物别名。用户语料里出现过「corn and egg」这种纯英混写。
+const EN_FOOD = {
+  'corn': '玉米', 'egg': '鸡蛋', 'eggs': '鸡蛋', 'rice': '米饭', 'noodle': '面条',
+  'noodles': '面条', 'chicken': '鸡肉', 'beef': '牛肉', 'pork': '猪肉', 'fish': '鱼',
+  'shrimp': '虾', 'milk': '牛奶', 'yogurt': '酸奶', 'apple': '苹果', 'banana': '香蕉',
+  'orange': '橘子', 'bread': '面包', 'cake': '蛋糕', 'coffee': '咖啡', 'tea': '茶',
+  'sandwich': '三明治', 'burger': '汉堡', 'pizza': '披萨', 'salad': '蔬菜'
+};
+
+// 句首餐次词：用户明确写「早餐/午饭」时，比按时段猜准。
+const MEAL_WORD = {
+  '早餐': 'breakfast', '早饭': 'breakfast', '早上': 'breakfast', '早': 'breakfast',
+  '午餐': 'lunch', '午饭': 'lunch', '中午': 'lunch', '午': 'lunch',
+  '晚餐': 'dinner', '晚饭': 'dinner', '晚上': 'dinner', '晚': 'dinner',
+  '夜宵': 'snack', '宵夜': 'snack', '零食': 'snack', '加餐': 'snack', '下午茶': 'snack'
+};
+
+// 剥掉的动词 / 连接词：用户会写「吃了碗面」「喝了杯奶茶」
+const MEAL_NOISE = /^(吃了?|喝了?|用过了?|来了一份?|来了一碗?|来了一?[个碗杯份]|一[个碗杯份])/;
+
+function mealTypeLabel(t) {
+  const hit = MEAL_TYPES.find(function (x) { return x[0] === t; });
+  return hit ? hit[1] : t;
+}
+
+// 把英文食物名换成中文，再把「加 / 和 / +」换成空格，方便逐词匹配。
+function normalizeMealText(s) {
+  let t = String(s || '');
+  t = t.replace(/[a-zA-Z]+/g, function (w) {
+    const k = w.toLowerCase();
+    return EN_FOOD[k] ? (' ' + EN_FOOD[k] + ' ') : w;
+  });
+  // 「酸奶加梨」「酸奶+梨」「酸奶、梨」都当并列处理
+  t = t.replace(/[加和与+＋、,，;；\/]/g, ' ');
+  return t;
+}
+
+// 猜热量：返回 { kcal, hits, exact }
+//   exact=true 表示用户自己写了数字，这时完全不估，直接采用
+function guessMealKcal(text) {
+  const raw = String(text || '').trim();
+  const out = { kcal: 0, hits: [], exact: false };
+  if (!raw) return out;
+
+  // ① 用户显式写了数字 → 那就是事实，不估。
+  //    支持「奶茶 500」「500kcal」「500 大卡」「奶茶 500kcal」
+  const explicit = raw.match(/(\d{2,4})\s*(?:kcal|千卡|大卡|卡)/i) || raw.match(/(\d{2,4})\s*$/);
+  if (explicit) {
+    const v = parseInt(explicit[1], 10);
+    if (v > 0 && v < 10000) { out.kcal = v; out.exact = true; return out; }
+  }
+
+  const t = normalizeMealText(raw);
+
+  // ② 长关键词优先匹配。一条里命中多个就**取和** ——
+  //    「烤鸭腿饭 西兰花 蒸蛋」= 700 + 80 + 75 = 855，比「挑最大的那个 700」合理得多。
+  //    但同一食物不能被重复计（「鸡蛋，火腿肠」里若都命中鸡蛋只算一次），
+  //    用一个 used 数组按名字去重。
+  //
+  // ★ 为什么要按长度排序而不是按表里的顺序：
+  //   「烤鸭腿饭」同时含「烤鸭」「鸭腿饭」「饭」。长度降序能保证先命中「烤鸭腿饭」，
+  //   命中后把这段文本「挖掉」，就不会再被「饭」重复命中一次。
+  //   原来记账那个词库踩过一模一样的坑（「生活费」被「生活」抢先），
+  //   那里的解法是长度排序，这里解法一样，但额外做「挖除」因为要累加多项。
+  const entries = [];
+  FOOD_KCAL_RAW.forEach(function (row) {
+    entries.push({ name: row[0], kw: row[0], kcal: row[2] });
+    String(row[1] || '').split(',').forEach(function (a) {
+      const al = a.trim();
+      if (al) entries.push({ name: row[0], kw: al, kcal: row[2] });
+    });
+  });
+  entries.sort(function (a, b) { return b.kw.length - a.kw.length; });
+
+  let work = t;
+  const used = {};
+  entries.forEach(function (e) {
+    if (used[e.name]) return;                    // 这个食物已经算过，别重复累加
+    if (work.indexOf(e.kw) >= 0) {
+      used[e.name] = true;
+      out.hits.push({ name: e.name, kw: e.kw, kcal: e.kcal });
+      out.kcal += e.kcal;
+      // 挖掉命中的关键词，避免短词二次命中（「饭」不会再咬「烤鸭腿饭」那一段）
+      work = work.split(e.kw).join(' ');
+    }
+  });
+
+  out.kcal = Math.round(out.kcal);
+  return out;
+}
+
+function parseMealSentence(input, hour) {
+  const raw = String(input || '').trim();
+  const out = {
+    raw: raw,
+    ok: false,
+    name: '',
+    type: defaultMealType(hour),
+    typeGuessed: true,      // true = 按时段猜的；false = 用户/文本明确指定
+    kcal: 0,
+    kcalExact: false,       // 用户手填的数字
+    kcalHits: []            // 估算依据，给用户看「凭什么这么多」
+  };
+  if (!raw) return out;
+
+  let rest = raw;
+
+  // ---- 1. 餐次（句首餐次词优先）----
+  const mwKeys = Object.keys(MEAL_WORD).sort(function (a, b) { return b.length - a.length; });
+  for (let i = 0; i < mwKeys.length; i++) {
+    const w = mwKeys[i];
+    if (rest.indexOf(w) === 0) {
+      out.type = MEAL_WORD[w];
+      out.typeGuessed = false;
+      rest = rest.slice(w.length).trim();
+      break;
+    }
+  }
+
+  // ---- 2. 热量 ----
+  const k = guessMealKcal(rest);
+  out.kcal = k.kcal;
+  out.kcalExact = k.exact;
+  if (!out.kcalExact) out.kcalHits = k.hits;
+
+  // ---- 3. 名称 ----
+  // 名称保留用户原话（去掉句首动词/餐次词、去掉手填的热量数字），
+  // 不做「标准化成菜名」——用户写「corn and egg」就存「corn and egg」，
+  // 改写成「玉米鸡蛋」反而认不出来。
+  let name = rest
+    .replace(MEAL_NOISE, '')
+    .replace(/(\d{2,4})\s*(?:kcal|千卡|大卡|卡)?\s*$/i, '')
+    .replace(/[\s]+/g, ' ')
+    .trim();
+  out.name = name || raw;
+
+  out.ok = out.name.length > 0;
+  return out;
+}
+
+// 估算依据的一行说明，给预览用。
+// ★ 「估」这个字不能省 —— 热量是参考值不是事实，措辞含糊会让人误以为准。
+function mealKcalWhy(p) {
+  if (!p || !p.kcal) return '';
+  if (p.kcalExact) return '你填的';
+  if (!p.kcalHits || !p.kcalHits.length) return '按常见份量估';
+  return '估｜' + p.kcalHits.map(function (h) { return h.name + ' ' + h.kcal; }).join(' + ');
+}
+
+// === 饮食一句话解析 END ===
 
 // === 物品管理 / 库存 START ===
 //
@@ -6611,22 +6951,10 @@ function renderTodayTasks() {
 // --- Meals ---
 // 记录的门槛必须足够低：卡路里选填、一餐可多条、常吃的点一下就能记。
 // （2026-09-20 重做：原来用 prompt() 弹窗还要手打「食物名,卡路里」，实际用了两天就没人用了）
-const MEAL_TYPES = [['breakfast', '早餐'], ['lunch', '午餐'], ['dinner', '晚餐'], ['snack', '零食']];
-let _mealType = null;
-
-// 按当前时段猜餐次：早上记的就是早餐，不用每次手选
-function defaultMealType() {
-  const h = new Date().getHours();
-  if (h < 10) return 'breakfast';
-  if (h < 15) return 'lunch';
-  if (h < 21) return 'dinner';
-  return 'snack';
-}
-function currentMealType() { return _mealType || defaultMealType(); }
-function mealTypeLabel(t) {
-  const hit = MEAL_TYPES.find(x => x[0] === t);
-  return hit ? hit[1] : t;
-}
+// MEAL_TYPES / defaultMealType / mealTypeLabel / currentMealType
+// 都搬到上面的「饮食一句话解析」模块 + 下面的一句话录入 UI 层了。
+// ★ 别在这里重新定义 —— 重复定义 const/function 会让后定义的静默覆盖前面的，
+//   改一边不生效，排查起来很费时间（这次改造实测踩到过）。
 
 // 「常吃」从历史里自己长出来：按出现次数排序取前 8，不需要用户维护任何清单
 function mealSuggestions() {
@@ -6652,13 +6980,14 @@ function renderMeals() {
       '<button class="chip" data-type="' + t[0] + '" aria-pressed="' + (t[0] === cur) +
       '" onclick="pickMealType(this.dataset.type)">' + t[1] + '</button>').join('');
   }
+  renderMealPreview();
 
   const sug = document.getElementById('meal-suggest');
   if (sug) {
     const list = mealSuggestions();
     sug.innerHTML = list.length
       ? '<span style="font-size:var(--fs-2xs);color:var(--text-dim);align-self:center;">常吃：</span>' +
-        list.map(n => '<button class="chip" onclick="quickAddMeal(this.textContent)">' + n + '</button>').join('')
+        list.map(n => '<button class="chip" onclick="quickAddMeal(this.textContent)">' + escAttr(n) + '</button>').join('')
       : '';
   }
 
@@ -6666,10 +6995,10 @@ function renderMeals() {
   if (listEl) {
     listEl.innerHTML = meals.length
       ? meals.map((m, i) => {
-          const kcal = m.kcal ? ' <span style="color:var(--text-dim);font-size:var(--fs-xs);">' + m.kcal + 'kcal</span>' : '';
+          const kcal = m.kcal ? ' <span style="color:var(--text-dim);font-size:var(--fs-xs);">' + escHtml(String(m.kcal)) + 'kcal</span>' : '';
           return '<div style="display:flex;gap:8px;align-items:baseline;">' +
-            '<span style="color:var(--text-dim);font-size:var(--fs-xs);flex:none;">' + mealTypeLabel(m.type) + '</span>' +
-            '<span style="flex:1;min-width:0;word-break:break-all;">' + m.name + kcal + '</span>' +
+            '<span style="color:var(--text-dim);font-size:var(--fs-xs);flex:none;">' + escHtml(mealTypeLabel(m.type)) + '</span>' +
+            '<span style="flex:1;min-width:0;word-break:break-all;">' + escHtml(m.name) + kcal + '</span>' +
             '<button class="btn btn-sm" onclick="removeMeal(' + i + ')" style="padding:0 7px;font-size:var(--fs-xs);flex:none;">×</button>' +
             '</div>';
         }).join('')
@@ -6680,20 +7009,77 @@ function renderMeals() {
   if (total) total.textContent = todayLog.totalKcal > 0 ? '合计 ' + todayLog.totalKcal + ' kcal' : '';
 }
 
-function pickMealType(t) { _mealType = t; renderMeals(); }
+// --- 一句话录入 UI 层 -------------------------------------------------
+// 结构跟记账那边（renderExpPreview / expSubmit）保持一致 —— 用户已经习惯了
+// 「打字 → 下面立刻出现我理解成什么 → 回车记下」这个节奏，两边不该长得不一样。
+// ★ _mealType 由时序声明在前面，而不是挪到 renderMeals 后面。
+//   原因：renderMeals() → renderMealPreview() → (_mealType || p.type)，
+//   `let` 不提升初始化，若声明在后面且启动早期撞上这次调用，
+//   读 _mealType 会抛 "Cannot access before initialization"。
+//   脚本末有 initAll() 所以其实不会触发，但这种雷不该留着 —— 挪声明比赌时序便宜。
 
-function addMeal() {
-  const nameEl = document.getElementById('meal-name');
-  const kcalEl = document.getElementById('meal-kcal');
-  const name = ((nameEl && nameEl.value) || '').trim();
-  if (!name) { if (nameEl) nameEl.focus(); return; }
-  saveMeal(currentMealType(), name, parseInt((kcalEl && kcalEl.value) || '') || 0);
-  if (kcalEl) kcalEl.value = '';
-  if (nameEl) { nameEl.value = ''; nameEl.focus(); }
+function currentMealType() {
+  return _mealType || defaultMealType();
+}
+
+function pickMealType(t) {
+  _mealType = t;
+  renderMealPreview();
+  renderMeals();
+}
+
+function mealOnInput() { renderMealPreview(); }
+
+function mealOnKey(e) {
+  if (e.key === 'Enter') { e.preventDefault(); mealSubmit(); }
+}
+
+// 预览：把解析结果一块儿摊给用户看。
+// ★ 每个插值点都必须走 escHtml —— 名称是用户原话，可能是 <script>。
+//   （security-regression.test.js 会对这个函数做转义守卫，别绕过。）
+function renderMealPreview() {
+  const box = document.getElementById('meal-preview');
+  if (!box) return;
+  const input = document.getElementById('meal-input');
+  const raw = ((input && input.value) || '').trim();
+  if (!raw) { box.className = 'exp-preview'; box.innerHTML = ''; return; }
+
+  const p = parseMealSentence(raw, new Date().getHours());
+  const type = _mealType || p.type;
+  const rows = [];
+  rows.push('<div class="ep-row">' +
+    '<span class="ep-k">记成</span>' +
+    '<span class="ep-v">' + escHtml(mealTypeLabel(type)) + '</span>' +
+    (p.kcal > 0
+      ? '<span class="ep-amt-exp">估 ' + escHtml(String(p.kcal)) + ' kcal</span>'
+      : '<span class="ep-warn">热量未知</span>') +
+    '</div>');
+  const why = mealKcalWhy(p);
+  if (why) rows.push('<div class="ep-row"><span class="ep-why">' + escHtml(why) + '</span></div>');
+  rows.push('<div class="ep-row"><span class="ep-note">名称「' + escHtml(p.name) + '」</span></div>');
+  box.className = 'exp-preview show';
+  box.innerHTML = rows.join('');
+}
+
+function mealSubmit() {
+  const input = document.getElementById('meal-input');
+  const raw = ((input && input.value) || '').trim();
+  if (!raw) { if (input) input.focus(); return; }
+  const p = parseMealSentence(raw, new Date().getHours());
+  saveMeal(_mealType || p.type, p.name, p.kcal);
+  if (input) { input.value = ''; input.focus(); }
+  renderMealPreview();
 }
 
 // 点「常吃」直接记：不弹窗、不问卡路里
-function quickAddMeal(name) { saveMeal(currentMealType(), name, 0); }
+// 点「常吃」直接记：不弹窗、不问卡路里。
+// ★ 以前这里写死 kcal=0 传进去 —— 那是老逻辑（热量靠手填）留下的。
+//   现在有参考表了，点「常吃」也该把热量估出来，不然「合计 kcal」会被这些
+//   一键记录的条目越拖越不准。走同一个解析器，保证和手打一句话的结果一致。
+function quickAddMeal(name) {
+  const p = parseMealSentence(name, new Date().getHours());
+  saveMeal(currentMealType(), name, p.kcal);
+}
 
 function saveMeal(type, name, kcal) {
   const logs = Store.get('dailyLog', {});

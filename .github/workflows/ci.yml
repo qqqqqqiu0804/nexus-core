@@ -47,6 +47,12 @@ jobs:
       - name: 记账一句话解析器测例
         run: node tests/verify-expense-parser.js
 
+      # 饮食一句话解析器：语料取自服务器 journal.db 里真实的 17 条饮食记录
+      # （2026-09-17 ~ 09-26），含 corn and egg / 一点点藏青盐咸奶绿 / 烤鸭腿饭 西兰花 蒸蛋
+      # 这些真实形态。纯函数、无浏览器依赖，能进 CI。
+      - name: 饮食一句话解析器测例
+        run: node tests/verify-meal-parser.js
+
       # --- 后端冒烟：真起服务，验 gzip / ETag / 鉴权 ---
       - name: 安装后端依赖
         run: cd server && npm ci
